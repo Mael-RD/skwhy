@@ -27,7 +27,10 @@ public abstract class DisplayData {
     private final UUID entityUUID = UUID.randomUUID();
 
     // ── Propriétés visuelles uniquement (plus de position) ────────────────────
-    protected float scaleX = 1f, scaleY = 1f, scaleZ = 1f;
+    protected Vector3f scale = new Vector3f(1f, 1f, 1f);
+    protected Vector3f translation = new Vector3f(0f, 0f, 0f);
+    protected Quaternion4f leftRotation = new Quaternion4f(0f, 0f, 0f, 1f);
+    protected Quaternion4f rightRotation = new Quaternion4f(0f, 0f, 0f, 1f);
     protected int   glowColor     = -1;   // -1 = pas de glow
     protected float shadowRadius  = 0f;
     protected float shadowStrength = 1f;
@@ -131,17 +134,17 @@ public abstract class DisplayData {
         // Index 9  – interpolation duration
         data.add(new EntityData<>(9, EntityDataTypes.INT, 0));
 
-        // Index 11 – translation offset (toujours 0,0,0 ici, la vraie position est dans spawn)
-        data.add(new EntityData<>(11, EntityDataTypes.VECTOR3F, new Vector3f(0f, 0f, 0f)));
+        // Index 11 – translation offset
+        data.add(new EntityData<>(11, EntityDataTypes.VECTOR3F, translation));
 
         // Index 12 – scale
-        data.add(new EntityData<>(12, EntityDataTypes.VECTOR3F, new Vector3f(scaleX, scaleY, scaleZ)));
+        data.add(new EntityData<>(12, EntityDataTypes.VECTOR3F, scale));
 
-        // Index 13 – left rotation (quaternion identité)
-        data.add(new EntityData<>(13, EntityDataTypes.QUATERNION, new Quaternion4f(0f, 0f, 0f, 1f)));
+        // Index 13 – left rotation (quaternion)
+        data.add(new EntityData<>(13, EntityDataTypes.QUATERNION, leftRotation));
 
-        // Index 14 – right rotation (quaternion identité)
-        data.add(new EntityData<>(14, EntityDataTypes.QUATERNION, new Quaternion4f(0f, 0f, 0f, 1f)));
+        // Index 14 – right rotation (quaternion)
+        data.add(new EntityData<>(14, EntityDataTypes.QUATERNION, rightRotation));
 
         // Index 15 – billboard mode (byte)
         data.add(new EntityData<>(15, EntityDataTypes.BYTE, (byte) billboardMode));
@@ -194,16 +197,21 @@ public abstract class DisplayData {
 
     // ── Getters / Setters (chaque setter invalide le cache) ───────────────────
 
-    public float getScaleX() { return scaleX; }
-    public void setScaleX(float v) { scaleX = v; markDirty(); }
+    public Vector3f getScale() { return scale; }
+    public void setScale(Vector3f v) { scale = v; markDirty(); }
+    public void setScale(float x, float y, float z) { scale = new Vector3f(x, y, z); markDirty(); }
 
-    public float getScaleY() { return scaleY; }
-    public void setScaleY(float v) { scaleY = v; markDirty(); }
+    public Vector3f getTranslation() { return translation; }
+    public void setTranslation(Vector3f v) { translation = v; markDirty(); }
+    public void setTranslation(float x, float y, float z) { translation = new Vector3f(x, y, z); markDirty(); }
 
-    public float getScaleZ() { return scaleZ; }
-    public void setScaleZ(float v) { scaleZ = v; markDirty(); }
+    public Quaternion4f getLeftRotation() { return leftRotation; }
+    public void setLeftRotation(Quaternion4f v) { leftRotation = v; markDirty(); }
+    public void setLeftRotation(float x, float y, float z, float w) { leftRotation = new Quaternion4f(x, y, z, w); markDirty(); }
 
-    public void setScale(float x, float y, float z) { scaleX=x; scaleY=y; scaleZ=z; markDirty(); }
+    public Quaternion4f getRightRotation() { return rightRotation; }
+    public void setRightRotation(Quaternion4f v) { rightRotation = v; markDirty(); }
+    public void setRightRotation(float x, float y, float z, float w) { rightRotation = new Quaternion4f(x, y, z, w); markDirty(); }
 
     public int getGlowColor() { return glowColor; }
     public void setGlowColor(int rgb) { glowColor = rgb; markDirty(); }

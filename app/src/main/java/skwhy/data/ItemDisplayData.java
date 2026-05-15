@@ -4,7 +4,8 @@ package skwhy.data;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
-
+import com.github.retrooper.packetevents.util.Quaternion4f;
+import com.github.retrooper.packetevents.util.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,12 +20,34 @@ public class ItemDisplayData extends DisplayData {
     private int displayMode; // 0=none, 1=thirdperson_lefthand, 2=thirdperson_righthand, 3=firstperson_lefthand, 4=firstperson_righthand, 5=head, 6=gui, 7=ground, 8=fixed
 
     public ItemDisplayData() {
-    this(1f, 1f, 1f, -1, 0f, 1f, 128f, 0, "STONE", 0);
-}
+        this("STONE");
+    }
+
+    public ItemDisplayData(String itemStack) {
+        this(new Vector3f(1f, 1f, 1f), itemStack);
+    }
+
+    public ItemDisplayData(Vector3f scale, String itemStack) {
+        this(scale, new Vector3f(0f, 0f, 0f), itemStack);
+    }
+
+    public ItemDisplayData(Vector3f scale, Vector3f translation, String itemStack) {
+        this(scale, translation, new Quaternion4f(0f, 0f, 0f, 1f), itemStack);
+    }
+
+    public ItemDisplayData(Vector3f scale, Vector3f translation, Quaternion4f leftRotation, String itemStack) {
+        this(scale, translation, leftRotation, new Quaternion4f(0f, 0f, 0f, 1f), itemStack);
+    }
+
+    public ItemDisplayData(Vector3f scale, Vector3f translation, Quaternion4f leftRotation, Quaternion4f rightRotation, String itemStack) {
+        this(scale, translation, leftRotation, rightRotation, -1, 0f, 1f, 128f, 0, itemStack, 0);
+    }
+
     public ItemDisplayData(
-        float scaleX,
-        float scaleY,
-        float scaleZ,
+        Vector3f scale,
+        Vector3f translation,
+        Quaternion4f leftRotation,
+        Quaternion4f rightRotation,
         int glowColor, 
         float shadowRadius,
         float shadowStrength,
@@ -34,9 +57,10 @@ public class ItemDisplayData extends DisplayData {
         int displayMode
     ) {
         super();
-        this.scaleX = scaleX;
-        this.scaleY = scaleY;
-        this.scaleZ = scaleZ;
+        this.scale = scale;
+        this.translation = translation;
+        this.leftRotation = leftRotation;
+        this.rightRotation = rightRotation;
         this.glowColor = glowColor;
         this.shadowRadius = shadowRadius;
         this.shadowStrength = shadowStrength;
@@ -64,6 +88,7 @@ public class ItemDisplayData extends DisplayData {
      */
     public void setItemStack(String itemStack) {
         this.itemStack = itemStack;
+        markDirty();
     }
     
     /**
@@ -80,6 +105,7 @@ public class ItemDisplayData extends DisplayData {
      */
     public void setDisplayMode(int mode) {
         this.displayMode = mode;
+        markDirty();
     }
     
     /**
@@ -112,23 +138,26 @@ public class ItemDisplayData extends DisplayData {
     public String serialize() {
         return String.format(
             "ItemDisplay{" +
-            "scaleX=%.2f,scaleY=%.2f,scaleZ=%.2f,itemStack=%s,displayMode=%d(%s)," +
-            "glowColor=%d,shadowRadius=%.2f,shadowStrength=%.2f,viewRange=%.2f," +
-            "billboardMode=%d}",
-            scaleX, scaleY, scaleZ, itemStack, displayMode, getDisplayModeName(),
-            glowColor, shadowRadius, shadowStrength, viewRange,
-            billboardMode
+            "scale=(%.2f,%.2f,%.2f),translation=(%.2f,%.2f,%.2f),leftRotation=%s,rightRotation=%s," +
+            "itemStack=%s,displayMode=%d(%s),glowColor=%d,shadowRadius=%.2f,shadowStrength=%.2f,viewRange=%.2f,billboardMode=%d}",
+            scale.x, scale.y, scale.z, translation.x, translation.y, translation.z,
+            leftRotation, rightRotation,
+            itemStack, displayMode, getDisplayModeName(),
+            glowColor, shadowRadius, shadowStrength, viewRange, billboardMode
         );
     }
     @Override
     public String toString() {
         return "item display [" +
-            "item="      + itemStack           + ", " +
-            "mode="      + getDisplayModeName() + ", " +
-            "scale=("    + scaleX + ", " + scaleY + ", " + scaleZ + "), " +
-            "billboard=" + billboardMode       + ", " +
-            "shadow="    + shadowRadius        + ", " +
-            "range="     + viewRange           +
+            "item="        + itemStack + ", " +
+            "mode="        + getDisplayModeName() + ", " +
+            "scale=("      + scale.x + ", " + scale.y + ", " + scale.z + "), " +
+            "translation=" + "(" + translation.x + ", " + translation.y + ", " + translation.z + "), " +
+            "leftRotation=" + leftRotation + ", " +
+            "rightRotation=" + rightRotation + ", " +
+            "billboard="   + billboardMode + ", " +
+            "shadow="      + shadowRadius + ", " +
+            "range="       + viewRange +
         "]";
     }
 }

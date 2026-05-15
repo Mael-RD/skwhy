@@ -144,9 +144,10 @@ public class Display {
                 @Override
                 public Fields serialize(BlockDisplayData data) {
                     Fields fields = new Fields();
-                    fields.putPrimitive("sx", data.getScaleX());
-                    fields.putPrimitive("sy", data.getScaleY());
-                    fields.putPrimitive("sz", data.getScaleZ());
+                    fields.putObject("scale", data.getScale());
+                    fields.putObject("translation", data.getTranslation());
+                    fields.putObject("leftRotation", data.getLeftRotation());
+                    fields.putObject("rightRotation", data.getRightRotation());
                     fields.putObject("blockData", data.getBlockData());
                     fields.putPrimitive("glowColor", data.getGlowColor());
                     fields.putPrimitive("shadowRadius", data.getShadowRadius());
@@ -165,9 +166,10 @@ public class Display {
                 public BlockDisplayData deserialize(Fields fields) throws StreamCorruptedException {
                     try {
                         BlockDisplayData data = new BlockDisplayData();
-                        data.setScaleX(fields.getPrimitive("sx", float.class));
-                        data.setScaleY(fields.getPrimitive("sy", float.class));
-                        data.setScaleZ(fields.getPrimitive("sz", float.class));
+                        data.setScale(fields.getObject("scale", com.github.retrooper.packetevents.util.Vector3f.class));
+                        data.setTranslation(fields.getObject("translation", com.github.retrooper.packetevents.util.Vector3f.class));
+                        data.setLeftRotation(fields.getObject("leftRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
+                        data.setRightRotation(fields.getObject("rightRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
                         data.setBlockData((String) fields.getObject("blockData"));
                         data.setGlowColor(fields.getPrimitive("glowColor", int.class));
                         data.setShadowRadius(fields.getPrimitive("shadowRadius", float.class));
@@ -248,9 +250,10 @@ public class Display {
                 @Override
                 public Fields serialize(ItemDisplayData data) {
                     Fields fields = new Fields();
-                    fields.putPrimitive("sx", data.getScaleX());
-                    fields.putPrimitive("sy", data.getScaleY());
-                    fields.putPrimitive("sz", data.getScaleZ());
+                    fields.putObject("scale", data.getScale());
+                    fields.putObject("translation", data.getTranslation());
+                    fields.putObject("leftRotation", data.getLeftRotation());
+                    fields.putObject("rightRotation", data.getRightRotation());
                     fields.putObject("itemStack", data.getItemStack());
                     fields.putPrimitive("displayMode", data.getDisplayMode());
                     fields.putPrimitive("glowColor", data.getGlowColor());
@@ -270,9 +273,10 @@ public class Display {
                 public ItemDisplayData deserialize(Fields fields) throws StreamCorruptedException {
                     try {
                         ItemDisplayData data = new ItemDisplayData();
-                        data.setScaleX(fields.getPrimitive("sx", float.class));
-                        data.setScaleY(fields.getPrimitive("sy", float.class));
-                        data.setScaleZ(fields.getPrimitive("sz", float.class));
+                        data.setScale(fields.getObject("scale", com.github.retrooper.packetevents.util.Vector3f.class));
+                        data.setTranslation(fields.getObject("translation", com.github.retrooper.packetevents.util.Vector3f.class));
+                        data.setLeftRotation(fields.getObject("leftRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
+                        data.setRightRotation(fields.getObject("rightRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
                         data.setItemStack((String) fields.getObject("itemStack"));
                         data.setDisplayMode(fields.getPrimitive("displayMode", int.class));
                         data.setGlowColor(fields.getPrimitive("glowColor", int.class));
@@ -354,9 +358,10 @@ public class Display {
                 @Override
                 public Fields serialize(TextDisplayData data) {
                     Fields fields = new Fields();
-                    fields.putPrimitive("sx", data.getScaleX());
-                    fields.putPrimitive("sy", data.getScaleY());
-                    fields.putPrimitive("sz", data.getScaleZ());
+                    fields.putObject("scale", data.getScale());
+                    fields.putObject("translation", data.getTranslation());
+                    fields.putObject("leftRotation", data.getLeftRotation());
+                    fields.putObject("rightRotation", data.getRightRotation());
                     fields.putObject("text", data.getText());
                     fields.putPrimitive("textColor", data.getTextColor());
                     fields.putPrimitive("bgColor", data.getBackgroundColor());
@@ -382,9 +387,10 @@ public class Display {
                 public TextDisplayData deserialize(Fields fields) throws StreamCorruptedException {
                     try {
                         TextDisplayData data = new TextDisplayData();
-                        data.setScaleX(fields.getPrimitive("sx", float.class));
-                        data.setScaleY(fields.getPrimitive("sy", float.class));
-                        data.setScaleZ(fields.getPrimitive("sz", float.class));
+                        data.setScale(fields.getObject("scale", com.github.retrooper.packetevents.util.Vector3f.class));
+                        data.setTranslation(fields.getObject("translation", com.github.retrooper.packetevents.util.Vector3f.class));
+                        data.setLeftRotation(fields.getObject("leftRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
+                        data.setRightRotation(fields.getObject("rightRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
                         data.setText((String) fields.getObject("text"));
                         data.setTextColor(fields.getPrimitive("textColor", int.class));
                         data.setBackgroundColor(fields.getPrimitive("bgColor", int.class));

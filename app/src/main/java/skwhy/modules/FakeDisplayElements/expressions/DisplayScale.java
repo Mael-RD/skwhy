@@ -29,7 +29,8 @@ public class DisplayScale extends SimpleExpression<Vector> {
     protected @Nullable Vector[] get(Event event) {
         DisplayData d = displayExpr.getSingle(event);
         if (d == null) return null;
-        return new Vector[]{ new Vector(d.getScaleX(), d.getScaleY(), d.getScaleZ()) };
+        com.github.retrooper.packetevents.util.Vector3f scale = d.getScale();
+        return new Vector[]{ new Vector(scale.x, scale.y, scale.z) };
     }
 
     @Override
