@@ -13,7 +13,7 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 
-public class PlayersOfGroup extends SimpleExpression<Player> {
+public class GroupPlayers extends SimpleExpression<Player> {
 
     private Expression<DisplayGroupData> groupExpr;
 
@@ -78,7 +78,7 @@ public class PlayersOfGroup extends SimpleExpression<Player> {
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
-            SyntaxInfo.Expression.builder(PlayersOfGroup.class, Player.class)
+            SyntaxInfo.Expression.builder(GroupPlayers.class, Player.class)
                 .addPattern("[the] players of %displaygroup%")
                 .build()
         );

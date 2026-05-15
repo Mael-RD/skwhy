@@ -16,7 +16,7 @@ import skwhy.data.DisplayGroupData;
 import skwhy.data.Vec3;
 import skwhy.data.Quat4;
 
-public class GlobalTransformation extends SimpleExpression<Object> {
+public class GroupTransformation extends SimpleExpression<Object> {
 
     // 0 = center      → Vector
     // 1 = translation → Vector
@@ -111,7 +111,7 @@ public class GlobalTransformation extends SimpleExpression<Object> {
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
-            SyntaxInfo.Expression.builder(GlobalTransformation.class, Object.class)
+            SyntaxInfo.Expression.builder(GroupTransformation.class, Object.class)
                 .addPattern("[the] center of %displaygroup%")      // 0
                 .addPattern("[the] translation of %displaygroup%") // 1
                 .addPattern("[the] rotation of %displaygroup%")    // 2

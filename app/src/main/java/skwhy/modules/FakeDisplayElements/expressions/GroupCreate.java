@@ -37,7 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class CreateDisplayGroup extends SimpleExpression<DisplayGroupData> {
+public class GroupCreate extends SimpleExpression<DisplayGroupData> {
 
     private Expression<DisplayData> displaysExpr;
     private Expression<Player> playersExpr;
@@ -240,7 +240,7 @@ public class CreateDisplayGroup extends SimpleExpression<DisplayGroupData> {
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
-            SyntaxInfo.Expression.builder(CreateDisplayGroup.class, DisplayGroupData.class)
+            SyntaxInfo.Expression.builder(GroupCreate.class, DisplayGroupData.class)
                 .addPattern("[a] [fake] display group at %location/entity% [from %displaydatas%] [with %players%]")
                 .build()
         );
