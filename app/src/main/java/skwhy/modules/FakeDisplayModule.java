@@ -18,7 +18,8 @@ import skwhy.modules.FakeDisplayElements.expressions.CreateDisplayGroup;
 import skwhy.modules.FakeDisplayElements.expressions.DisplayBlockData;
 import skwhy.modules.FakeDisplayElements.expressions.DisplayItem;
 import skwhy.modules.FakeDisplayElements.expressions.DisplayText;
-
+import skwhy.modules.FakeDisplayElements.expressions.DisplayFromReal;
+import skwhy.modules.FakeDisplayElements.expressions.EntityTrackers;
 
 public class FakeDisplayModule implements AddonModule {
 
@@ -58,5 +59,7 @@ public class FakeDisplayModule implements AddonModule {
         DisplayText.register(addon);
         DisplayId.register(addon);
         CreateDisplayGroup.register(addon);
+        EntityTrackers.register(addon);
+        DisplayFromReal.register(addon);
     }
 }

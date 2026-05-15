@@ -8,6 +8,9 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
+import org.skriptlang.skript.registration.SyntaxInfo;
+import org.skriptlang.skript.registration.SyntaxRegistry;
+import org.skriptlang.skript.addon.SkriptAddon;
 
 import java.util.Collection;
 
@@ -51,5 +54,14 @@ public class EntityTrackers extends SimpleExpression<Player> {
     @Override
     public String toString(@Nullable Event event, boolean debug) {
         return "trackers of " + entityExpr.toString(event, debug);
+    }
+
+    public static void register(SkriptAddon addon) {
+        addon.syntaxRegistry().register(
+            SyntaxRegistry.EXPRESSION,
+            SyntaxInfo.Expression.builder(DisplayId.class, Object.class)
+                .addPattern("[all] [the] trackers of %entity%")
+                .build()
+        );
     }
 }
