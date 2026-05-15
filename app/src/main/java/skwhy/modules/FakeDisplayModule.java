@@ -14,6 +14,7 @@ import skwhy.modules.FakeDisplayElements.expressions.DisplayScale;
 import skwhy.modules.FakeDisplayElements.expressions.DisplayNumber;
 import skwhy.modules.FakeDisplayElements.expressions.DisplayBoolean;
 import skwhy.modules.FakeDisplayElements.expressions.DisplayId;
+import skwhy.modules.FakeDisplayElements.expressions.CreateDisplayGroup;
 import skwhy.modules.FakeDisplayElements.expressions.DisplayBlockData;
 import skwhy.modules.FakeDisplayElements.expressions.DisplayItem;
 import skwhy.modules.FakeDisplayElements.expressions.DisplayText;
@@ -56,5 +57,6 @@ public class FakeDisplayModule implements AddonModule {
         DisplayItem.register(addon);
         DisplayText.register(addon);
         DisplayId.register(addon);
+        CreateDisplayGroup.register(addon);
     }
 }

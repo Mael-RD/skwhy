@@ -3,13 +3,17 @@ package skwhy.modules.FakeDisplayElements.types;
 import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.classes.Parser;
 import ch.njol.skript.classes.Serializer;
-import ch.njol.skript.lang.ParseContext;
 import ch.njol.skript.registrations.Classes;
 import ch.njol.yggdrasil.Fields;
 import skwhy.data.DisplayGroupData;
-import org.jetbrains.annotations.Nullable;
+import skwhy.data.DisplayData;
+
+import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 
 import java.io.StreamCorruptedException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DisplayGroup {
     
@@ -28,18 +32,9 @@ public class DisplayGroup {
             
             .parser(new Parser<>() {
                 @Override
-                public @Nullable DisplayGroupData parse(String s, ParseContext context) {
-                    if (s.equalsIgnoreCase("display group")) {
-                        return new DisplayGroupData();
-                    }
-                    return null;
-                }
-
-                @Override
                 public String toString(DisplayGroupData data, int flags) {
-                    return "display group [world=" + data.getWorld() 
-                        + ", pos=(" + data.getX() + "," + data.getY() + "," + data.getZ() + ")"
-                        + ", displays=" + data.getDisplays().size() + "]";
+                    return "display group [displays=" + data.getDisplays().size() +
+                           ", viewers=" + data.getViewers().size() + "]";
                 }
 
                 @Override
@@ -52,13 +47,19 @@ public class DisplayGroup {
                 @Override
                 public Fields serialize(DisplayGroupData data) {
                     Fields fields = new Fields();
-                    fields.putObject("world", data.getWorld());
-                    fields.putPrimitive("x", data.getX());
-                    fields.putPrimitive("y", data.getY());
-                    fields.putPrimitive("z", data.getZ());
-                    fields.putPrimitive("yaw", data.getYaw());
-                    fields.putPrimitive("pitch", data.getPitch());
-                    fields.putPrimitive("displayCount", data.getDisplays().size());
+
+                    // 1. Sérialisation des displays
+                    List<DisplayData> displays = data.getDisplays();
+                    fields.putPrimitive("displayCount", displays.size());
+                    for (int i = 0; i < displays.size(); i++) {
+                        fields.putObject("display_" + i, displays.get(i));
+                    }
+
+                    // 2. Sérialisation de la position et de l'entité attachée
+                    // On utilise getLocation() pour avoir la location actuelle (statique ou dynamique)
+                    fields.putObject("location", data.getLocation()); 
+                    fields.putObject("attachedEntity", data.getAttachedEntity());
+
                     return fields;
                 }
 
@@ -68,20 +69,44 @@ public class DisplayGroup {
                 }
 
                 @Override
-                public DisplayGroupData deserialize(Fields fields) throws StreamCorruptedException {
-                    try {
-                        DisplayGroupData data = new DisplayGroupData();
-                        data.setWorld((String) fields.getObject("world"));
-                        data.setX(fields.getPrimitive("x", double.class));
-                        data.setY(fields.getPrimitive("y", double.class));
-                        data.setZ(fields.getPrimitive("z", double.class));
-                        data.setYaw(fields.getPrimitive("yaw", float.class));
-                        data.setPitch(fields.getPrimitive("pitch", float.class));
-                        return data;
-                    } catch (Exception e) {
-                        throw new StreamCorruptedException("Impossible de désérialiser DisplayGroupData : " + e.getMessage());
-                    }
-                }
+                    public DisplayGroupData deserialize(Fields fields) throws StreamCorruptedException {
+                        try {
+                            // 1. Récupération de la liste des displays
+                            List<DisplayData> displays = new ArrayList<>();
+                            int displayCount = fields.getPrimitive("displayCount", int.class);
+                            for (int i = 0; i < displayCount; i++) {
+                                DisplayData display = (DisplayData) fields.getObject("display_" + i);
+                                if (display != null) {
+                                    displays.add(display);
+                                }
+                            }
+
+                            // 2. Récupération des données de position
+                            Location loc = (Location) fields.getObject("location");
+                            Entity entity = (Entity) fields.getObject("attachedEntity");
+
+                            // 3. Choix du constructeur selon les données présentes (Priorité à l'entité)
+                            if (entity != null) {
+                                if (displays.isEmpty()) {
+                                    return new DisplayGroupData(entity);
+                                } else {
+                                    return new DisplayGroupData(displays, entity);
+                                }
+                            } else if (loc != null) {
+                                if (displays.isEmpty()) {
+                                    return new DisplayGroupData(loc);
+                                } else {
+                                    return new DisplayGroupData(displays, loc);
+                                }
+                            }
+
+                            // Fallback de sécurité si aucune position n'a été trouvée
+                            throw new StreamCorruptedException("Aucune location ou entité trouvée pour le DisplayGroupData");
+
+                        } catch (Exception e) {
+                            throw new StreamCorruptedException("Impossible de désérialiser DisplayGroupData : " + e.getMessage());
+        }
+    }
 
                 @Override
                 public boolean mustSyncDeserialization() {

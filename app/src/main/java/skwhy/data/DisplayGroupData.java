@@ -1,188 +1,321 @@
 package skwhy.data;
 
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import java.util.*;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.Location;
+
+import com.github.retrooper.packetevents.util.Vector3d;
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSetPassengers;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Classe pour gérer un groupe de display entities.
- * Permet de contrôler plusieurs displays en même temps avec une position et une monture communes.
+ * Classe pour gérer un groupe de display entities avec une position ou une attache fixe.
  */
 public class DisplayGroupData {
     
-    private List<Player> viewers; // Joueurs pouvant voir ce groupe
-    private List<DisplayData> displays; // Liste des displays dans ce groupe
-    private Entity mountedEntity; // Entité sur laquelle le groupe est monté (null = libre)
-    private String world;
-    private double x, y, z;
-    private float yaw, pitch;
+    private final List<Player> viewers;
+    private final List<DisplayData> displays;
     
-    /**
-     * Constructeur du groupe de displays.
-     */
-    public DisplayGroupData() {
+    // Position du groupe : soit une location statique, soit une entité mobile
+    private Location location;
+    private Entity attachedEntity;
+    private Integer attachedId;
+    
+    private DisplayGroupData() {
         this.viewers = new ArrayList<>();
         this.displays = new ArrayList<>();
-        this.mountedEntity = null;
-        this.world = "world";
-        this.x = 0;
-        this.y = 0;
-        this.z = 0;
-        this.yaw = 0;
-        this.pitch = 0;
     }
-    
-    // ── Getters et Setters pour la liste des viewers ──
-    public List<Player> getViewers() {
-        return new ArrayList<>(viewers);
+
+    public DisplayGroupData(Location location) {
+        this();
+        this.location = location;
     }
-    
-    public boolean hasViewer(Player player) {
-        return viewers.contains(player);
+    public DisplayGroupData(Entity attachedEntity) {
+        this();
+        this.attachedEntity = attachedEntity;
+        this.attachedId = attachedEntity.getEntityId();
     }
-    
-    // ── Getters et Setters pour la liste des displays ──
+    public DisplayGroupData(Location location, Integer attachedId) {
+        this(location);
+        this.attachedId = attachedId;
+    }
+    public DisplayGroupData(List<DisplayData> displays, Location location) {
+        this(location);
+        this.displays.addAll(displays);
+    }
+    public DisplayGroupData(List<DisplayData> displays, Entity attachedEntity) {
+        this(attachedEntity);
+        this.displays.addAll(displays);
+    }
+    public DisplayGroupData(List<DisplayData> displays, Location location, Integer attachedId) {
+        this(displays, location);
+        this.attachedId = attachedId;
+    }
+    public DisplayGroupData(List<DisplayData> displays, List<Player> viewers, Location location) {
+        this(displays,location);
+        this.viewers.addAll(viewers);
+    }
+    public DisplayGroupData(List<DisplayData> displays, List<Player> viewers, Entity attachedEntity) {
+        this(displays,attachedEntity);
+        this.viewers.addAll(viewers);
+    }
+    public DisplayGroupData(List<DisplayData> displays, List<Player> viewers, Location location, Integer attachedId) {
+        this(displays, location, attachedId);
+        this.viewers.addAll(viewers);
+    }
+
+    // ── Gestion de la Position et de l'Attache ──
+
+    /**
+     * Définit une position statique pour le groupe et retire toute attache à une entité.
+     */
+    public void setLocation(Location location) {
+        if (location == null) return;
+        this.location = location;
+        this.attachedEntity = null;
+        this.attachedId = null;
+        sendMovePacket();
+    }
+
+    /**
+     * Attache le groupe à une entité. La position sera celle de l'entité.
+     */
+    public void setAttachedEntity(Entity entity) {
+        if (entity == null) return;
+        this.attachedEntity = entity;
+        this.location = null;
+        this.attachedId = entity.getEntityId();
+        sendMovePacket();
+        mount();
+    }
+
+    /**
+     * Attache le groupe à une entité via son ID.
+     */
+    public void setAttachedId(Location location, Integer entityId) {
+        if (entityId == null) return;
+        this.attachedEntity = null;
+        this.location = location;
+        this.attachedId = entityId;
+        sendMovePacket();
+        mount();
+    }
+
+    public Location getLocation() {
+        if (attachedEntity != null) {
+            if (attachedEntity.isValid()) return (attachedEntity instanceof LivingEntity living) ? living.getEyeLocation() : attachedEntity.getLocation();
+            else {
+                sendDestroyPacket(displays, viewers);
+                return null;
+            }
+        } else if (location != null) {
+            return location;
+        } else {
+            sendDestroyPacket(displays, viewers);
+            return null;
+        }
+    }
+
+    public Entity getAttachedEntity() {
+        return attachedEntity;
+    }
+
+    public Integer getAttachedId() {
+        return attachedId;
+    }
+
+    // ── Gestion des Displays ──
+
     public List<DisplayData> getDisplays() {
         return new ArrayList<>(displays);
     }
     
-    /**
-     * Ajoute une display au groupe.
-     * La display sera liée à ce groupe et utilisera ses paramètres.
-     */
     public void addDisplay(DisplayData display) {
         if (display != null && !displays.contains(display)) {
             displays.add(display);
+            // Si des joueurs regardent déjà, on fait apparaître la nouvelle display
+            Location currentPos = getLocation();
+            if (currentPos != null && !viewers.isEmpty()) {
+                DisplayData.CompiledDisplayPacket packet = display.getSpawnPacket(currentPos);
+                if (packet != null) packet.sendToAll(viewers);
+                
+                if (attachedId != null) {
+                    mountOnEntity(attachedId, viewers);
+                }
+            }
         }
     }
     
-    /**
-     * Retire une display du groupe.
-     * La display redevient indépendante.
-     */
+    public void addDisplay(List<DisplayData> displays) {
+        for (DisplayData display : displays) addDisplay(display);
+    }
+
     public void removeDisplay(DisplayData display) {
         if (display != null && displays.contains(display)) {
+            sendDestroyPacket(List.of(display), viewers);
             displays.remove(display);
         }
     }
-    
+
+    public void removeDisplay(List<DisplayData> displaysToRemove) {
+        if (displaysToRemove == null || displaysToRemove.isEmpty()) return;
+        sendDestroyPacket(displaysToRemove, viewers);
+        displays.removeAll(displaysToRemove);
+    }
+
+    public void clearDisplays() {
+        sendDestroyPacket(displays, viewers);
+        displays.clear();
+    }
+
+    // ── Gestion des Viewers ──
+
+    public List<Player> getViewers() {
+        return new ArrayList<>(viewers);
+    }
+
     /**
-     * Ajoute un joueur à la liste des viewers du groupe.
-     * Ajoute également le joueur aux viewers de toutes les displays du groupe.
+     * Ajoute un ou plusieurs joueurs aux viewers en utilisant la position enregistrée.
      */
     public void addViewer(Player player) {
-        if (player != null && !viewers.contains(player)) {
-            viewers.add(player);
+        if (player == null || viewers.contains(player)) return;
+        
+        Location spawnLoc = getLocation();
+        if (spawnLoc == null) return;
+
+        viewers.add(player);
+        
+        // 1. Spawn des entités
+        sendSpawnPacket(List.of(player));
+        
+        // 2. Montage automatique si une entité est définie
+        if (attachedId != null) {
+            mountOnEntity(attachedId, List.of(player));
         }
     }
-    
-    /**
-     * Retire un joueur de la liste des viewers du groupe.
-     * Retire également le joueur des viewers de toutes les displays du groupe.
-     */
+
+    public void addViewer(List<Player> players) {
+        if (players == null) return;
+        for (Player p : players) addViewer(p);
+    }
+
     public void removeViewer(Player player) {
         if (player != null && viewers.contains(player)) {
+            sendDestroyPacket(displays, List.of(player));
             viewers.remove(player);
         }
     }
     
-    // ── Getters et Setters pour la position et la monture ──
-    public String getWorld() {
-        return world;
+    public void removeViewer(List<Player> players) {
+        if (players == null) return;
+        sendDestroyPacket(displays, players);
+        viewers.removeAll(players);
     }
-    
-    public void setWorld(String world) {
-        this.world = world;
+
+    public void clearViewers() {
+        sendDestroyPacket(displays, viewers);
+        viewers.clear();
     }
-    
-    public double getX() {
-        if (mountedEntity != null && mountedEntity.isValid()) {
-            return mountedEntity.getLocation().getX();
-        }
-        return x;
-    }
-    
-    public void setX(double x) {
-        this.x = x;
-        this.mountedEntity = null;
-    }
-    
-    public double getY() {
-        if (mountedEntity != null && mountedEntity.isValid()) {
-            return mountedEntity.getLocation().getY();
-        }
-        return y;
-    }
-    
-    public void setY(double y) {
-        this.y = y;
-        this.mountedEntity = null;
-    }
-    
-    public double getZ() {
-        if (mountedEntity != null && mountedEntity.isValid()) {
-            return mountedEntity.getLocation().getZ();
-        }
-        return z;
-    }
-    
-    public void setZ(double z) {
-        this.z = z;
-        this.mountedEntity = null;
-    }
-    
-    public void setLocation(String world, double x, double y, double z) {
-        this.world = world;
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        this.mountedEntity = null;
-    }
-    
-    public float getYaw() {
-        return yaw;
-    }
-    
-    public void setYaw(float yaw) {
-        this.yaw = yaw;
-    }
-    
-    public float getPitch() {
-        return pitch;
-    }
-    
-    public void setPitch(float pitch) {
-        this.pitch = pitch;
-    }
-    
-    public Entity getMountedEntity() {
-        return mountedEntity;
-    }
-    
-    public void setMountedEntity(Entity entity) {
-        this.mountedEntity = entity;
-    }
-    
-    /**
-     * Met à jour tous les displays du groupe avec les nouvelles valeurs.
-     * Les arguments doivent être des paires clé-valeur.
-     */
-    public void updateGroup(Object... args) {
-        // Mettre à jour les paramètres du groupe
-        for (int i = 0; i < args.length - 1; i += 2) {
-            String key = String.valueOf(args[i]);
-            Object value = args[i + 1];
-            
-            switch (key.toLowerCase()) {
-                case "world" -> setWorld(String.valueOf(value));
-                case "x" -> setX(((Number) value).doubleValue());
-                case "y" -> setY(((Number) value).doubleValue());
-                case "z" -> setZ(((Number) value).doubleValue());
-                case "yaw" -> setYaw(((Number) value).floatValue());
-                case "pitch" -> setPitch(((Number) value).floatValue());
-                case "entity" -> setMountedEntity((Entity) value);
+
+    // ── Envoi des Paquets (Utilise l'état interne) ──
+
+    public void sendSpawnPacket(List<Player> players) {
+        if (players.isEmpty() || displays.isEmpty()) return;
+        for (DisplayData display : displays) {
+            Location spawnLoc = getLocation();
+            if (spawnLoc == null) return;
+            DisplayData.CompiledDisplayPacket packet = display.getSpawnPacket(spawnLoc);
+            if (packet == null) return;
+            packet.sendToAll(players);
+            if (attachedId != null) {
+                mountOnEntity(attachedId, players);
             }
         }
+    }
+
+    public void sendDestroyPacket(List<DisplayData> displaysToRemove, List<Player> targetPlayers) {
+        if (displaysToRemove.isEmpty() || targetPlayers.isEmpty()) return;
         
+        int[] ids = displaysToRemove.stream().mapToInt(DisplayData::getEntityId).toArray();
+        WrapperPlayServerDestroyEntities destroyPacket = new WrapperPlayServerDestroyEntities(ids);
+
+        for (Player player : targetPlayers) {
+            var user = PacketEvents.getAPI().getPlayerManager().getUser(player);
+            if (user != null) user.sendPacket(destroyPacket);
+        }
+    }
+
+    /**
+     * Téléporte toutes les displays du groupe à la position actuelle (getPosition()).
+     * Utile pour rafraîchir la position ou déplacer un groupe statique.
+     */
+    private void sendMovePacket() {
+        Location loc = getLocation();
+        if (loc == null || viewers.isEmpty() || displays.isEmpty()) return;
+
+        for (DisplayData display : displays) {
+            // Création du paquet de téléportation pour l'entité
+            WrapperPlayServerEntityTeleport teleportPacket = new WrapperPlayServerEntityTeleport(
+                display.getEntityId(),
+                new Vector3d(loc.getX(), loc.getY(), loc.getZ()),
+                loc.getYaw(),
+                loc.getPitch(),
+                false // onGround
+            );
+
+            // Envoi à tous les viewers
+            for (Player player : viewers) {
+                var user = PacketEvents.getAPI().getPlayerManager().getUser(player);
+                if (user != null) {
+                    user.sendPacket(teleportPacket);
+                }
+            }
+        }
+    }
+
+    public void updateMetadata() {
+        if (viewers.isEmpty() || displays.isEmpty()) return;
+
+        for (DisplayData display : displays) {
+            WrapperPlayServerEntityMetadata updatePacket = display.getUpdatePacket();
+            if (updatePacket != null) {
+                for (Player player : viewers) {
+                    var user = PacketEvents.getAPI().getPlayerManager().getUser(player);
+                    if (user != null) user.sendPacket(updatePacket);
+                }
+            }
+        }
+    }
+
+    // ── Montage (Mount) ──
+
+    /**
+     * Force le montage des displays sur l'entité enregistrée pour tous les viewers.
+     */
+    public void mount() {
+        if (attachedId != null && !viewers.isEmpty()) {
+            mountOnEntity(attachedId, viewers);
+        }
+    }
+
+    private void mountOnEntity(int targetEntityId, List<Player> targetPlayers) {
+        if (displays.isEmpty() || targetPlayers.isEmpty()) return;
+
+        WrapperPlayServerSetPassengers passengerPacket = new WrapperPlayServerSetPassengers(
+            targetEntityId,
+            displays.stream().mapToInt(DisplayData::getEntityId).toArray()
+        );
+
+        for (Player player : targetPlayers) {
+            var user = PacketEvents.getAPI().getPlayerManager().getUser(player);
+            if (user != null) user.sendPacket(passengerPacket);
+        }
     }
 }

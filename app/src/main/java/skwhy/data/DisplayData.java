@@ -8,6 +8,7 @@ import com.github.retrooper.packetevents.util.Quaternion4f;
 import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.util.Vector3f;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSetPassengers;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
 
 import io.github.retrooper.packetevents.util.SpigotReflectionUtil;
@@ -129,6 +130,40 @@ public abstract class DisplayData {
             return metadataPacket;
         }
         return null;
+    }
+
+    /**
+     * Attache cette fausse display à une entité et l'envoie à une liste de joueurs.
+     * La display montera sur l'entité en tant que passager.
+     *
+     * @param entity L'entité à laquelle attacher la display
+     * @param players La liste des joueurs pour envoyer le packet
+     */
+    public void mountOnEntity(org.bukkit.entity.Entity entity, List<org.bukkit.entity.Player> players) {
+        mountOnEntity(entity.getEntityId(), players);
+    }
+
+    /**
+     * Attache cette fausse display à une entité (par son ID) et l'envoie à une liste de joueurs.
+     * La display montera sur l'entité en tant que passager.
+     *
+     * @param targetEntityId L'ID de l'entité à laquelle attacher la display
+     * @param players La liste des joueurs pour envoyer le packet
+     */
+    public void mountOnEntity(int targetEntityId, List<org.bukkit.entity.Player> players) {
+        // Crée un packet SetPassengers qui attache cette display à l'entité cible
+        WrapperPlayServerSetPassengers passengerPacket = new WrapperPlayServerSetPassengers(
+            targetEntityId,
+            new int[]{ entityId }
+        );
+
+        // Envoie le packet à tous les joueurs
+        for (org.bukkit.entity.Player player : players) {
+            var user = PacketEvents.getAPI().getPlayerManager().getUser(player);
+            if (user != null) {
+                user.sendPacket(passengerPacket);
+            }
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
