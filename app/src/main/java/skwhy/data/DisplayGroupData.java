@@ -22,6 +22,7 @@ public class DisplayGroupData {
     
     private final List<Player> viewers;
     private final List<DisplayData> displays;
+    private final GlobalTransformation globalTransformation;
     
     // Position du groupe : soit une location statique, soit une entité mobile
     private Location location;
@@ -31,6 +32,7 @@ public class DisplayGroupData {
     private DisplayGroupData() {
         this.viewers = new ArrayList<>();
         this.displays = new ArrayList<>();
+        this.globalTransformation = new GlobalTransformation();
     }
 
     public DisplayGroupData(Location location) {
@@ -48,11 +50,11 @@ public class DisplayGroupData {
     }
     public DisplayGroupData(List<DisplayData> displays, Location location) {
         this(location);
-        this.displays.addAll(displays);
+        addDisplay(displays);
     }
     public DisplayGroupData(List<DisplayData> displays, Entity attachedEntity) {
         this(attachedEntity);
-        this.displays.addAll(displays);
+        addDisplay(displays);
     }
     public DisplayGroupData(List<DisplayData> displays, Location location, Integer attachedId) {
         this(displays, location);
@@ -139,15 +141,14 @@ public class DisplayGroupData {
     
     public void addDisplay(DisplayData display) {
         if (display != null && !displays.contains(display)) {
-            displays.add(display);
-            // Si des joueurs regardent déjà, on fait apparaître la nouvelle display
-            Location currentPos = getLocation();
-            if (currentPos != null && !viewers.isEmpty()) {
-                DisplayData.CompiledDisplayPacket packet = display.getSpawnPacket(currentPos);
-                if (packet != null) packet.sendToAll(viewers);
-                
-                if (attachedId != null) {
-                    mountOnEntity(attachedId, viewers);
+            if (display.setGlobalTransformation(globalTransformation)) {
+                displays.add(display);
+                // Si des joueurs regardent déjà, on fait apparaître la nouvelle display
+                Location currentPos = getLocation();
+                if (currentPos != null && !viewers.isEmpty()) {
+                    DisplayData.CompiledDisplayPacket packet = display.getSpawnPacket(currentPos);
+                    if (packet != null) packet.sendToAll(viewers);
+                    if (attachedId != null) mountOnEntity(attachedId, viewers);
                 }
             }
         }
@@ -318,4 +319,60 @@ public class DisplayGroupData {
             if (user != null) user.sendPacket(passengerPacket);
         }
     }
+
+    // ── Transformation Globale ──
+
+    public GlobalTransformation getGlobalTransformation() {
+        return globalTransformation;
+    }
+
+    public void setRotation(Quat4 rotation) {
+        if (rotation != null) {
+            globalTransformation.setRotation(rotation);
+            for (DisplayData display : displays) {
+                display.updateGlobalTransformation(false, true, false);
+            }
+        }
+    }
+    public void setTranslation(Vec3 translation) {
+        if (translation != null) {
+            globalTransformation.setTranslation(translation);
+            for (DisplayData display : displays) {
+                display.updateGlobalTransformation(true, false, false);
+            }
+        }
+    }
+
+    public void setCenter(Vec3 centreRotation) {
+        if (centreRotation != null) {
+            globalTransformation.setCentreRotation(centreRotation);
+            for (DisplayData display : displays) {
+                display.updateGlobalTransformation(true, false, false);
+            }
+        }
+    }
+
+    public void setScale(float scale) {
+        globalTransformation.setScale(scale);
+        for (DisplayData display : displays) {
+            display.updateGlobalTransformation(false, false, true);
+        }
+    }
+
+    public Vec3 getTranslation() {
+        return globalTransformation.getTranslation();
+    }
+
+    public Vec3 getCenter() {
+        return globalTransformation.getCentreRotation();
+    }
+
+    public Quat4 getRotation() {
+        return globalTransformation.getRotation();
+    }
+
+    public float getScale() {
+        return globalTransformation.getScale();
+    }
+
 }

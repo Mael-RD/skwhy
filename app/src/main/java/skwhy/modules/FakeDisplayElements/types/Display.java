@@ -10,6 +10,9 @@ import skwhy.data.DisplayData;
 import skwhy.data.BlockDisplayData;
 import skwhy.data.ItemDisplayData;
 import skwhy.data.TextDisplayData;
+import skwhy.data.Vec3;
+import skwhy.data.Quat4;
+
 import org.jetbrains.annotations.Nullable;
 
 import java.io.StreamCorruptedException;
@@ -166,10 +169,10 @@ public class Display {
                 public BlockDisplayData deserialize(Fields fields) throws StreamCorruptedException {
                     try {
                         BlockDisplayData data = new BlockDisplayData();
-                        data.setScale(fields.getObject("scale", com.github.retrooper.packetevents.util.Vector3f.class));
-                        data.setTranslation(fields.getObject("translation", com.github.retrooper.packetevents.util.Vector3f.class));
-                        data.setLeftRotation(fields.getObject("leftRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
-                        data.setRightRotation(fields.getObject("rightRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
+                        data.setScale(fields.getObject("scale", Vec3.class));
+                        data.setTranslation(fields.getObject("translation", Vec3.class));
+                        data.setLeftRotation(fields.getObject("leftRotation", Quat4.class));
+                        data.setRightRotation(fields.getObject("rightRotation", Quat4.class));
                         data.setBlockData((String) fields.getObject("blockData"));
                         data.setGlowColor(fields.getPrimitive("glowColor", int.class));
                         data.setShadowRadius(fields.getPrimitive("shadowRadius", float.class));
@@ -273,10 +276,10 @@ public class Display {
                 public ItemDisplayData deserialize(Fields fields) throws StreamCorruptedException {
                     try {
                         ItemDisplayData data = new ItemDisplayData();
-                        data.setScale(fields.getObject("scale", com.github.retrooper.packetevents.util.Vector3f.class));
-                        data.setTranslation(fields.getObject("translation", com.github.retrooper.packetevents.util.Vector3f.class));
-                        data.setLeftRotation(fields.getObject("leftRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
-                        data.setRightRotation(fields.getObject("rightRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
+                        data.setScale(fields.getObject("scale", Vec3.class));
+                        data.setTranslation(fields.getObject("translation", Vec3.class));
+                        data.setLeftRotation(fields.getObject("leftRotation", Quat4.class));
+                        data.setRightRotation(fields.getObject("rightRotation", Quat4.class));
                         data.setItemStack((String) fields.getObject("itemStack"));
                         data.setDisplayMode(fields.getPrimitive("displayMode", int.class));
                         data.setGlowColor(fields.getPrimitive("glowColor", int.class));
@@ -384,10 +387,10 @@ public class Display {
                 public TextDisplayData deserialize(Fields fields) throws StreamCorruptedException {
                     try {
                         TextDisplayData data = new TextDisplayData();
-                        data.setScale(fields.getObject("scale", com.github.retrooper.packetevents.util.Vector3f.class));
-                        data.setTranslation(fields.getObject("translation", com.github.retrooper.packetevents.util.Vector3f.class));
-                        data.setLeftRotation(fields.getObject("leftRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
-                        data.setRightRotation(fields.getObject("rightRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
+                        data.setScale(fields.getObject("scale", Vec3.class));
+                        data.setTranslation(fields.getObject("translation", Vec3.class));
+                        data.setLeftRotation(fields.getObject("leftRotation", Quat4.class));
+                        data.setRightRotation(fields.getObject("rightRotation", Quat4.class));
                         data.setText((String) fields.getObject("text"));
                         data.setBackgroundColor(fields.getPrimitive("bgColor", int.class));
                         data.setTextAlignment(fields.getPrimitive("alignment", int.class));

@@ -11,7 +11,7 @@ import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 
-import com.github.retrooper.packetevents.util.Quaternion4f;
+import org.joml.Quaternionf;
 import skwhy.data.DisplayData;
 import skwhy.data.Quat4;
 
@@ -46,13 +46,13 @@ public class DisplayRotation extends SimpleExpression<Quat4> {
         DisplayData d = displayExpr.getSingle(event);
         if (d == null) return null;
 
-        Quaternion4f rotation = switch (matchedPattern) {
-            case 0 -> d.getLeftRotation();
-            case 1 -> d.getRightRotation();
+        Quaternionf rotation = switch (matchedPattern) {
+            case 0 -> d.getLeftRotation().toQuaternionf();
+            case 1 -> d.getRightRotation().toQuaternionf();
             default -> null;
         };
 
-        // On utilise ton constructeur de Quat4 qui accepte un Quaternion4f
+        // On utilise ton constructeur de Quat4 qui accepte un Quaternionf
         return rotation != null ? new Quat4[]{ new Quat4(rotation) } : null;
     }
 
@@ -70,10 +70,10 @@ public class DisplayRotation extends SimpleExpression<Quat4> {
         DisplayData d = displayExpr.getSingle(event);
         if (d == null) return;
 
-        // On applique la rotation en convertissant Quat4 en Quaternion4f
+        // On applique la rotation en convertissant Quat4 en Quaternionf
         switch (matchedPattern) {
-            case 0 -> d.setLeftRotation(q.toQuaternion4f());
-            case 1 -> d.setRightRotation(q.toQuaternion4f());
+            case 0 -> d.setLeftRotation(q);
+            case 1 -> d.setRightRotation(q);
         }
     }
 

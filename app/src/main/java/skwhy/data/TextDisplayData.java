@@ -4,8 +4,6 @@ import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
-import com.github.retrooper.packetevents.util.Quaternion4f;
-import com.github.retrooper.packetevents.util.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,10 +22,10 @@ public class TextDisplayData extends DisplayData {
 
     public TextDisplayData() {
         this(
-            new Vector3f(1f, 1f, 1f),
-            new Vector3f(0f, 0f, 0f),
-            new Quaternion4f(0f, 0f, 0f, 1f),
-            new Quaternion4f(0f, 0f, 0f, 1f),
+            new Vec3(1f, 1f, 1f),
+            new Vec3(0f, 0f, 0f),
+            new Quat4(0f, 0f, 0f, 1f),
+            new Quat4(0f, 0f, 0f, 1f),
             -1,
             0f,
             1f,
@@ -44,7 +42,7 @@ public class TextDisplayData extends DisplayData {
     }
 
     public TextDisplayData(
-        Vector3f scale, Vector3f translation, Quaternion4f leftRotation, Quaternion4f rightRotation,
+        Vec3 scale, Vec3 translation, Quat4 leftRotation, Quat4 rightRotation,
         int glowColor, float shadowRadius, float shadowStrength, float viewRange, int billboardMode,
         int interpolationStart, int interpolationDuration,
         String text, int backgroundColor, int textAlignment, int lineWidth, boolean seeThrough

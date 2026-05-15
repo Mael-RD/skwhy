@@ -1,9 +1,10 @@
 package skwhy.data;
 
+import org.joml.Quaternionf;
 import com.github.retrooper.packetevents.util.Quaternion4f;
 
 /**
- * Wrapper pour Quaternion4f de PacketEvents pour faciliter l'accès aux composants.
+ * Wrapper pour Quaternion4f avec opérations mathématiques.
  */
 public class Quat4 {
     public float x, y, z, w;
@@ -16,27 +17,56 @@ public class Quat4 {
     }
 
     public Quat4(Quaternion4f q) {
-        // Essayer d'accéder aux composants si possibles, sinon utiliser des valeurs par défaut
-        try {
-            this.x = q.getClass().getDeclaredField("x").getFloat(q);
-            this.y = q.getClass().getDeclaredField("y").getFloat(q);
-            this.z = q.getClass().getDeclaredField("z").getFloat(q);
-            this.w = q.getClass().getDeclaredField("w").getFloat(q);
-        } catch (Exception e) {
-            // Si on ne peut pas accéder par réflexion, utiliser quaternion identité
-            this.x = 0f;
-            this.y = 0f;
-            this.z = 0f;
-            this.w = 1f;
-        }
+        // PacketEvents Quaternion4f possède généralement des getters ou des champs publics
+        // La réflexion est coûteuse, on privilégie l'assignation directe si possible
+        this.x = q.getX();
+        this.y = q.getY();
+        this.z = q.getZ();
+        this.w = q.getW();
+    }
+
+    public Quat4(Quaternionf q) {
+        this.x = q.x;
+        this.y = q.y;
+        this.z = q.z;
+        this.w = q.w;
+    }
+
+    // ── Addition (+) ──
+    public Quat4 add(Quat4 q) {
+        return new Quat4(this.x + q.x, this.y + q.y, this.z + q.z, this.w + q.w);
+    }
+
+    // ── Soustraction (-) ──
+    public Quat4 sub(Quat4 q) {
+        return new Quat4(this.x - q.x, this.y - q.y, this.z - q.z, this.w - q.w);
+    }
+
+    // ── Multiplication par un nombre (*) ──
+    public Quat4 mul(float n) {
+        return new Quat4(this.x * n, this.y * n, this.z * n, this.w * n);
+    }
+
+    // ── Multiplication de Quaternions (Combinaison de rotations) ──
+    public Quat4 mul(Quat4 q) {
+        return new Quat4(
+            this.w * q.x + this.x * q.w + this.y * q.z - this.z * q.y,
+            this.w * q.y - this.x * q.z + this.y * q.w + this.z * q.x,
+            this.w * q.z + this.x * q.y - this.y * q.x + this.z * q.w,
+            this.w * q.w - this.x * q.x - this.y * q.y - this.z * q.z
+        );
     }
 
     public Quaternion4f toQuaternion4f() {
         return new Quaternion4f(x, y, z, w);
     }
 
+    public Quaternionf toQuaternionf() {
+        return new Quaternionf(x, y, z, w);
+    }
+
     @Override
     public String toString() {
-        return String.format("(%.2f,%.2f,%.2f,%.2f)", x, y, z, w);
+        return String.format("(%.2f, %.2f, %.2f, %.2f)", x, y, z, w);
     }
 }

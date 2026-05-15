@@ -3,9 +3,6 @@ package skwhy.modules.FakeDisplayElements.expressions;
 import ch.njol.util.Kleenean;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 
-import com.github.retrooper.packetevents.util.Quaternion4f;
-import com.github.retrooper.packetevents.util.Vector3f;
-
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 import org.bukkit.Color;
@@ -31,6 +28,8 @@ import skwhy.data.DisplayData;
 import skwhy.data.DisplayGroupData;
 import skwhy.data.ItemDisplayData;
 import skwhy.data.TextDisplayData;
+import skwhy.data.Quat4;
+import skwhy.data.Vec3;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -97,23 +96,15 @@ public class CreateDisplayGroup extends SimpleExpression<DisplayGroupData> {
         // ── Transformation (scale, translation, rotations) ────────────────────
         Transformation tf = display.getTransformation();
 
-        Vector3f scale = new Vector3f(
-            tf.getScale().x(),
-            tf.getScale().y(),
-            tf.getScale().z()
-        );
-        Vector3f translation = new Vector3f(
-            tf.getTranslation().x(),
-            tf.getTranslation().y(),
-            tf.getTranslation().z()
-        );
-        Quaternion4f leftRotation = new Quaternion4f(
+        Vec3 scale = new Vec3(tf.getScale());
+        Vec3 translation = new Vec3(tf.getTranslation());
+        Quat4 leftRotation = new Quat4(
             tf.getLeftRotation().x(),
             tf.getLeftRotation().y(),
             tf.getLeftRotation().z(),
             tf.getLeftRotation().w()
         );
-        Quaternion4f rightRotation = new Quaternion4f(
+        Quat4 rightRotation = new Quat4(
             tf.getRightRotation().x(),
             tf.getRightRotation().y(),
             tf.getRightRotation().z(),
@@ -157,8 +148,8 @@ public class CreateDisplayGroup extends SimpleExpression<DisplayGroupData> {
     // ── BlockDisplay ──────────────────────────────────────────────────────────
 
     private BlockDisplayData buildBlock(BlockDisplay entity,
-                                        Vector3f scale, Vector3f translation,
-                                        Quaternion4f leftRot, Quaternion4f rightRot,
+                                        Vec3 scale, Vec3 translation,
+                                        Quat4 leftRot, Quat4 rightRot,
                                         int glowColor, float shadowRadius, float shadowStrength,
                                         float viewRange, int billboardMode,
                                         int interpolationStart, int interpolationDuration) {
@@ -176,8 +167,8 @@ public class CreateDisplayGroup extends SimpleExpression<DisplayGroupData> {
     // ── ItemDisplay ───────────────────────────────────────────────────────────
 
     private ItemDisplayData buildItem(ItemDisplay entity,
-                                      Vector3f scale, Vector3f translation,
-                                      Quaternion4f leftRot, Quaternion4f rightRot,
+                                      Vec3 scale, Vec3 translation,
+                                      Quat4 leftRot, Quat4 rightRot,
                                       int glowColor, float shadowRadius, float shadowStrength,
                                       float viewRange, int billboardMode,
                                       int interpolationStart, int interpolationDuration) {
@@ -202,8 +193,8 @@ public class CreateDisplayGroup extends SimpleExpression<DisplayGroupData> {
     // ── TextDisplay ───────────────────────────────────────────────────────────
 
     private TextDisplayData buildText(TextDisplay entity,
-                                      Vector3f scale, Vector3f translation,
-                                      Quaternion4f leftRot, Quaternion4f rightRot,
+                                      Vec3 scale, Vec3 translation,
+                                      Quat4 leftRot, Quat4 rightRot,
                                       int glowColor, float shadowRadius, float shadowStrength,
                                       float viewRange, int billboardMode,
                                       int interpolationStart, int interpolationDuration) {

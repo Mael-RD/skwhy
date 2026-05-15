@@ -4,9 +4,9 @@ import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.lang.util.SimpleExpression;
 import ch.njol.util.Kleenean;
-import com.github.retrooper.packetevents.util.Quaternion4f;
-import com.github.retrooper.packetevents.util.Vector3f;
+
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+
 import org.bukkit.Color;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
@@ -15,14 +15,18 @@ import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.Event;
 import org.bukkit.util.Transformation;
+
 import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
+
 import skwhy.data.BlockDisplayData;
 import skwhy.data.DisplayData;
 import skwhy.data.ItemDisplayData;
 import skwhy.data.TextDisplayData;
+import skwhy.data.Vec3;
+import skwhy.data.Quat4;
 
 public class DisplayFromReal extends SimpleExpression<DisplayData> {
 
@@ -56,28 +60,10 @@ public class DisplayFromReal extends SimpleExpression<DisplayData> {
         // ── Transformation (scale, translation, rotations) ────────────────────
         Transformation tf = display.getTransformation();
 
-        Vector3f scale = new Vector3f(
-            tf.getScale().x(),
-            tf.getScale().y(),
-            tf.getScale().z()
-        );
-        Vector3f translation = new Vector3f(
-            tf.getTranslation().x(),
-            tf.getTranslation().y(),
-            tf.getTranslation().z()
-        );
-        Quaternion4f leftRotation = new Quaternion4f(
-            tf.getLeftRotation().x(),
-            tf.getLeftRotation().y(),
-            tf.getLeftRotation().z(),
-            tf.getLeftRotation().w()
-        );
-        Quaternion4f rightRotation = new Quaternion4f(
-            tf.getRightRotation().x(),
-            tf.getRightRotation().y(),
-            tf.getRightRotation().z(),
-            tf.getRightRotation().w()
-        );
+        Vec3 scale = new Vec3(tf.getScale());
+        Vec3 translation = new Vec3(tf.getTranslation());
+        Quat4 leftRotation = new Quat4(tf.getLeftRotation());
+        Quat4 rightRotation = new Quat4(tf.getRightRotation());
 
         // ── Propriétés communes ───────────────────────────────────────────────
         Color glowOverride = display.getGlowColorOverride();
@@ -116,8 +102,8 @@ public class DisplayFromReal extends SimpleExpression<DisplayData> {
     // ── BlockDisplay ──────────────────────────────────────────────────────────
 
     private BlockDisplayData buildBlock(BlockDisplay entity,
-                                        Vector3f scale, Vector3f translation,
-                                        Quaternion4f leftRot, Quaternion4f rightRot,
+                                        Vec3 scale, Vec3 translation,
+                                        Quat4 leftRot, Quat4 rightRot,
                                         int glowColor, float shadowRadius, float shadowStrength,
                                         float viewRange, int billboardMode,
                                         int interpolationStart, int interpolationDuration) {
@@ -135,8 +121,8 @@ public class DisplayFromReal extends SimpleExpression<DisplayData> {
     // ── ItemDisplay ───────────────────────────────────────────────────────────
 
     private ItemDisplayData buildItem(ItemDisplay entity,
-                                      Vector3f scale, Vector3f translation,
-                                      Quaternion4f leftRot, Quaternion4f rightRot,
+                                      Vec3 scale, Vec3 translation,
+                                      Quat4 leftRot, Quat4 rightRot,
                                       int glowColor, float shadowRadius, float shadowStrength,
                                       float viewRange, int billboardMode,
                                       int interpolationStart, int interpolationDuration) {
@@ -161,8 +147,8 @@ public class DisplayFromReal extends SimpleExpression<DisplayData> {
     // ── TextDisplay ───────────────────────────────────────────────────────────
 
     private TextDisplayData buildText(TextDisplay entity,
-                                      Vector3f scale, Vector3f translation,
-                                      Quaternion4f leftRot, Quaternion4f rightRot,
+                                      Vec3 scale, Vec3 translation,
+                                      Quat4 leftRot, Quat4 rightRot,
                                       int glowColor, float shadowRadius, float shadowStrength,
                                       float viewRange, int billboardMode,
                                       int interpolationStart, int interpolationDuration) {

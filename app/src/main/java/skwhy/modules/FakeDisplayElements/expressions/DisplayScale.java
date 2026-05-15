@@ -44,9 +44,9 @@ public class DisplayScale extends SimpleExpression<Vector> {
     protected @Nullable Vector[] get(Event event) {
         DisplayData d = displayExpr.getSingle(event);
         if (d == null) return null;
-        com.github.retrooper.packetevents.util.Vector3f scale = switch (matchedPattern) {
-            case 0 -> d.getScale();
-            case 1 -> d.getTranslation();
+        Vector scale = switch (matchedPattern) {
+            case 0 -> d.getScale().toVector();
+            case 1 -> d.getTranslation().toVector();
             default -> null;
         };
         return scale != null ? new Vector[]{ new Vector(scale.getX(), scale.getY(), scale.getZ()) } : null;
