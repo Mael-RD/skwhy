@@ -21,27 +21,19 @@ public class BlockDisplayData extends DisplayData {
     private String blockData; // Format: "MATERIAL[state1=value1,state2=value2,...]"
     
     public BlockDisplayData() {
-        this("STONE");
-    }
-
-    public BlockDisplayData(String blockData) {
-        this(new Vector3f(1f, 1f, 1f), blockData);
-    }
-
-    public BlockDisplayData(Vector3f scale, String blockData) {
-        this(scale, new Vector3f(0f, 0f, 0f), blockData);
-    }
-
-    public BlockDisplayData(Vector3f scale, Vector3f translation, String blockData) {
-        this(scale, translation, new Quaternion4f(0f, 0f, 0f, 1f), blockData);
-    }
-
-    public BlockDisplayData(Vector3f scale, Vector3f translation, Quaternion4f leftRotation, String blockData) {
-        this(scale, translation, leftRotation, new Quaternion4f(0f, 0f, 0f, 1f), blockData);
-    }
-
-    public BlockDisplayData(Vector3f scale, Vector3f translation, Quaternion4f leftRotation, Quaternion4f rightRotation, String blockData) {
-        this(scale, translation, leftRotation, rightRotation, -1, 0f, 1f, 128f, 0, blockData);
+        this(
+            new Vector3f(1f, 1f, 1f),
+            new Vector3f(0f, 0f, 0f),
+            new Quaternion4f(1f, 0f, 0f, 1f),
+            new Quaternion4f(1f, 0f, 0f, 1f),
+            -1,
+            1f,
+            0f,
+            128f,
+            0, 
+            0,
+            0,
+            "STONE");
     }
 
     public BlockDisplayData(
@@ -54,6 +46,8 @@ public class BlockDisplayData extends DisplayData {
         float shadowStrength,
         float viewRange, 
         int billboardMode,
+        int interpolationStart,
+        int interpolationDuration,
         String blockData
     ) {
         super();
@@ -66,6 +60,8 @@ public class BlockDisplayData extends DisplayData {
         this.shadowStrength = shadowStrength;
         this.viewRange = viewRange;
         this.billboardMode = billboardMode;
+        this.interpolationStart = interpolationStart;
+        this.interpolationDuration = interpolationDuration;
         this.blockData = (blockData != null) ? blockData : "STONE";
     }
     
@@ -86,7 +82,11 @@ public class BlockDisplayData extends DisplayData {
 
     public void setBlockData(String blockData) {
         this.blockData = blockData;
-        markDirty();
+        var blockState = SpigotConversionUtil.fromBukkitBlockData(
+            org.bukkit.Bukkit.createBlockData(blockData != null ? blockData : "minecraft:air")
+        );
+        cachedDataRemove(23);
+        cachedData.add(new EntityData<Integer>(23, EntityDataTypes.BLOCK_STATE, blockState.getGlobalId()));
     }
     
     /**

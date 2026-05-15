@@ -6,27 +6,28 @@ import ch.njol.skript.lang.util.SimpleExpression;
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.util.Kleenean;
 import org.bukkit.event.Event;
-import org.bukkit.util.Vector;
 import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
+
+import com.github.retrooper.packetevents.util.Quaternion4f;
 import skwhy.data.DisplayData;
+import skwhy.data.Quat4;
 
 import ch.njol.skript.doc.Name;
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Examples;
 import ch.njol.skript.doc.Since;
 
-
-@Name("Display Scale/Translation")
-@Description("Récupère ou modifie l'échelle ou la translation d'un display.")
+@Name("Display Rotation")
+@Description("Récupère ou modifie la rotation gauche ou droite d'une display entity.")
 @Examples({
-    "set scale of {_d} to vector(2, 2, 2)",
-    "broadcast \"Scale: %scale of {_d}%\""
+    "set left rotation of {_d} to new quat(0, 0, 0, 1)",
+    "set {_r} to right rotation of {_d}"
 })
 @Since("1.0.0")
-public class DisplayScale extends SimpleExpression<Vector> {
+public class DisplayRotation extends SimpleExpression<Quat4> {
 
     private int matchedPattern;
     private Expression<DisplayData> displayExpr;
@@ -41,31 +42,38 @@ public class DisplayScale extends SimpleExpression<Vector> {
     }
 
     @Override
-    protected @Nullable Vector[] get(Event event) {
+    protected @Nullable Quat4[] get(Event event) {
         DisplayData d = displayExpr.getSingle(event);
         if (d == null) return null;
-        com.github.retrooper.packetevents.util.Vector3f scale = switch (matchedPattern) {
-            case 0 -> d.getScale();
-            case 1 -> d.getTranslation();
+
+        Quaternion4f rotation = switch (matchedPattern) {
+            case 0 -> d.getLeftRotation();
+            case 1 -> d.getRightRotation();
             default -> null;
         };
-        return scale != null ? new Vector[]{ new Vector(scale.getX(), scale.getY(), scale.getZ()) } : null;
+
+        // On utilise ton constructeur de Quat4 qui accepte un Quaternion4f
+        return rotation != null ? new Quat4[]{ new Quat4(rotation) } : null;
     }
 
     @Override
     public @Nullable Class<?>[] acceptChange(ChangeMode mode) {
-        if (mode == ChangeMode.SET) return new Class<?>[]{ Vector.class };
+        // Permet de faire : set left rotation of {_d} to new quat...
+        if (mode == ChangeMode.SET) return new Class<?>[]{ Quat4.class };
         return null;
     }
 
     @Override
     public void change(Event event, Object @Nullable [] delta, ChangeMode mode) {
-        if (mode != ChangeMode.SET || delta == null || !(delta[0] instanceof Vector v)) return;
+        if (mode != ChangeMode.SET || delta == null || !(delta[0] instanceof Quat4 q)) return;
+        
         DisplayData d = displayExpr.getSingle(event);
         if (d == null) return;
+
+        // On applique la rotation en convertissant Quat4 en Quaternion4f
         switch (matchedPattern) {
-            case 0 -> d.setScale((float) v.getX(), (float) v.getY(), (float) v.getZ());
-            case 1 -> d.setTranslation((float) v.getX(), (float) v.getY(), (float) v.getZ());
+            case 0 -> d.setLeftRotation(q.toQuaternion4f());
+            case 1 -> d.setRightRotation(q.toQuaternion4f());
         }
     }
 
@@ -73,19 +81,20 @@ public class DisplayScale extends SimpleExpression<Vector> {
     public boolean isSingle() { return true; }
 
     @Override
-    public Class<? extends Vector> getReturnType() { return Vector.class; }
+    public Class<? extends Quat4> getReturnType() { return Quat4.class; }
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return "scale of " + displayExpr.toString(event, debug);
+        String type = (matchedPattern == 0) ? "left rotation" : "right rotation";
+        return type + " of " + displayExpr.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
-            SyntaxInfo.Expression.builder(DisplayScale.class, Vector.class)
-                .addPattern("[the] scale of %displaydata%")           // 0
-                .addPattern("[the] translation of %displaydata%")     // 1
+            SyntaxInfo.Expression.builder(DisplayRotation.class, Quat4.class)
+                .addPattern("[the] left rotation of %displaydata%")    // 0
+                .addPattern("[the] right rotation of %displaydata%")   // 1
                 .build()
         );
     }

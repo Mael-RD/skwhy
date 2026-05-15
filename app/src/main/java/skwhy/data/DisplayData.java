@@ -36,10 +36,11 @@ public abstract class DisplayData {
     protected float shadowStrength = 1f;
     protected float viewRange     = 128f;
     protected int   billboardMode = 0;    // 0=fixed, 1=vertical, 2=horizontal, 3=center
+    protected int   interpolationStart = 0;
+    protected int   interpolationDuration = 0;
 
     // ── Cache du packet compilé ───────────────────────────────────────────────
-    private CompiledDisplayPacket cachedPacket    = null;
-    private boolean               packetDirty     = true;
+    protected List<EntityData<?>> cachedData = new ArrayList<>();
 
     // ─────────────────────────────────────────────────────────────────────────
     // Packet compilé : contient spawn + metadata, prêt à envoyer
@@ -87,14 +88,7 @@ public abstract class DisplayData {
      * @return Le packet compilé, ou null si location est null et qu'aucun packet n'a encore été créé.
      */
     @Nullable
-    public CompiledDisplayPacket getPacket(@Nullable Location location) {
-
-        // ── Cas 1 : pas de localisation → retourne le cache tel quel ──────────
-        if (location == null || cachedPacket == null || packetDirty) {
-            return cachedPacket; // null si jamais construit, c'est au caller de vérifier
-        }
-
-        // ── Cas 2 : localisation fournie → recréer le packet complet ──────────
+    public CompiledDisplayPacket getSpawnPacket(@Nullable Location location) {
 
         // Spawn packet (position + entity type)
         WrapperPlayServerSpawnEntity spawnPacket = new WrapperPlayServerSpawnEntity(
@@ -115,10 +109,26 @@ public abstract class DisplayData {
             buildMetadata()
         );
 
-        cachedPacket = new CompiledDisplayPacket(entityId, spawnPacket, metadataPacket);
-        packetDirty  = false;
+        return new CompiledDisplayPacket(entityId, spawnPacket, metadataPacket);
+    }
 
-        return cachedPacket;
+    /**
+     * Retourne un packet de mise à jour basé sur le cache des données modifiées.
+     * Si cachedData n'est pas vide, compile un packet metadata et réinitialise le cache.
+     *
+     * @return Le packet metadata compilé, ou null si cachedData est vide.
+     */
+    @Nullable
+    public WrapperPlayServerEntityMetadata getUpdatePacket() {
+        if (!cachedData.isEmpty()) {
+            WrapperPlayServerEntityMetadata metadataPacket = new WrapperPlayServerEntityMetadata(
+                entityId,
+                cachedData
+            );
+            cachedData = new ArrayList<>();
+            return metadataPacket;
+        }
+        return null;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -129,10 +139,10 @@ public abstract class DisplayData {
         List<EntityData<?>> data = new ArrayList<>();
 
         // Index 8  – interpolation start delta (0 = immédiat)
-        data.add(new EntityData<>(8, EntityDataTypes.INT, 0));
+        data.add(new EntityData<>(8, EntityDataTypes.INT, interpolationStart));
 
         // Index 9  – interpolation duration
-        data.add(new EntityData<>(9, EntityDataTypes.INT, 0));
+        data.add(new EntityData<>(9, EntityDataTypes.INT, interpolationDuration));
 
         // Index 11 – translation offset
         data.add(new EntityData<>(11, EntityDataTypes.VECTOR3F, translation));
@@ -190,41 +200,113 @@ public abstract class DisplayData {
     // Invalidation du cache quand une propriété change
     // ─────────────────────────────────────────────────────────────────────────
 
-    protected void markDirty() { this.packetDirty = true; }
-    public boolean isPacketDirty() { return packetDirty; }
+    /**
+     * Retire l'EntityData avec l'index spécifié du cache s'il est présent.
+     * Évite la duplication lors de la mise à jour d'une propriété.
+     */
+    protected void cachedDataRemove(int index) {
+        cachedData.removeIf(data -> data.getIndex() == index);
+    }
+
     public int getEntityId() { return entityId; }
     public UUID getEntityUUID() { return entityUUID; }
 
     // ── Getters / Setters (chaque setter invalide le cache) ───────────────────
 
     public Vector3f getScale() { return scale; }
-    public void setScale(Vector3f v) { scale = v; markDirty(); }
-    public void setScale(float x, float y, float z) { scale = new Vector3f(x, y, z); markDirty(); }
+    public void setScale(Vector3f v) {
+        scale = v;
+        cachedDataRemove(12);
+        cachedData.add(new EntityData<>(12, EntityDataTypes.VECTOR3F, scale));
+    }
+    public void setScale(float x, float y, float z) {
+        scale = new Vector3f(x, y, z);
+        cachedDataRemove(12);
+        cachedData.add(new EntityData<>(12, EntityDataTypes.VECTOR3F, scale));
+    }
 
     public Vector3f getTranslation() { return translation; }
-    public void setTranslation(Vector3f v) { translation = v; markDirty(); }
-    public void setTranslation(float x, float y, float z) { translation = new Vector3f(x, y, z); markDirty(); }
+    public void setTranslation(Vector3f v) {
+        translation = v;
+        cachedDataRemove(11);
+        cachedData.add(new EntityData<>(11, EntityDataTypes.VECTOR3F, translation));
+    }
+    public void setTranslation(float x, float y, float z) {
+        translation = new Vector3f(x, y, z);
+        cachedDataRemove(11);
+        cachedData.add(new EntityData<>(11, EntityDataTypes.VECTOR3F, translation));
+    }
 
     public Quaternion4f getLeftRotation() { return leftRotation; }
-    public void setLeftRotation(Quaternion4f v) { leftRotation = v; markDirty(); }
-    public void setLeftRotation(float x, float y, float z, float w) { leftRotation = new Quaternion4f(x, y, z, w); markDirty(); }
+    public void setLeftRotation(Quaternion4f v) {
+        leftRotation = v;
+        cachedDataRemove(13);
+        cachedData.add(new EntityData<>(13, EntityDataTypes.QUATERNION, leftRotation));
+    }
+    public void setLeftRotation(float x, float y, float z, float w) {
+        leftRotation = new Quaternion4f(x, y, z, w);
+        cachedDataRemove(13);
+        cachedData.add(new EntityData<>(13, EntityDataTypes.QUATERNION, leftRotation));
+    }
 
     public Quaternion4f getRightRotation() { return rightRotation; }
-    public void setRightRotation(Quaternion4f v) { rightRotation = v; markDirty(); }
-    public void setRightRotation(float x, float y, float z, float w) { rightRotation = new Quaternion4f(x, y, z, w); markDirty(); }
+    public void setRightRotation(Quaternion4f v) {
+        rightRotation = v;
+        cachedDataRemove(14);
+        cachedData.add(new EntityData<>(14, EntityDataTypes.QUATERNION, rightRotation));
+    }
+    public void setRightRotation(float x, float y, float z, float w) {
+        rightRotation = new Quaternion4f(x, y, z, w);
+        cachedDataRemove(14);
+        cachedData.add(new EntityData<>(14, EntityDataTypes.QUATERNION, rightRotation));
+    }
 
     public int getGlowColor() { return glowColor; }
-    public void setGlowColor(int rgb) { glowColor = rgb; markDirty(); }
+    public void setGlowColor(int rgb) {
+        glowColor = rgb;
+        cachedDataRemove(22);
+        cachedData.add(new EntityData<>(22, EntityDataTypes.INT, glowColor));
+    }
 
     public float getShadowRadius() { return shadowRadius; }
-    public void setShadowRadius(float v) { shadowRadius = v; markDirty(); }
+    public void setShadowRadius(float v) {
+        shadowRadius = v;
+        cachedDataRemove(18);
+        cachedData.add(new EntityData<>(18, EntityDataTypes.FLOAT, shadowRadius));
+    }
 
     public float getShadowStrength() { return shadowStrength; }
-    public void setShadowStrength(float v) { shadowStrength = v; markDirty(); }
+    public void setShadowStrength(float v) {
+        shadowStrength = v;
+        cachedDataRemove(19);
+        cachedData.add(new EntityData<>(19, EntityDataTypes.FLOAT, shadowStrength));
+    }
 
     public float getViewRange() { return viewRange; }
-    public void setViewRange(float v) { viewRange = v; markDirty(); }
+    public void setViewRange(float v) {
+        viewRange = v;
+        cachedDataRemove(17);
+        cachedData.add(new EntityData<>(17, EntityDataTypes.FLOAT, viewRange));
+    }
 
     public int getBillboardMode() { return billboardMode; }
-    public void setBillboardMode(int v) { billboardMode = v; markDirty(); }
+    public void setBillboardMode(int v) {
+        billboardMode = v;
+        cachedDataRemove(15);
+        cachedData.add(new EntityData<>(15, EntityDataTypes.BYTE, (byte) billboardMode));
+    }
+
+    public int getInterpolationStart() { return interpolationStart; }
+    public void setInterpolationStart(int v) {
+        interpolationStart = v;
+        cachedDataRemove(8);
+        cachedData.add(new EntityData<>(8, EntityDataTypes.INT, interpolationStart));
+    }
+
+    public int getInterpolationDuration() { return interpolationDuration; }
+    public void setInterpolationDuration(int v) {
+        interpolationDuration = v;
+        cachedDataRemove(9);
+        cachedData.add(new EntityData<>(9, EntityDataTypes.INT, interpolationDuration));
+    }
 }

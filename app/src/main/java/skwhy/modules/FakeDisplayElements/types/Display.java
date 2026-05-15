@@ -363,13 +363,10 @@ public class Display {
                     fields.putObject("leftRotation", data.getLeftRotation());
                     fields.putObject("rightRotation", data.getRightRotation());
                     fields.putObject("text", data.getText());
-                    fields.putPrimitive("textColor", data.getTextColor());
                     fields.putPrimitive("bgColor", data.getBackgroundColor());
-                    fields.putPrimitive("outline", data.hasOutline());
                     fields.putPrimitive("alignment", data.getTextAlignment());
                     fields.putPrimitive("lineWidth", data.getLineWidth());
                     fields.putPrimitive("seeThrough", data.isSeeThrough());
-                    fields.putPrimitive("defaultBg", data.hasDefaultBackground());
                     fields.putPrimitive("glowColor", data.getGlowColor());
                     fields.putPrimitive("shadowRadius", data.getShadowRadius());
                     fields.putPrimitive("shadowStrength", data.getShadowStrength());
@@ -392,13 +389,10 @@ public class Display {
                         data.setLeftRotation(fields.getObject("leftRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
                         data.setRightRotation(fields.getObject("rightRotation", com.github.retrooper.packetevents.util.Quaternion4f.class));
                         data.setText((String) fields.getObject("text"));
-                        data.setTextColor(fields.getPrimitive("textColor", int.class));
                         data.setBackgroundColor(fields.getPrimitive("bgColor", int.class));
-                        data.setOutline(fields.getPrimitive("outline", boolean.class));
                         data.setTextAlignment(fields.getPrimitive("alignment", int.class));
                         data.setLineWidth(fields.getPrimitive("lineWidth", int.class));
                         data.setSeeThrough(fields.getPrimitive("seeThrough", boolean.class));
-                        data.setDefaultBackground(fields.getPrimitive("defaultBg", boolean.class));
                         data.setGlowColor(fields.getPrimitive("glowColor", int.class));
                         data.setShadowRadius(fields.getPrimitive("shadowRadius", float.class));
                         data.setShadowStrength(fields.getPrimitive("shadowStrength", float.class));

@@ -71,3 +71,13 @@ tasks {
         dependsOn(shadowJar)
     }
 }
+
+tasks.javadoc {
+    options.encoding = "UTF-8"
+
+    (options as StandardJavadocDocletOptions).apply {
+        author(true)
+        version(true)
+        links("https://docs.oracle.com/en/java/javase/21/docs/api/")
+    }
+}

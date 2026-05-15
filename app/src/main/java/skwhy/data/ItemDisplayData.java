@@ -2,6 +2,7 @@ package skwhy.data;
 
 
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
+import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.github.retrooper.packetevents.util.Quaternion4f;
@@ -20,27 +21,21 @@ public class ItemDisplayData extends DisplayData {
     private int displayMode; // 0=none, 1=thirdperson_lefthand, 2=thirdperson_righthand, 3=firstperson_lefthand, 4=firstperson_righthand, 5=head, 6=gui, 7=ground, 8=fixed
 
     public ItemDisplayData() {
-        this("STONE");
-    }
-
-    public ItemDisplayData(String itemStack) {
-        this(new Vector3f(1f, 1f, 1f), itemStack);
-    }
-
-    public ItemDisplayData(Vector3f scale, String itemStack) {
-        this(scale, new Vector3f(0f, 0f, 0f), itemStack);
-    }
-
-    public ItemDisplayData(Vector3f scale, Vector3f translation, String itemStack) {
-        this(scale, translation, new Quaternion4f(0f, 0f, 0f, 1f), itemStack);
-    }
-
-    public ItemDisplayData(Vector3f scale, Vector3f translation, Quaternion4f leftRotation, String itemStack) {
-        this(scale, translation, leftRotation, new Quaternion4f(0f, 0f, 0f, 1f), itemStack);
-    }
-
-    public ItemDisplayData(Vector3f scale, Vector3f translation, Quaternion4f leftRotation, Quaternion4f rightRotation, String itemStack) {
-        this(scale, translation, leftRotation, rightRotation, -1, 0f, 1f, 128f, 0, itemStack, 0);
+        this(
+            new Vector3f(1f, 1f, 1f),
+            new Vector3f(0f, 0f, 0f),
+            new Quaternion4f(0f, 0f, 0f, 1f),
+            new Quaternion4f(0f, 0f, 0f, 1f),
+            -1,
+            0f,
+            1f,
+            128f,
+            0,
+            0,
+            0,
+            "STONE",
+            0
+        );
     }
 
     public ItemDisplayData(
@@ -53,6 +48,8 @@ public class ItemDisplayData extends DisplayData {
         float shadowStrength,
         float viewRange, 
         int billboardMode,
+        int interpolationStart,
+        int interpolationDuration,
         String itemStack,
         int displayMode
     ) {
@@ -66,6 +63,8 @@ public class ItemDisplayData extends DisplayData {
         this.shadowStrength = shadowStrength;
         this.viewRange = viewRange;
         this.billboardMode = billboardMode;
+        this.interpolationStart = interpolationStart;
+        this.interpolationDuration = interpolationDuration;
         this.itemStack = (itemStack != null) ? itemStack : "STONE";
         this.displayMode = displayMode;
     }
@@ -74,11 +73,31 @@ public class ItemDisplayData extends DisplayData {
     public EntityType getEntityType() {
         return EntityTypes.ITEM_DISPLAY;
     }
-
+    
     @Override
     protected List<EntityData<?>> buildSpecificMetadata() {
         List<EntityData<?>> data = new ArrayList<>();
-        
+
+        // Index 23 – item stack
+        try {
+            org.bukkit.inventory.ItemStack bukkitItem =
+                new org.bukkit.inventory.ItemStack(
+                    org.bukkit.Material.valueOf(itemStack.toUpperCase())
+                );
+            data.add(new EntityData<>(23, EntityDataTypes.ITEMSTACK,
+                io.github.retrooper.packetevents.util.SpigotConversionUtil
+                    .fromBukkitItemStack(bukkitItem)));
+        } catch (IllegalArgumentException e) {
+            // Matériau invalide → slot vide
+            data.add(new EntityData<>(23, EntityDataTypes.ITEMSTACK,
+                com.github.retrooper.packetevents.protocol.item.ItemStack.EMPTY));
+        }
+
+        // Index 24 – display transform (byte)
+        // 0=none 1=thirdperson_left 2=thirdperson_right 3=firstperson_left
+        // 4=firstperson_right 5=head 6=gui 7=ground 8=fixed
+        data.add(new EntityData<>(24, EntityDataTypes.BYTE, (byte) displayMode));
+
         return data;
     }
 
@@ -88,7 +107,6 @@ public class ItemDisplayData extends DisplayData {
      */
     public void setItemStack(String itemStack) {
         this.itemStack = itemStack;
-        markDirty();
     }
     
     /**
@@ -105,7 +123,6 @@ public class ItemDisplayData extends DisplayData {
      */
     public void setDisplayMode(int mode) {
         this.displayMode = mode;
-        markDirty();
     }
     
     /**

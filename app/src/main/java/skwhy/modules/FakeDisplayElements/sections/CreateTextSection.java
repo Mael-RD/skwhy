@@ -55,28 +55,10 @@ public class CreateTextSection extends SimpleExpression<TextDisplayData> {
                 case "text" ->
                     display.setText(value);
 
-                // ── Couleur du texte (hex: "#FF0000" ou entier) ───────────────
-                case "textcolor", "color", "textcolour" -> {
-                    int color = parseColor(value);
-                    display.setTextColor(color);
-                }
-
                 // ── Couleur de fond ───────────────────────────────────────────
                 case "background", "backgroundcolor", "bgcolor" -> {
                     int color = parseColor(value);
                     display.setBackgroundColor(color);
-                }
-
-                // ── Fond par défaut ───────────────────────────────────────────
-                case "defaultbackground", "defaultbg" -> {
-                    boolean b = parseBoolean(value);
-                    display.setDefaultBackground(b);
-                }
-
-                // ── Contour ───────────────────────────────────────────────────
-                case "outline", "shadow_text" -> {
-                    boolean b = parseBoolean(value);
-                    display.setOutline(b);
                 }
 
                 // ── See through ───────────────────────────────────────────────

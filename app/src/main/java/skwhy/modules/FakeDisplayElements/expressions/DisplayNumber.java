@@ -52,10 +52,9 @@ public class DisplayNumber extends SimpleExpression<Number> {
             case 3 -> d.getViewRange();
             case 4 -> d.getBillboardMode();
             case 5 -> d instanceof ItemDisplayData item ? item.getDisplayMode() : null;
-            case 6 -> d instanceof TextDisplayData  text ? text.getTextColor()       : null;
-            case 7 -> d instanceof TextDisplayData  text ? text.getBackgroundColor() : null;
-            case 8 -> d instanceof TextDisplayData  text ? text.getTextAlignment()   : null;
-            case 9 -> d instanceof TextDisplayData  text ? text.getLineWidth()       : null;
+            case 6 -> d instanceof TextDisplayData  text ? text.getBackgroundColor() : null;
+            case 7 -> d instanceof TextDisplayData  text ? text.getTextAlignment()   : null;
+            case 8 -> d instanceof TextDisplayData  text ? text.getLineWidth()       : null;
             default -> null;
         };
 
@@ -81,10 +80,9 @@ public class DisplayNumber extends SimpleExpression<Number> {
             case 3 -> d.setViewRange(n.floatValue());
             case 4 -> d.setBillboardMode(n.intValue());
             case 5 -> { if (d instanceof ItemDisplayData item) item.setDisplayMode(n.intValue()); }
-            case 6 -> { if (d instanceof TextDisplayData  text) text.setTextColor(n.intValue()); }
-            case 7 -> { if (d instanceof TextDisplayData  text) text.setBackgroundColor(n.intValue()); }
-            case 8 -> { if (d instanceof TextDisplayData  text) text.setTextAlignment(n.intValue()); }
-            case 9 -> { if (d instanceof TextDisplayData  text) text.setLineWidth(n.intValue()); }
+            case 6 -> { if (d instanceof TextDisplayData  text) text.setBackgroundColor(n.intValue()); }
+            case 7 -> { if (d instanceof TextDisplayData  text) text.setTextAlignment(n.intValue()); }
+            case 8 -> { if (d instanceof TextDisplayData  text) text.setLineWidth(n.intValue()); }
         }
     }
 
@@ -96,20 +94,20 @@ public class DisplayNumber extends SimpleExpression<Number> {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        String prop = switch (matchedPattern) {
-            case 0 -> "glow color";
-            case 1 -> "shadow radius";
-            case 2 -> "shadow strength";
-            case 3 -> "view range";
-            case 4 -> "billboard mode";
-            case 5 -> "display mode";
-            case 6 -> "text color";
-            case 7 -> "background color";
-            case 8 -> "text alignment";
-            case 9 -> "line width";
-            default -> "unknown";
+        DisplayData d = displayExpr.getSingle(event);
+        if (d == null) return null;
+        return switch (matchedPattern) {
+            case 0 -> Integer.toString(d.getGlowColor());
+            case 1 -> Float.toString(d.getShadowRadius());
+            case 2 -> Float.toString(d.getShadowStrength());
+            case 3 -> Float.toString(d.getViewRange());
+            case 4 -> Integer.toString(d.getBillboardMode());
+            case 5 -> d instanceof ItemDisplayData item ? Integer.toString(item.getDisplayMode()) : null;
+            case 6 -> d instanceof TextDisplayData text ? Integer.toString(text.getBackgroundColor()) : null;
+            case 7 -> d instanceof TextDisplayData text ? Integer.toString(text.getTextAlignment()) : null;
+            case 8 -> d instanceof TextDisplayData text ? Integer.toString(text.getLineWidth()) : null;
+            default -> null;
         };
-        return prop + " of " + displayExpr.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
@@ -122,10 +120,9 @@ public class DisplayNumber extends SimpleExpression<Number> {
                 .addPattern("[the] view range of %displaydata%")              // 3
                 .addPattern("[the] billboard [mode] of %displaydata%")        // 4
                 .addPattern("[the] display mode of %displaydata%")            // 5
-                .addPattern("[the] text color of %displaydata%")              // 6
-                .addPattern("[the] background color of %displaydata%")        // 7
-                .addPattern("[the] text alignment of %displaydata%")          // 8
-                .addPattern("[the] line width of %displaydata%")              // 9
+                .addPattern("[the] background color of %displaydata%")        // 6
+                .addPattern("[the] text alignment of %displaydata%")          // 7
+                .addPattern("[the] line width of %displaydata%")              // 8
                 .build()
         );
     }

@@ -19,14 +19,12 @@ public class DisplayBoolean extends SimpleExpression<Boolean> {
     // 1  see through        → TextDisplayData seulement
     // 2  default background → TextDisplayData seulement
 
-    private int matchedPattern;
     private Expression<DisplayData> displayExpr;
 
     @Override
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        this.matchedPattern = matchedPattern;
         this.displayExpr    = (Expression<DisplayData>) exprs[0];
         return true;
     }
@@ -35,13 +33,7 @@ public class DisplayBoolean extends SimpleExpression<Boolean> {
     protected @Nullable Boolean[] get(Event event) {
         DisplayData d = displayExpr.getSingle(event);
         if (!(d instanceof TextDisplayData text)) return null;
-
-        Boolean value = switch (matchedPattern) {
-            case 0 -> text.hasOutline();
-            case 1 -> text.isSeeThrough();
-            case 2 -> text.hasDefaultBackground();
-            default -> null;
-        };
+        Boolean value = text.isSeeThrough();
 
         return value != null ? new Boolean[]{ value } : null;
     }
@@ -57,12 +49,7 @@ public class DisplayBoolean extends SimpleExpression<Boolean> {
         if (mode != ChangeMode.SET || delta == null || !(delta[0] instanceof Boolean b)) return;
         DisplayData d = displayExpr.getSingle(event);
         if (!(d instanceof TextDisplayData text)) return;
-
-        switch (matchedPattern) {
-            case 0 -> text.setOutline(b);
-            case 1 -> text.setSeeThrough(b);
-            case 2 -> text.setDefaultBackground(b);
-        }
+        text.setSeeThrough(b);
     }
 
     @Override
@@ -73,22 +60,17 @@ public class DisplayBoolean extends SimpleExpression<Boolean> {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        String prop = switch (matchedPattern) {
-            case 0 -> "outline";
-            case 1 -> "see through";
-            case 2 -> "default background";
-            default -> "unknown";
-        };
-        return prop + " of " + displayExpr.toString(event, debug);
+        DisplayData d = displayExpr.getSingle(event);
+        if (!(d instanceof TextDisplayData text)) return null;
+
+        return text.isSeeThrough() ? "true" : "false";
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayBoolean.class, Boolean.class)
-                .addPattern("[the] outline of %displaydata%")            // 0
-                .addPattern("[the] see[ ]through of %displaydata%")      // 1
-                .addPattern("[the] default background of %displaydata%") // 2
+                .addPattern("[the] see[ ]through of %displaydata%")
                 .build()
         );
     }

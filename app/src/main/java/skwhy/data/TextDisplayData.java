@@ -1,6 +1,7 @@
 package skwhy.data;
 
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
+import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.github.retrooper.packetevents.util.Quaternion4f;
@@ -15,47 +16,38 @@ import java.util.List;
  */
 public class TextDisplayData extends DisplayData {
     
-    private String text; // Texte à afficher (supporte les couleurs et formatage Minecraft)
-    private int textColor; // RGB couleur du texte
-    private int backgroundColor; // RGB couleur de fond
-    private boolean hasOutline;
+    private String text;
+    private int backgroundColor;
     private int textAlignment; // 0=center, 1=left, 2=right
     private int lineWidth; // Largeur de ligne maximale (0=illimité)
     private boolean seeThrough;
-    private boolean defaultBackground;
 
     public TextDisplayData() {
-        this("Text");
-    }
-
-    public TextDisplayData(String text) {
-        this(new Vector3f(1f, 1f, 1f), text);
-    }
-
-    public TextDisplayData(Vector3f scale, String text) {
-        this(scale, new Vector3f(0f, 0f, 0f), text);
-    }
-
-    public TextDisplayData(Vector3f scale, Vector3f translation, String text) {
-        this(scale, translation, new Quaternion4f(0f, 0f, 0f, 1f), text);
-    }
-
-    public TextDisplayData(Vector3f scale, Vector3f translation, Quaternion4f leftRotation, String text) {
-        this(scale, translation, leftRotation, new Quaternion4f(0f, 0f, 0f, 1f), text);
-    }
-
-    public TextDisplayData(Vector3f scale, Vector3f translation, Quaternion4f leftRotation, Quaternion4f rightRotation, String text) {
-        this(scale, translation, leftRotation, rightRotation, -1, 0f, 1f, 128f, 0, text, 0xFFFFFF, 0x000000, false, 0, 0, false, true);
+        this(
+            new Vector3f(1f, 1f, 1f),
+            new Vector3f(0f, 0f, 0f),
+            new Quaternion4f(0f, 0f, 0f, 1f),
+            new Quaternion4f(0f, 0f, 0f, 1f),
+            -1,
+            0f,
+            1f,
+            128f,
+            0,
+            0,
+            0,
+            "Text",
+            0xFFFFFF,
+            0,
+            100,
+            false
+            );
     }
 
     public TextDisplayData(
         Vector3f scale, Vector3f translation, Quaternion4f leftRotation, Quaternion4f rightRotation,
-        int glowColor, 
-        float shadowRadius, float shadowStrength, 
-        float viewRange, 
-        int billboardMode, String text, int textColor, 
-        int backgroundColor, boolean hasOutline, int textAlignment, 
-        int lineWidth, boolean seeThrough, boolean defaultBackground
+        int glowColor, float shadowRadius, float shadowStrength, float viewRange, int billboardMode,
+        int interpolationStart, int interpolationDuration,
+        String text, int backgroundColor, int textAlignment, int lineWidth, boolean seeThrough
     ) {
         super();
         this.scale = scale;
@@ -67,14 +59,12 @@ public class TextDisplayData extends DisplayData {
         this.shadowStrength = shadowStrength;
         this.viewRange = viewRange;
         this.billboardMode = billboardMode;
+        this.interpolationStart = interpolationStart;
+        this.interpolationDuration = interpolationDuration;
         this.text = (text != null) ? text : "Text";
-        this.textColor = textColor;
-        this.backgroundColor = backgroundColor;
-        this.hasOutline = hasOutline;
         this.textAlignment = textAlignment;
         this.lineWidth = lineWidth;
         this.seeThrough = seeThrough;
-        this.defaultBackground = defaultBackground;
     }
     
     @Override
@@ -85,7 +75,35 @@ public class TextDisplayData extends DisplayData {
     @Override
     protected List<EntityData<?>> buildSpecificMetadata() {
         List<EntityData<?>> data = new ArrayList<>();
-        
+
+        // Index 23 – texte (Adventure Component, supporte les codes &)
+        net.kyori.adventure.text.Component component =
+            net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+                .legacyAmpersand()
+                .deserialize(text != null ? text : "");
+        data.add(new EntityData<>(23, EntityDataTypes.ADV_COMPONENT, component));
+
+        // Index 24 – largeur de ligne
+        data.add(new EntityData<>(24, EntityDataTypes.INT, lineWidth));
+
+        // Index 25 – couleur de fond (ARGB)
+        // On force l'alpha à 0xFF pour un fond opaque
+        int argbBackground = 0xFF000000 | (backgroundColor & 0xFFFFFF);
+        data.add(new EntityData<>(25, EntityDataTypes.INT, argbBackground));
+
+        // Index 26 – opacité du texte (-1 = 0xFF = complètement opaque)
+        data.add(new EntityData<>(26, EntityDataTypes.BYTE, (byte) -1));
+
+        // Index 27 – flags de style (byte)
+        // bit 0 (0x01) : text shadow
+        // bit 1 (0x02) : see through
+        // bit 2 (0x04) : default background
+        // bits 3-4     : alignment (0=center, 1=left, 2=right)
+        byte styleFlags = 0;
+        if (seeThrough)   styleFlags |= 0x02;
+        styleFlags |= (byte) ((textAlignment & 0x03) << 3);
+        data.add(new EntityData<>(27, EntityDataTypes.BYTE, styleFlags));
+
         return data;
     }
 
@@ -95,7 +113,12 @@ public class TextDisplayData extends DisplayData {
      */
     public void setText(String text) {
         this.text = text;
-        markDirty();
+        cachedDataRemove(23);
+        net.kyori.adventure.text.Component component =
+            net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+                .legacyAmpersand()
+                .deserialize(text != null ? text : "");
+        cachedData.add(new EntityData<>(23, EntityDataTypes.ADV_COMPONENT, component));
     }
     
     /**
@@ -106,26 +129,13 @@ public class TextDisplayData extends DisplayData {
     }
     
     /**
-     * Définit la couleur du texte (format RGB).
-     */
-    public void setTextColor(int rgb) {
-        this.textColor = rgb;
-        markDirty();
-    }
-    
-    /**
-     * Récupère la couleur du texte.
-     */
-    public int getTextColor() {
-        return textColor;
-    }
-    
-    /**
      * Définit la couleur de fond (format RGB).
      */
     public void setBackgroundColor(int rgb) {
         this.backgroundColor = rgb;
-        markDirty();
+        cachedDataRemove(25);
+        int argbBackground = 0xFF000000 | (backgroundColor & 0xFFFFFF);
+        cachedData.add(new EntityData<>(25, EntityDataTypes.INT, argbBackground));
     }
     
     /**
@@ -136,27 +146,16 @@ public class TextDisplayData extends DisplayData {
     }
     
     /**
-     * Active/désactive le contour du texte.
-     */
-    public void setOutline(boolean outline) {
-        this.hasOutline = outline;
-        markDirty();
-    }
-    
-    /**
-     * Vérifie si le texte a un contour.
-     */
-    public boolean hasOutline() {
-        return hasOutline;
-    }
-    
-    /**
      * Définit l'alignement du texte.
      * 0=center, 1=left, 2=right
      */
     public void setTextAlignment(int alignment) {
         this.textAlignment = alignment;
-        markDirty();
+        cachedDataRemove(27);
+        byte styleFlags = 0;
+        if (seeThrough)   styleFlags |= 0x02;
+        styleFlags |= (byte) ((textAlignment & 0x03) << 3);
+        cachedData.add(new EntityData<>(27, EntityDataTypes.BYTE, styleFlags));
     }
     
     /**
@@ -180,7 +179,8 @@ public class TextDisplayData extends DisplayData {
      */
     public void setLineWidth(int width) {
         this.lineWidth = width;
-        markDirty();
+        cachedDataRemove(24);
+        cachedData.add(new EntityData<>(24, EntityDataTypes.INT, lineWidth));
     }
     
     /**
@@ -195,7 +195,11 @@ public class TextDisplayData extends DisplayData {
      */
     public void setSeeThrough(boolean seeThrough) {
         this.seeThrough = seeThrough;
-        markDirty();
+        cachedDataRemove(27);
+        byte styleFlags = 0;
+        if (seeThrough)   styleFlags |= 0x02;
+        styleFlags |= (byte) ((textAlignment & 0x03) << 3);
+        cachedData.add(new EntityData<>(27, EntityDataTypes.BYTE, styleFlags));
     }
     
     /**
@@ -203,21 +207,6 @@ public class TextDisplayData extends DisplayData {
      */
     public boolean isSeeThrough() {
         return seeThrough;
-    }
-    
-    /**
-     * Active/désactive le fond par défaut.
-     */
-    public void setDefaultBackground(boolean defaultBackground) {
-        this.defaultBackground = defaultBackground;
-        markDirty();
-    }
-    
-    /**
-     * Vérifie si le fond par défaut est activé.
-     */
-    public boolean hasDefaultBackground() {
-        return defaultBackground;
     }
     
     @Override
@@ -230,22 +219,20 @@ public class TextDisplayData extends DisplayData {
         return String.format(
             "TextDisplay{" +
             "scale=(%.2f,%.2f,%.2f),translation=(%.2f,%.2f,%.2f),leftRotation=%s,rightRotation=%s," +
-            "text='%s',textColor=0x%06X,backgroundColor=0x%06X,outline=%b,alignment=%d(%s),lineWidth=%d," +
-            "seeThrough=%b,defaultBackground=%b,glowColor=0x%06X,shadowRadius=%.2f,shadowStrength=%.2f,viewRange=%.2f,billboardMode=%d}",
+            "text='%s',backgroundColor=0x%06X,alignment=%d(%s),lineWidth=%d," +
+            "seeThrough=%b,glowColor=0x%06X,shadowRadius=%.2f,shadowStrength=%.2f,viewRange=%.2f,billboardMode=%d}",
             scale.x, scale.y, scale.z, translation.x, translation.y, translation.z,
             leftRotation, rightRotation,
-            text, textColor, backgroundColor, hasOutline, textAlignment, getTextAlignmentName(), lineWidth,
-            seeThrough, defaultBackground, glowColor, shadowRadius, shadowStrength, viewRange, billboardMode
+            text, backgroundColor, textAlignment, getTextAlignmentName(), lineWidth,
+            seeThrough, glowColor, shadowRadius, shadowStrength, viewRange, billboardMode
         );
     }
     @Override
     public String toString() {
         return "text display [" +
             "text='"      + text + "', " +
-            "color=#"     + String.format("%06X", textColor) + ", " +
             "bg=#"        + String.format("%06X", backgroundColor) + ", " +
             "align="      + getTextAlignmentName() + ", " +
-            "outline="    + hasOutline + ", " +
             "through="    + seeThrough + ", " +
             "width="      + lineWidth + ", " +
             "scale=("     + scale.x + ", " + scale.y + ", " + scale.z + "), " +
