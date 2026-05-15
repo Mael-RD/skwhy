@@ -1,0 +1,56 @@
+package skwhy.modules.FakeDisplayElements.effects;
+
+import ch.njol.skript.lang.Effect;
+import ch.njol.skript.lang.Expression;
+import ch.njol.skript.lang.SkriptParser;
+import ch.njol.util.Kleenean;
+import org.bukkit.event.Event;
+import org.jetbrains.annotations.Nullable;
+import org.skriptlang.skript.addon.SkriptAddon;
+import org.skriptlang.skript.registration.SyntaxInfo;
+import org.skriptlang.skript.registration.SyntaxRegistry;
+import skwhy.data.DisplayGroupData;
+
+public class SetGroupDirection extends Effect {
+
+    private Expression<DisplayGroupData> groupExpr;
+    private Expression<Number> yawExpr;
+    private Expression<Number> pitchExpr;
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public boolean init(Expression<?>[] exprs, int matchedPattern,
+                        Kleenean isDelayed, SkriptParser.ParseResult pr) {
+        groupExpr = (Expression<DisplayGroupData>) exprs[0];
+        yawExpr   = (Expression<Number>) exprs[1];
+        pitchExpr = (Expression<Number>) exprs[2];
+        return true;
+    }
+
+    @Override
+    protected void execute(Event event) {
+        DisplayGroupData group = groupExpr.getSingle(event);
+        Number yaw             = yawExpr.getSingle(event);
+        Number pitch           = pitchExpr.getSingle(event);
+
+        if (group == null || yaw == null || pitch == null) return;
+
+        group.setYawPitch(yaw.floatValue(), pitch.floatValue());
+    }
+
+    @Override
+    public String toString(@Nullable Event event, boolean debug) {
+        return "set direction of " + groupExpr.toString(event, debug)
+            + " to yaw " + yawExpr.toString(event, debug)
+            + " and pitch " + pitchExpr.toString(event, debug);
+    }
+
+    public static void register(SkriptAddon addon) {
+        addon.syntaxRegistry().register(
+            SyntaxRegistry.EFFECT,
+            SyntaxInfo.builder(SetGroupDirection.class)
+                .addPattern("set (direction|yaw and pitch) of %displaygroup% to %number% [and] %number%")
+                .build()
+        );
+    }
+}

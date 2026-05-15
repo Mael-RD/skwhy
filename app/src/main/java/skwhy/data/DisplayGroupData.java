@@ -8,9 +8,11 @@ import org.bukkit.Location;
 import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityRotation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSetPassengers;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +29,7 @@ public class DisplayGroupData {
     // Position du groupe : soit une location statique, soit une entité mobile
     private Location location;
     private Entity attachedEntity;
+    private float yaw, pitch;
     private Integer attachedId;
     
     private DisplayGroupData() {
@@ -37,12 +40,16 @@ public class DisplayGroupData {
 
     public DisplayGroupData(Location location) {
         this();
-        this.location = location;
+        this.location = location.clone();
+        this.yaw = location.getYaw();
+        this.pitch = location.getPitch();
     }
     public DisplayGroupData(Entity attachedEntity) {
         this();
         this.attachedEntity = attachedEntity;
         this.attachedId = attachedEntity.getEntityId();
+        this.yaw = attachedEntity.getLocation().getYaw();
+        this.pitch = attachedEntity.getLocation().getPitch();
     }
     public DisplayGroupData(Location location, Integer attachedId) {
         this(location);
@@ -104,7 +111,7 @@ public class DisplayGroupData {
     public void setAttachedId(Location location, Integer entityId) {
         if (entityId == null) return;
         this.attachedEntity = null;
-        this.location = location;
+        this.location = location.clone();
         this.attachedId = entityId;
         sendMovePacket();
         mount();
@@ -112,16 +119,36 @@ public class DisplayGroupData {
 
     public Location getLocation() {
         if (attachedEntity != null) {
-            if (attachedEntity.isValid()) return (attachedEntity instanceof LivingEntity living) ? living.getEyeLocation() : attachedEntity.getLocation();
+            if (attachedEntity.isValid()) return (attachedEntity instanceof LivingEntity living) ? living.getEyeLocation().clone() : attachedEntity.getLocation().clone();
             else {
                 sendDestroyPacket(displays, viewers);
                 return null;
             }
         } else if (location != null) {
-            return location;
+            return location.clone();
         } else {
             sendDestroyPacket(displays, viewers);
             return null;
+        }
+    }
+
+    public float getYaw() {
+        return yaw;
+    }
+
+    public float getPitch() {
+        return pitch;
+    }
+
+    public void setYawPitch(float yaw, float pitch) {
+        this.yaw = yaw;
+        this.pitch = pitch;
+        if (attachedEntity == null){
+            this.location.setYaw(yaw);
+            this.location.setPitch(pitch);
+            sendMovePacket();
+        } else {
+            sendRotation();
         }
     }
 
@@ -277,6 +304,44 @@ public class DisplayGroupData {
                 if (user != null) {
                     user.sendPacket(teleportPacket);
                 }
+            }
+        }
+    }
+
+    /**
+     * Envoie uniquement la rotation (yaw/pitch) à tous les viewers.
+     * Les displays montées sur une entité sont ignorées — elles héritent
+     * de la rotation de leur monture et ne doivent pas recevoir de packet
+     * individuel qui pourrait entrer en conflit.
+     */
+    public void sendRotation() {
+        if (viewers.isEmpty() || displays.isEmpty()) return;
+
+        // Si le groupe entier est monté sur une entité, sa rotation
+        // est dictée par la monture → on n'envoie rien
+        if (attachedId != null) return;
+
+        for (DisplayData display : displays) {
+            WrapperPlayServerEntityRotation rotationPacket =
+                new WrapperPlayServerEntityRotation(
+                    display.getEntityId(),
+                    yaw,
+                    pitch,
+                    false // onGround
+                );
+
+            // On envoie aussi le head yaw pour que la rotation soit cohérente
+            WrapperPlayServerEntityHeadLook headLookPacket =
+                new WrapperPlayServerEntityHeadLook(
+                    display.getEntityId(),
+                    yaw
+                );
+
+            for (Player player : viewers) {
+                var user = PacketEvents.getAPI().getPlayerManager().getUser(player);
+                if (user == null) continue;
+                user.sendPacket(rotationPacket);
+                user.sendPacket(headLookPacket);
             }
         }
     }
