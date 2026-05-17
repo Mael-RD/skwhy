@@ -440,4 +440,56 @@ public class DisplayGroupData {
         return globalTransformation.getScale();
     }
 
+
+    public void delete() {
+        sendDestroyPacket(displays, viewers);
+        displays.clear();
+        viewers.clear();
+    }
+
+// ─────────────────────────────────────────────────────────────────────────
+    // ── Méthodes d'Affichage et Debug ──
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Affichage NORMAL : Format compact, idéal pour les logs standards ou l'affichage en jeu.
+     */
+    @Override
+    public String toString() {
+        String target = "Statique";
+        if (attachedEntity != null) {
+            target = "Attaché à l'Entité (Type: " + attachedEntity.getType().name() + ", ID: " + attachedId + ")";
+        } else if (attachedId != null) {
+            target = "Attaché à l'ID Entité: " + attachedId;
+        }
+
+        Location loc = getLocation();
+        String coords;
+        
+        // Sécurité maximale : on vérifie que loc ET loc.getWorld() ne soient pas null
+        if (loc != null && loc.getWorld() != null) {
+            coords = String.format("%.2f, %.2f, %.2f dans %s", loc.getX(), loc.getY(), loc.getZ(), loc.getWorld().getName());
+        } else if (loc != null) {
+            coords = String.format("%.2f, %.2f, %.2f (Monde non chargé/indéfini)", loc.getX(), loc.getY(), loc.getZ());
+        } else {
+            coords = "Inconnue ou non initialisée";
+        }
+
+        return "DisplayGroup[Target: " + target + 
+               "; Pos: [" + coords + "]" +
+               "; Yaw/Pitch: " + String.format("%.1f°/%.1f°", yaw, pitch) +
+               "; Displays: " + displays.size() + 
+               "; Viewers: " + viewers.size() + "]";
+    }
+    
+    public String serialize() {
+        return String.format(
+            "DisplayGroup[Target: %s; Pos: %s; Yaw/Pitch: %.1f/%.1f; Displays: %d; Viewers: %d]",
+            (attachedEntity != null) ? "Entité (ID: " + attachedId + ")" : (attachedId != null ? "ID Entité: " + attachedId : "Statique"),
+            (getLocation() != null) ? String.format("%.2f, %.2f, %.2f", getLocation().getX(), getLocation().getY(), getLocation().getZ()) : "Inconnue",
+            yaw, pitch, displays.size(), viewers.size()
+        );
+    }
+
+
 }

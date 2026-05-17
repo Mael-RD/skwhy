@@ -3,6 +3,7 @@ package skwhy.modules.FakeDisplayElements.types;
 import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.classes.Parser;
 import ch.njol.skript.classes.Serializer;
+import ch.njol.skript.lang.ParseContext;
 import ch.njol.skript.registrations.Classes;
 import ch.njol.yggdrasil.Fields;
 import skwhy.data.DisplayGroupData;
@@ -31,15 +32,37 @@ public class DisplayGroup {
             .since("1.0.0")
             
             .parser(new Parser<>() {
+
                 @Override
                 public String toString(DisplayGroupData data, int flags) {
-                    return "display group [displays=" + data.getDisplays().size() +
-                           ", viewers=" + data.getViewers().size() + "]";
+                    return this.toString();
                 }
 
                 @Override
                 public String toVariableNameString(DisplayGroupData data) {
-                    return "displaygroup:" + data.getDisplays().size();
+                    return "displaygroup:" + data.serialize();
+                }
+            })
+            .parser(new Parser<DisplayGroupData>() {
+                @Override
+                public DisplayGroupData parse(String s, ParseContext context) {
+                    return null; 
+                }
+
+                @Override
+                public boolean canParse(ParseContext context) {
+                    // Tu peux mettre false si ce type ne doit jamais être parsé depuis du texte
+                    return false; 
+                }
+
+                @Override
+                public String toString(DisplayGroupData o, int flags) {
+                    return o.toString();
+                }
+
+                @Override
+                public String toVariableNameString(DisplayGroupData o) {
+                    return "displaygroup:" + o.toString();
                 }
             })
             

@@ -1,13 +1,15 @@
 package skwhy.modules.FakeDisplayElements.sections;
 
 import ch.njol.skript.Skript;
+import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.config.EntryNode;
 import ch.njol.skript.config.Node;
 import ch.njol.skript.config.SectionNode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.lang.ParseContext;
-import ch.njol.skript.lang.util.SimpleExpression;
+import ch.njol.skript.lang.Section;
+import ch.njol.skript.lang.TriggerItem;
 import ch.njol.skript.registrations.Classes;
 import ch.njol.util.Kleenean;
 import org.bukkit.event.Event;
@@ -15,84 +17,125 @@ import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
-import skwhy.data.TextDisplayData;
-import ch.njol.skript.log.SkriptLogger;
 
-import java.util.HashMap;
+import org.joml.Quaternionf;
+import org.bukkit.util.Vector;
+import skwhy.data.Quat4;
+import skwhy.data.Vec3;
+
+import skwhy.data.TextDisplayData;
+
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
-public class CreateTextSection extends SimpleExpression<TextDisplayData> {
+public class CreateTextSection extends Section {
 
-    private final Map<String, String> fields = new HashMap<>();
+    private Expression<?> resultVar;
+    private final Map<String, String> fields = new LinkedHashMap<>();
 
     @Override
-    public boolean init(Expression<?>[] exprs, int matchedPattern,
-                        Kleenean isDelayed, SkriptParser.ParseResult parseResult) {
-        Node node = SkriptLogger.getNode();
+    public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed,
+                        SkriptParser.ParseResult parseResult,
+                        @Nullable SectionNode sectionNode,
+                        List<TriggerItem> triggerItems) {
+        resultVar = exprs[0];
 
-        if (!(node instanceof SectionNode sectionNode)) {
-            return true;
+        if (sectionNode == null) {
+            Skript.error("'new fake text display' nécessite une section de configuration.");
+            return false;
         }
 
-        for (Node child : sectionNode) {
-            if (child instanceof EntryNode entry) {
-                String key   = entry.getKey().toLowerCase().trim();
-                String value = entry.getValue().trim();
-                fields.put(key, value);
+        for (Node node : sectionNode) {
+            if (node instanceof EntryNode entry) {
+                // Valeurs simples : block: oak_log, scale: 2, billboard: 0
+                fields.put(
+                    entry.getKey().toLowerCase().trim(),
+                    entry.getValue().trim()
+                );
+            } else {
+                String raw = node.getKey();
+                int colon = raw.indexOf(':');
+                if (colon > 0) {
+                    fields.put(
+                        raw.substring(0, colon).toLowerCase().trim(),
+                        raw.substring(colon + 1).trim()
+                    );
+                }
             }
         }
+
         return true;
     }
 
     @Override
-    protected @Nullable TextDisplayData[] get(Event event) {
+    protected @Nullable TriggerItem walk(Event event) {
         TextDisplayData display = new TextDisplayData();
 
         fields.forEach((key, value) -> {
             switch (key) {
-
-                // ── Texte ─────────────────────────────────────────────────────
-                case "text" ->
-                    display.setText(value);
-
-                // ── Couleur de fond ───────────────────────────────────────────
-                case "background", "backgroundcolor", "bgcolor" -> {
-                    int color = parseColor(value);
-                    display.setBackgroundColor(color);
-                }
-
-                // ── See through ───────────────────────────────────────────────
-                case "seethrough", "see_through", "through" -> {
-                    boolean b = parseBoolean(value);
-                    display.setSeeThrough(b);
-                }
-
-                // ── Alignement ────────────────────────────────────────────────
-                // Accepte "center"/"left"/"right" ou 0/1/2
-                case "alignment", "align", "textalignment" -> {
-                    int align = parseAlignment(value);
-                    display.setTextAlignment(align);
-                }
-
-                // ── Largeur de ligne ──────────────────────────────────────────
-                case "linewidth", "width", "line_width" -> {
-                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                    if (n != null) display.setLineWidth(n.intValue());
-                }
-
-                // ── Scale ─────────────────────────────────────────────────────
                 case "scale" -> {
-                    org.bukkit.util.Vector v = Classes.parse(value, org.bukkit.util.Vector.class, ParseContext.DEFAULT);
+                    Vector v = Classes.parse(value, Vector.class, ParseContext.DEFAULT);
                     if (v != null) {
-                        display.setScale((float) v.getX(), (float) v.getY(), (float) v.getZ());
+                        display.setScale(new Vec3(v));
                     } else {
                         Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                        if (n != null) display.setScale(n.floatValue(), n.floatValue(), n.floatValue());
+                        if (n != null) display.setScale(new Vec3(n.floatValue()));
                         else Skript.warning("Valeur invalide pour 'scale' : " + value);
                     }
                 }
-
-                // ── Propriétés communes ───────────────────────────────────────
+                case "translation" -> {
+                    Vector v = Classes.parse(value, Vector.class, ParseContext.DEFAULT);
+                    if (v != null) {
+                        display.setTranslation(new Vec3(v));
+                    } else {
+                        Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
+                        if (n != null) display.setTranslation(new Vec3(n.floatValue()));
+                        else Skript.warning("Valeur invalide pour 'translation' : " + value);
+                    }
+                }
+                case "rotation", "leftrotation" -> {
+                    Quaternionf q = Classes.parse(value, Quaternionf.class, ParseContext.DEFAULT);
+                    if (q != null) {
+                        display.setLeftRotation(new Quat4(q));
+                    } else {
+                        // Format : "x, y, z, w"
+                        String[] parts = value.split(",");
+                        if (parts.length == 4) {
+                            try {
+                                display.setLeftRotation(
+                                    Float.parseFloat(parts[0].trim()),
+                                    Float.parseFloat(parts[1].trim()),
+                                    Float.parseFloat(parts[2].trim()),
+                                    Float.parseFloat(parts[3].trim())
+                                );
+                            } catch (NumberFormatException e) {
+                                Skript.warning("Quaternion invalide pour 'rotation' : " + value);
+                            }
+                        }
+                    }
+                }
+                case "rightrotation" -> {
+                    Quaternionf q = Classes.parse(value, Quaternionf.class, ParseContext.DEFAULT);
+                    if (q != null) {
+                        display.setRightRotation(new Quat4(q));
+                    } else {
+                        // Format : "x, y, z, w"
+                        String[] parts = value.split(",");
+                        if (parts.length == 4) {
+                            try {
+                                display.setRightRotation(
+                                    Float.parseFloat(parts[0].trim()),
+                                    Float.parseFloat(parts[1].trim()),
+                                    Float.parseFloat(parts[2].trim()),
+                                    Float.parseFloat(parts[3].trim())
+                                );
+                            } catch (NumberFormatException e) {
+                                Skript.warning("Quaternion invalide pour 'rightrotation' : " + value);
+                            }
+                        }
+                    }
+                }
                 case "glow" -> {
                     Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
                     if (n != null) display.setGlowColor(n.intValue());
@@ -113,23 +156,44 @@ public class CreateTextSection extends SimpleExpression<TextDisplayData> {
                     Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
                     if (n != null) display.setBillboardMode(n.intValue());
                 }
+                case "interpolation", "interpolationduration" -> {
+                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
+                    if (n != null) display.setInterpolationDuration(n.intValue());
+                }
+                case "interpolationstart", "interpolationdelay" -> {
+                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
+                    if (n != null) display.setInterpolationStart(n.intValue());
+                }
 
+                case "text" ->
+                    display.setText(value);
+
+                case "background", "backgroundcolor", "bgcolor" ->
+                    display.setBackgroundColor(parseColor(value));
+
+                case "seethrough", "see_through", "through" ->
+                    display.setSeeThrough(parseBoolean(value));
+
+                case "alignment", "align", "textalignment" ->
+                    display.setTextAlignment(parseAlignment(value));
+
+                case "linewidth", "width", "line_width" -> {
+                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
+                    if (n != null) display.setLineWidth(n.intValue());
+                }
                 default -> Skript.warning("Champ inconnu ignoré : '" + key + "'");
             }
         });
 
-        return new TextDisplayData[]{ display };
+        resultVar.change(event, new Object[]{ display }, ChangeMode.SET);
+
+        return getNext();
     }
 
-    // ── Utilitaires de parsing ─────────────────────────────────────────────────
-
-    /**
-     * Parse une couleur depuis "#RRGGBB", "0xRRGGBB" ou un entier brut.
-     */
     private int parseColor(String value) {
         String v = value.trim();
         try {
-            if (v.startsWith("#"))  return Integer.parseInt(v.substring(1), 16);
+            if (v.startsWith("#"))                      return Integer.parseInt(v.substring(1), 16);
             if (v.startsWith("0x") || v.startsWith("0X")) return Integer.parseInt(v.substring(2), 16);
             return Integer.parseInt(v);
         } catch (NumberFormatException e) {
@@ -138,9 +202,6 @@ public class CreateTextSection extends SimpleExpression<TextDisplayData> {
         }
     }
 
-    /**
-     * Parse un booléen depuis "true"/"false"/"yes"/"no"/"1"/"0".
-     */
     private boolean parseBoolean(String value) {
         return switch (value.toLowerCase().trim()) {
             case "true", "yes", "1", "on" -> true;
@@ -148,9 +209,6 @@ public class CreateTextSection extends SimpleExpression<TextDisplayData> {
         };
     }
 
-    /**
-     * Parse l'alignement depuis "center"/"left"/"right" ou 0/1/2.
-     */
     private int parseAlignment(String value) {
         return switch (value.toLowerCase().trim()) {
             case "center", "0" -> 0;
@@ -164,21 +222,15 @@ public class CreateTextSection extends SimpleExpression<TextDisplayData> {
     }
 
     @Override
-    public boolean isSingle() { return true; }
-
-    @Override
-    public Class<? extends TextDisplayData> getReturnType() { return TextDisplayData.class; }
-
-    @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return "new text display section";
+        return "set " + resultVar.toString(event, debug) + " to new fake text display";
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
-            SyntaxRegistry.EXPRESSION,
-            SyntaxInfo.Expression.builder(CreateTextSection.class, TextDisplayData.class)
-                .addPattern("[a] [new] [fake] text display")
+            SyntaxRegistry.SECTION,
+            SyntaxInfo.builder(CreateTextSection.class)
+                .addPattern("set %~objects% to [a] [new] [fake] text display")
                 .build()
         );
     }

@@ -1,13 +1,15 @@
 package skwhy.modules.FakeDisplayElements.sections;
 
 import ch.njol.skript.Skript;
+import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.config.EntryNode;
 import ch.njol.skript.config.Node;
 import ch.njol.skript.config.SectionNode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.lang.ParseContext;
-import ch.njol.skript.lang.util.SimpleExpression;
+import ch.njol.skript.lang.Section;
+import ch.njol.skript.lang.TriggerItem;
 import ch.njol.skript.registrations.Classes;
 import ch.njol.util.Kleenean;
 import org.bukkit.event.Event;
@@ -16,65 +18,123 @@ import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.ItemDisplayData;
-import ch.njol.skript.log.SkriptLogger;
 
-import java.util.HashMap;
+import org.bukkit.util.Vector;
+import org.joml.Quaternionf;
+import skwhy.data.Vec3;
+import skwhy.data.Quat4;
+
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
-public class CreateItemSection extends SimpleExpression<ItemDisplayData> {
+public class CreateItemSection extends Section {
 
-    private final Map<String, String> fields = new HashMap<>();
+    private Expression<?> resultVar;
+    private final Map<String, String> fields = new LinkedHashMap<>();
 
     @Override
-    public boolean init(Expression<?>[] exprs, int matchedPattern,
-                        Kleenean isDelayed, SkriptParser.ParseResult parseResult) {
-        Node node = SkriptLogger.getNode();
+    public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed,
+                        SkriptParser.ParseResult parseResult,
+                        @Nullable SectionNode sectionNode,
+                        List<TriggerItem> triggerItems) {
+        resultVar = exprs[0];
 
-        if (!(node instanceof SectionNode sectionNode)) {
-            return true;
+        if (sectionNode == null) {
+            Skript.error("'new fake item display' nécessite une section de configuration.");
+            return false;
         }
 
-        for (Node child : sectionNode) {
-            if (child instanceof EntryNode entry) {
-                String key   = entry.getKey().toLowerCase().trim();
-                String value = entry.getValue().trim();
-                fields.put(key, value);
+        for (Node node : sectionNode) {
+            if (node instanceof EntryNode entry) {
+                // Valeurs simples : block: oak_log, scale: 2, billboard: 0
+                fields.put(
+                    entry.getKey().toLowerCase().trim(),
+                    entry.getValue().trim()
+                );
+            } else {
+                String raw = node.getKey();
+                int colon = raw.indexOf(':');
+                if (colon > 0) {
+                    fields.put(
+                        raw.substring(0, colon).toLowerCase().trim(),
+                        raw.substring(colon + 1).trim()
+                    );
+                }
             }
         }
+
         return true;
     }
 
     @Override
-    protected @Nullable ItemDisplayData[] get(Event event) {
+    protected @Nullable TriggerItem walk(Event event) {
         ItemDisplayData display = new ItemDisplayData();
 
         fields.forEach((key, value) -> {
             switch (key) {
-
-                // ── Item ──────────────────────────────────────────────────────
-                case "item", "itemstack", "material" ->
-                    display.setItemStack(value.toUpperCase());
-
-                // ── Mode d'affichage ──────────────────────────────────────────
-                // Accepte le nom ("gui", "head"...) ou un entier (0-8)
-                case "mode", "displaymode" -> {
-                    int mode = parseDisplayMode(value);
-                    display.setDisplayMode(mode);
-                }
-
-                // ── Scale ─────────────────────────────────────────────────────
                 case "scale" -> {
-                    org.bukkit.util.Vector v = Classes.parse(value, org.bukkit.util.Vector.class, ParseContext.DEFAULT);
+                    Vector v = Classes.parse(value, Vector.class, ParseContext.DEFAULT);
                     if (v != null) {
-                        display.setScale((float) v.getX(), (float) v.getY(), (float) v.getZ());
+                        display.setScale(new Vec3(v));
                     } else {
                         Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                        if (n != null) display.setScale(n.floatValue(), n.floatValue(), n.floatValue());
+                        if (n != null) display.setScale(new Vec3(n.floatValue()));
                         else Skript.warning("Valeur invalide pour 'scale' : " + value);
                     }
                 }
-
-                // ── Propriétés communes ───────────────────────────────────────
+                case "translation" -> {
+                    Vector v = Classes.parse(value, Vector.class, ParseContext.DEFAULT);
+                    if (v != null) {
+                        display.setTranslation(new Vec3(v));
+                    } else {
+                        Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
+                        if (n != null) display.setTranslation(new Vec3(n.floatValue()));
+                        else Skript.warning("Valeur invalide pour 'translation' : " + value);
+                    }
+                }
+                case "rotation", "leftrotation" -> {
+                    Quaternionf q = Classes.parse(value, Quaternionf.class, ParseContext.DEFAULT);
+                    if (q != null) {
+                        display.setLeftRotation(new Quat4(q));
+                    } else {
+                        // Format : "x, y, z, w"
+                        String[] parts = value.split(",");
+                        if (parts.length == 4) {
+                            try {
+                                display.setLeftRotation(
+                                    Float.parseFloat(parts[0].trim()),
+                                    Float.parseFloat(parts[1].trim()),
+                                    Float.parseFloat(parts[2].trim()),
+                                    Float.parseFloat(parts[3].trim())
+                                );
+                            } catch (NumberFormatException e) {
+                                Skript.warning("Quaternion invalide pour 'rotation' : " + value);
+                            }
+                        }
+                    }
+                }
+                case "rightrotation" -> {
+                    Quaternionf q = Classes.parse(value, Quaternionf.class, ParseContext.DEFAULT);
+                    if (q != null) {
+                        display.setRightRotation(new Quat4(q));
+                    } else {
+                        // Format : "x, y, z, w"
+                        String[] parts = value.split(",");
+                        if (parts.length == 4) {
+                            try {
+                                display.setRightRotation(
+                                    Float.parseFloat(parts[0].trim()),
+                                    Float.parseFloat(parts[1].trim()),
+                                    Float.parseFloat(parts[2].trim()),
+                                    Float.parseFloat(parts[3].trim())
+                                );
+                            } catch (NumberFormatException e) {
+                                Skript.warning("Quaternion invalide pour 'rightrotation' : " + value);
+                            }
+                        }
+                    }
+                }
                 case "glow" -> {
                     Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
                     if (n != null) display.setGlowColor(n.intValue());
@@ -95,17 +155,30 @@ public class CreateItemSection extends SimpleExpression<ItemDisplayData> {
                     Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
                     if (n != null) display.setBillboardMode(n.intValue());
                 }
+                case "interpolation", "interpolationduration" -> {
+                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
+                    if (n != null) display.setInterpolationDuration(n.intValue());
+                }
+                case "interpolationstart", "interpolationdelay" -> {
+                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
+                    if (n != null) display.setInterpolationStart(n.intValue());
+                }
+
+                case "item", "itemstack", "material" ->
+                    display.setItemStack(value.toUpperCase());
+
+                case "mode", "displaymode" ->
+                    display.setDisplayMode(parseDisplayMode(value));
 
                 default -> Skript.warning("Champ inconnu ignoré : '" + key + "'");
             }
         });
 
-        return new ItemDisplayData[]{ display };
+        resultVar.change(event, new Object[]{ display }, ChangeMode.SET);
+
+        return getNext();
     }
 
-    /**
-     * Accepte le nom textuel du mode ("gui", "head"...) ou un entier direct.
-     */
     private int parseDisplayMode(String value) {
         return switch (value.toLowerCase().trim()) {
             case "none"                  -> 0;
@@ -125,21 +198,15 @@ public class CreateItemSection extends SimpleExpression<ItemDisplayData> {
     }
 
     @Override
-    public boolean isSingle() { return true; }
-
-    @Override
-    public Class<? extends ItemDisplayData> getReturnType() { return ItemDisplayData.class; }
-
-    @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return "new item display section";
+        return "set " + resultVar.toString(event, debug) + " to new fake item display";
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
-            SyntaxRegistry.EXPRESSION,
-            SyntaxInfo.Expression.builder(CreateItemSection.class, ItemDisplayData.class)
-                .addPattern("[a] [new] [fake] item display")
+            SyntaxRegistry.SECTION,
+            SyntaxInfo.builder(CreateItemSection.class)
+                .addPattern("set %~objects% to [a] [new] [fake] item display")
                 .build()
         );
     }

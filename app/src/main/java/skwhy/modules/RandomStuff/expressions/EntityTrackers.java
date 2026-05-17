@@ -1,4 +1,4 @@
-package skwhy.modules.FakeDisplayElements.expressions;
+package skwhy.modules.RandomStuff.expressions;
 
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -59,7 +59,7 @@ public class EntityTrackers extends SimpleExpression<Player> {
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
-            SyntaxInfo.Expression.builder(DisplayId.class, Object.class)
+            SyntaxInfo.Expression.builder(EntityTrackers.class, Player.class)
                 .addPattern("[all] [the] trackers of %entity%")
                 .build()
         );

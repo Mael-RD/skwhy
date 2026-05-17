@@ -11,6 +11,7 @@ import org.skriptlang.skript.addon.SkriptAddon;
 import com.github.retrooper.packetevents.PacketEvents;
 
 import skwhy.modules.FakeDisplayModule;
+import skwhy.modules.RandomStuffModule;
 // import com.github.retrooper.packetevents.PacketEvents;
 
 public class SkWhy extends JavaPlugin {
@@ -44,6 +45,7 @@ public class SkWhy extends JavaPlugin {
         );
         // Chargement des modules
         skriptAddon.loadModules(new FakeDisplayModule());
+        skriptAddon.loadModules(new RandomStuffModule());
 
         getLogger().info("SkWhy activé avec succès !");
     }

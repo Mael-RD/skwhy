@@ -41,34 +41,20 @@ public class GroupCreate extends SimpleExpression<DisplayGroupData> {
 
     private Expression<DisplayData> displaysExpr;
     private Expression<Player> playersExpr;
-    private Location location;
-    private Entity entity;
-
-    @Override
+    private Expression<?> locationExpr;
+@Override
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, ParseResult pr) {
-    
-        boolean hasDisplays = (pr.mark & 1) != 0;
-        boolean hasPlayers = (pr.mark & 2) != 0;
-
-        if (hasDisplays && hasPlayers) {
-            displaysExpr = (Expression<DisplayData>) exprs[1];
-            playersExpr = (Expression<Player>) exprs[2];
-        } else if (hasDisplays) {
-            displaysExpr = (Expression<DisplayData>) exprs[1];
-        } else if (hasPlayers) {
-            playersExpr = (Expression<Player>) exprs[2];
-        }
-
-        Object pos = exprs[0];
-
-        if (pos instanceof Entity entity) {
-            this.entity = entity;
-        } else if (pos instanceof Location location) {
-            this.location = location;
-        } else {
-            return false;
+        
+        this.locationExpr = exprs[0];
+        // Récupération des expressions optionnelles via les marks configurés dans le pattern
+        displaysExpr = (pr.mark & 1) != 0 ? (Expression<DisplayData>) exprs[1] : null;
+        
+        // Si le groupe contient à la fois les displays et les players, players sera à l'index 2.
+        // Si seulement les players sont présents, il sera à l'index 1.
+        if ((pr.mark & 2) != 0) {
+            playersExpr = (Expression<Player>) exprs[(pr.mark & 1) != 0 ? 2 : 1];
         }
 
         return true;
@@ -78,9 +64,10 @@ public class GroupCreate extends SimpleExpression<DisplayGroupData> {
     protected @Nullable DisplayGroupData[] get(Event event) {
         List<DisplayData> displays = displaysExpr != null ? Arrays.asList(displaysExpr.getAll(event)) : new ArrayList<>();
         List<Player> players = playersExpr != null ? Arrays.asList(playersExpr.getAll(event)) : new ArrayList<>();
-        if (entity != null) {
+        Object locOrEntity = locationExpr.getSingle(event);
+        if (locOrEntity instanceof Entity entity) {
             return new DisplayGroupData[] { new DisplayGroupData(displays, players, entity) {} };
-        } else if (location != null) {
+        } else if (locOrEntity instanceof Location location) {
             return new DisplayGroupData[] { new DisplayGroupData(displays, players, location) {} };
         } else {
             return null;
@@ -237,11 +224,14 @@ public class GroupCreate extends SimpleExpression<DisplayGroupData> {
         return "display group from " + displaysExpr.toString(event, debug);
     }
 
+
+    // ... Garde le reste de ton code identique (get, buildFromDisplay, etc.) ...
+
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(GroupCreate.class, DisplayGroupData.class)
-                .addPattern("[a] [fake] display group at %location/entity% [from %displaydatas%] [with %players%]")
+                .addPattern("[a] [fake] display group at %location/entity% [(1:from %displaydatas%)] [(2:with %players%)]")
                 .build()
         );
     }

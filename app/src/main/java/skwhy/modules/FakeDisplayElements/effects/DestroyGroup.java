@@ -4,7 +4,6 @@ import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.util.Kleenean;
-import org.bukkit.entity.Entity;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.addon.SkriptAddon;
@@ -12,17 +11,15 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 
-public class MountGroup extends Effect {
+public class DestroyGroup extends Effect {
 
     private Expression<DisplayGroupData> groupExpr;
-    private @Nullable Expression<Entity> entityExpr;
 
     @Override
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        groupExpr  = (Expression<DisplayGroupData>) exprs[0];
-        entityExpr = exprs.length > 1 ? (Expression<Entity>) exprs[1] : null;
+        groupExpr = (Expression<DisplayGroupData>) exprs[0];
         return true;
     }
 
@@ -30,29 +27,19 @@ public class MountGroup extends Effect {
     protected void execute(Event event) {
         DisplayGroupData group = groupExpr.getSingle(event);
         if (group == null) return;
-
-        if (entityExpr != null) {
-            Entity entity = entityExpr.getSingle(event);
-            if (entity == null) return;
-            group.setAttachedEntity(entity);
-        } else {
-            group.mount();
-        }
+        group.delete();
     }
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        String base = "make " + groupExpr.toString(event, debug) + " mount";
-        return entityExpr != null
-            ? base + " on " + entityExpr.toString(event, debug)
-            : base;
+        return "destroy display group " + groupExpr.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EFFECT,
-            SyntaxInfo.builder(MountGroup.class)
-                .addPattern("make %displaygroup% mount [on %entity%]")
+            SyntaxInfo.builder(DestroyGroup.class)
+                .addPattern("destroy [display] group %displaygroup%")
                 .build()
         );
     }
