@@ -85,4 +85,18 @@ public class Vec3 {
         Quat4 rotatedP = q.mul(p).mul(new Quat4(-q.x, -q.y, -q.z, q.w));
         return new Vec3(rotatedP.x, rotatedP.y, rotatedP.z);
     }
+
+    /**
+     * Applique un effet miroir directement sur ce vecteur selon les axes spécifiés.
+     * Modifie l'état interne de cette instance.
+     *
+     * @param x true pour inverser la composante X
+     * @param y true pour inverser la composante Y
+     * @param z true pour inverser la composante Z
+     */
+    public void mirror(boolean x, boolean y, boolean z) {
+        if (x) this.x = -this.x;
+        if (y) this.y = -this.y;
+        if (z) this.z = -this.z;
+    }
 }

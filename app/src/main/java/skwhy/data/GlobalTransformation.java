@@ -140,4 +140,20 @@ public class GlobalTransformation {
         // Multiplie l'échelle globale par l'échelle du display
         return displayScale.mul(scale);
     }
+
+    /**
+     * Applique un effet miroir sur la transformation globale selon les axes spécifiés.
+     * Inverse les composantes correspondantes de la translation et des quaternions.
+     *
+     * @param x true pour appliquer un miroir sur l'axe X
+     * @param y true pour appliquer un miroir sur l'axe Y
+     * @param z true pour appliquer un miroir sur l'axe Z
+     */
+    public void mirror(boolean x, boolean y, boolean z) {
+        if (!x && !y && !z) return;
+
+        translation.mirror(x, y, z);
+        centreRotation.mirror(x, y, z);
+        rotation.mirror(x, y, z);
+    }
 }

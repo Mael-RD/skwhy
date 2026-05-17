@@ -175,4 +175,12 @@ public class ItemDisplayData extends DisplayData {
             "range="       + viewRange +
         "]";
     }
+
+    @Override
+    protected DisplayData createEmptyClone() {
+        ItemDisplayData clone = new ItemDisplayData();
+        clone.itemStack = this.itemStack;
+        clone.displayMode = this.displayMode;
+        return clone;
+    }
 }

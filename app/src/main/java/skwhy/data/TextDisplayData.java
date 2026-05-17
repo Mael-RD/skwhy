@@ -239,4 +239,15 @@ public class TextDisplayData extends DisplayData {
             "range="      + viewRange +
         "]";
     }
+
+    @Override
+    protected DisplayData createEmptyClone() {
+        TextDisplayData clone = new TextDisplayData();
+        clone.text = this.text;
+        clone.backgroundColor = this.backgroundColor;
+        clone.textAlignment = this.textAlignment;
+        clone.lineWidth = this.lineWidth;
+        clone.seeThrough = this.seeThrough;
+        return clone;
+    }
 }

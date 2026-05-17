@@ -69,4 +69,27 @@ public class Quat4 {
     public String toString() {
         return String.format("(%.2f, %.2f, %.2f, %.2f)", x, y, z, w);
     }
+
+    /**
+     * Applique un effet miroir directement sur ce quaternion selon les axes spécifiés.
+     * Modifie l'état interne de cette instance.
+     *
+     * @param x true pour appliquer un miroir sur l'axe X (Plan YZ)
+     * @param y true pour appliquer un miroir sur l'axe Y (Plan XZ)
+     * @param z true pour appliquer un miroir sur l'axe Z (Plan XY)
+     */
+    public void mirror(boolean x, boolean y, boolean z) {
+        if (x) {
+            this.y = -this.y;
+            this.z = -this.z;
+        }
+        if (y) {
+            this.x = -this.x;
+            this.z = -this.z;
+        }
+        if (z) {
+            this.x = -this.x;
+            this.y = -this.y;
+        }
+    }
 }

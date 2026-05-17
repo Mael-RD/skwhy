@@ -229,6 +229,9 @@ public abstract class DisplayData {
 
     /** Sérialise les données en String. */
     public abstract String serialize();
+
+    /** Retourne une copie brute (shallow copy) du sous-type exact. */
+    protected abstract DisplayData createEmptyClone();
     
     // ─────────────────────────────────────────────────────────────────────────
     // Invalidation du cache quand une propriété change
@@ -338,6 +341,55 @@ public abstract class DisplayData {
         cachedData.add(new EntityData<>(9, EntityDataTypes.INT, interpolationDuration));
     }
 
+    /**
+     * Applique un effet miroir sur les axes spécifiés (X, Y, Z).
+     * Modifie uniquement la translation et les quaternions de rotation.
+     *
+     * @param x true pour appliquer un miroir sur l'axe X
+     * @param y true pour appliquer un miroir sur l'axe Y
+     * @param z true pour appliquer un miroir sur l'axe Z
+     */
+    public void mirror(boolean x, boolean y, boolean z) {
+        if (!x && !y && !z) return;
+
+        translation.mirror(x, y, z);
+        leftRotation.mirror(x, y, z);
+        rightRotation.mirror(x, y, z);
+
+        updateGlobalTransformation(true, true, false);
+    }
+
+    /**
+     * Crée une copie conforme de cette display, applique le miroir sur les axes demandés
+     * et génère de nouveaux identifiants d'entité réseau uniques.
+     */
+    public DisplayData clone(boolean mirrorX, boolean mirrorY, boolean mirrorZ) {
+        // 1. Demande au sous-type de créer une nouvelle instance propre de sa classe
+        DisplayData cloned = this.createEmptyClone();
+
+        // 2. Copie de l'intégralité des propriétés visuelles communes
+        cloned.scale = new Vec3(this.scale.x, this.scale.y, this.scale.z);
+        cloned.translation = new Vec3(this.translation.x, this.translation.y, this.translation.z);
+        cloned.leftRotation = new Quat4(this.leftRotation.x, this.leftRotation.y, this.leftRotation.z, this.leftRotation.w);
+        cloned.rightRotation = new Quat4(this.rightRotation.x, this.rightRotation.y, this.rightRotation.z, this.rightRotation.w);
+        cloned.glowColor = this.glowColor;
+        cloned.shadowRadius = this.shadowRadius;
+        cloned.shadowStrength = this.shadowStrength;
+        cloned.viewRange = this.viewRange;
+        cloned.billboardMode = this.billboardMode;
+        cloned.interpolationStart = this.interpolationStart;
+        cloned.interpolationDuration = this.interpolationDuration;
+        
+        // Note : globalTransformation n'est volontairement pas copié machinalement ici 
+        // car le clone possède son propre cycle de vie et d'attachement réseau.
+
+        // 3. Application du miroir sur le clone
+        cloned.mirror(mirrorX, mirrorY, mirrorZ);
+
+        return cloned;
+    }
+
+
     // ─────────────────────────────────────────────────────────────────────────
     // GlobalTransformation (position/rotation/scale relative à un parent)
     // ─────────────────────────────────────────────────────────────────────────
@@ -379,4 +431,7 @@ public abstract class DisplayData {
         }
     }
 
+    public DisplayData clone() {
+        return clone(false, false, false);
+    }
 }

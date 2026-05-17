@@ -123,4 +123,12 @@ public class BlockDisplayData extends DisplayData {
             "range="        + viewRange +
         "]";
     }
+    
+    @Override
+    protected DisplayData createEmptyClone() {
+        BlockDisplayData clone = new BlockDisplayData();
+        clone.blockData = this.blockData;
+        return clone;
+    }
+    
 }

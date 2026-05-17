@@ -491,5 +491,80 @@ public class DisplayGroupData {
         );
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── Miroir et Clonage du Groupe ──
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Applique un effet miroir sur toutes les displays contenues dans ce groupe 
+     * selon les axes spécifiés (X, Y, Z).
+     *
+     * @param x true pour appliquer un miroir sur l'axe X
+     * @param y true pour appliquer un miroir sur l'axe Y
+     * @param z true pour appliquer un miroir sur l'axe Z
+     */
+    public void mirror(boolean x, boolean y, boolean z) {
+        if (!x && !y && !z) return;
+
+        globalTransformation.mirror(x, y, z);
+        // On répercute le miroir sur chacune des displays du groupe
+        for (DisplayData display : displays) {
+            display.mirror(x, y, z);
+        }
+
+        // Si le groupe est actif (des joueurs le regardent), on rafraîchit la metadata visuelle
+        if (!viewers.isEmpty()) {
+            updateMetadata();
+        }
+    }
+
+    /**
+     * Crée une copie indépendante (clone) de ce groupe de displays.
+     * Chaque display du groupe d'origine est clonée et inversée selon les axes demandés.
+     * Le nouveau groupe hérite de la position ou de l'ancrage de l'original, mais pas de ses viewers.
+     *
+     * @param mirrorX true pour appliquer un miroir sur l'axe X au moment du clonage
+     * @param mirrorY true pour appliquer un miroir sur l'axe Y au moment du clonage
+     * @param mirrorZ true pour appliquer un miroir sur l'axe Z au moment du clonage
+     * @return Une nouvelle instance de DisplayGroupData clonée et transformée
+     */
+    public DisplayGroupData clone(boolean mirrorX, boolean mirrorY, boolean mirrorZ) {
+        DisplayGroupData clonedGroup;
+
+        // 1. Initialisation du clone selon le type d'ancrage d'origine
+        if (this.attachedEntity != null) {
+            clonedGroup = new DisplayGroupData(this.attachedEntity);
+        } else if (this.location != null) {
+            clonedGroup = new DisplayGroupData(this.location, this.attachedId);
+        } else {
+            clonedGroup = new DisplayGroupData();
+            clonedGroup.attachedId = this.attachedId;
+        }
+
+        // 2. Duplication des attributs d'orientation
+        clonedGroup.yaw = this.yaw;
+        clonedGroup.pitch = this.pitch;
+
+        // 3. Duplication de la matrice de transformation globale
+        clonedGroup.globalTransformation.setScale(this.getScale());
+        clonedGroup.globalTransformation.setTranslation(this.getTranslation());
+        clonedGroup.globalTransformation.setCentreRotation(this.getCenter());
+        clonedGroup.globalTransformation.setRotation(this.getRotation());
+
+        // 4. Clonage individuel et application du miroir sur chaque display
+        for (DisplayData originalDisplay : this.displays) {
+            // Utilise la méthode polymorphique d'instance écrite sur DisplayData
+            DisplayData clonedDisplay = originalDisplay.clone(mirrorX, mirrorY, mirrorZ);
+            
+            // On l'ajoute au nouveau groupe (l'attachement à la GlobalTransformation du clone se fait ici)
+            clonedGroup.addDisplay(clonedDisplay);
+        }
+
+        return clonedGroup;
+    }
+    
+    public DisplayGroupData clone() {
+        return clone(false, false, false);
+    }
 
 }
