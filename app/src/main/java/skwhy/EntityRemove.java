@@ -9,8 +9,10 @@ import org.bukkit.event.entity.EntityMountEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.List;
 
 
 import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
@@ -24,22 +26,36 @@ public class EntityRemove implements Listener {
 
     @EventHandler
     public void onEntityMount(EntityMountEvent event) {
-        Entity passenger = event.getEntity(); // Celui qui s'assoit
-        Entity vehicle = event.getMount();    // La monture
-        Bukkit.getLogger().info("EntityMountEvent: " + passenger + " monte sur " + vehicle);
-        Bukkit.getScheduler().runTask(JavaPlugin.getProvidingPlugin(getClass()), () -> {
-            DisplayGroupData.addOtherMount(vehicle, passenger.getEntityId(), new ArrayList<>(vehicle.getTrackedBy()));
-        });
+        Entity vehicle = event.getMount();
+        
+        List<Player> playersToUpdate = new ArrayList<>(vehicle.getTrackedBy());
+        
+        if (vehicle instanceof Player player) {
+            if (!playersToUpdate.contains(player)) {
+                playersToUpdate.add(player);
+            }
+        }
+
+        Bukkit.getScheduler().runTaskLater(JavaPlugin.getProvidingPlugin(getClass()), () -> {
+            DisplayGroupData.finalMount(playersToUpdate, vehicle);
+        }, 1L);
     }
 
     @EventHandler
     public void onEntityDismount(EntityDismountEvent event) {
-        Entity passenger = event.getEntity();
         Entity vehicle = event.getDismounted();
         
-        Bukkit.getScheduler().runTask(JavaPlugin.getProvidingPlugin(getClass()), () -> {
-            DisplayGroupData.removeOtherMount(vehicle, passenger.getEntityId(), new ArrayList<>(vehicle.getTrackedBy()));
-        });
+        List<Player> playersToUpdate = new ArrayList<>(vehicle.getTrackedBy());
+        
+        if (vehicle instanceof Player player) {
+            if (!playersToUpdate.contains(player)) {
+                playersToUpdate.add(player);
+            }
+        }
+
+        Bukkit.getScheduler().runTaskLater(JavaPlugin.getProvidingPlugin(getClass()), () -> {
+            DisplayGroupData.finalMount(playersToUpdate, vehicle);
+        }, 1L);
     }
 
 }

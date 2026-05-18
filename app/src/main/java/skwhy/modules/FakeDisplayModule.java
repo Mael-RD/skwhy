@@ -45,6 +45,7 @@ public class FakeDisplayModule implements AddonModule {
         MountGroup.register(addon);
         SendUpdate.register(addon);
         SetGroupDirection.register(addon);
+        SetGroupRotation.register(addon);
 
         CloneDisplays.register(addon);
         DisplayBlockData.register(addon);

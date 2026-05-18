@@ -89,7 +89,6 @@ public abstract class DisplayData {
      */
     @Nullable
     public CompiledDisplayPacket getSpawnPacket(@Nullable Location location) {
-
         // Spawn packet (position + entity type)
         WrapperPlayServerSpawnEntity spawnPacket = new WrapperPlayServerSpawnEntity(
             entityId,
@@ -179,13 +178,13 @@ public abstract class DisplayData {
         data.add(new EntityData<>(9, EntityDataTypes.INT, interpolationDuration));
 
         // Index 11 – translation offset
-        data.add(new EntityData<>(11, EntityDataTypes.VECTOR3F, translation.toVector3f()));
+        data.add(new EntityData<>(11, EntityDataTypes.VECTOR3F, globalTransformation.getTranslation(translation).toVector3f()));
 
         // Index 12 – scale
-        data.add(new EntityData<>(12, EntityDataTypes.VECTOR3F, scale.toVector3f()));
+        data.add(new EntityData<>(12, EntityDataTypes.VECTOR3F, globalTransformation.getScale(scale).toVector3f()));
 
         // Index 13 – left rotation (quaternion)
-        data.add(new EntityData<>(13, EntityDataTypes.QUATERNION, leftRotation.toQuaternion4f()));
+        data.add(new EntityData<>(13, EntityDataTypes.QUATERNION, globalTransformation.getRotation(leftRotation).toQuaternion4f()));
 
         // Index 14 – right rotation (quaternion)
         data.add(new EntityData<>(14, EntityDataTypes.QUATERNION, rightRotation.toQuaternion4f()));

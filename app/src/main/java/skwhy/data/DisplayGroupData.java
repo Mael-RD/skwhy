@@ -160,7 +160,6 @@ public class DisplayGroupData {
         if (display != null && !displays.contains(display)) {
             if (display.setGlobalTransformation(globalTransformation)) {
                 displays.add(display);
-                // Si des joueurs regardent déjà, on fait apparaître la nouvelle display
                 Location currentPos = getLocation();
                 if (currentPos != null && !viewers.isEmpty()) {
                     DisplayData.CompiledDisplayPacket packet = display.getSpawnPacket(currentPos);
@@ -306,10 +305,6 @@ public class DisplayGroupData {
     public void sendRotation() {
         if (viewers.isEmpty() || displays.isEmpty()) return;
 
-        // Si le groupe entier est monté sur une entité, sa rotation
-        // est dictée par la monture → on n'envoie rien
-        if (attachedId != null) return;
-
         for (DisplayData display : displays) {
             WrapperPlayServerEntityRotation rotationPacket =
                 new WrapperPlayServerEntityRotation(
@@ -418,9 +413,8 @@ public class DisplayGroupData {
         if (entity == null) return;
         this.attachedEntity = entity;
         this.location = null;
-        setAttachedId(entity.getEntityId());
         sendMovePacket();
-        finalMount(viewers, entity);
+        setAttachedId(entity.getEntityId());
     }
 
     private void setAttachedId(Integer entityId) {
@@ -446,12 +440,12 @@ public class DisplayGroupData {
     }
 
 
-    private static void finalMount(List<Player> targetPlayers, Entity vehicle) {
+    public static void finalMount(List<Player> targetPlayers, Entity vehicle) {
         if (vehicle == null) return;
         finalMount(targetPlayers, vehicle.getEntityId(), vehicle.getPassengers().stream()
             .map(Entity::getEntityId)
             .collect(Collectors.toList())
-);
+        );
     }
 
     private static void finalMount(List<Player> targetPlayers, int vehicleId) {
@@ -470,6 +464,7 @@ public class DisplayGroupData {
         for (List<Integer> groupList : entityOtherMount.values()) {
             passengerIds.addAll(groupList);
         }
+        Bukkit.getLogger().info("FinalMount: Liste passagers finaux : " + passengerIds + " pour joueurs " + targetPlayers.stream().map(Player::getName).toList());
 
         WrapperPlayServerSetPassengers passengerPacket = new WrapperPlayServerSetPassengers(
             vehicleId,

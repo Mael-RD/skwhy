@@ -112,10 +112,10 @@ public class GroupTransformation extends SimpleExpression<Object> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(GroupTransformation.class, Object.class)
-                .addPattern("[the] center of %displaygroup%")      // 0
-                .addPattern("[the] translation of %displaygroup%") // 1
-                .addPattern("[the] rotation of %displaygroup%")    // 2
-                .addPattern("[the] scale of %displaygroup%")       // 3
+                .addPattern("[the] group center of %displaygroup%")      // 0
+                .addPattern("[the] group translation of %displaygroup%") // 1
+                .addPattern("[the] group rotation of %displaygroup%")    // 2
+                .addPattern("[the] group scale of %displaygroup%")       // 3
                 .build()
         );
     }
