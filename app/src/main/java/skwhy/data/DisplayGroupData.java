@@ -3,6 +3,7 @@ package skwhy.data;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 
 import com.github.retrooper.packetevents.util.Vector3d;
@@ -15,12 +16,17 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDe
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Classe pour gérer un groupe de display entities avec une position ou une attache fixe.
  */
 public class DisplayGroupData {
+    private static final Map<Integer, List<DisplayGroupData>> entityGroupMount = new HashMap<>();
+    private static final Map<Integer, List<Integer>> entityOtherMount = new HashMap<>();
     
     private final List<Player> viewers;
     private final List<DisplayData> displays;
@@ -47,13 +53,13 @@ public class DisplayGroupData {
     public DisplayGroupData(Entity attachedEntity) {
         this();
         this.attachedEntity = attachedEntity;
-        this.attachedId = attachedEntity.getEntityId();
+        setAttachedId(attachedEntity.getEntityId());
         this.yaw = attachedEntity.getLocation().getYaw();
         this.pitch = attachedEntity.getLocation().getPitch();
     }
     public DisplayGroupData(Location location, Integer attachedId) {
         this(location);
-        this.attachedId = attachedId;
+        setAttachedId(attachedId);
     }
     public DisplayGroupData(List<DisplayData> displays, Location location) {
         this(location);
@@ -65,7 +71,7 @@ public class DisplayGroupData {
     }
     public DisplayGroupData(List<DisplayData> displays, Location location, Integer attachedId) {
         this(displays, location);
-        this.attachedId = attachedId;
+        setAttachedId(attachedId);
     }
     public DisplayGroupData(List<DisplayData> displays, List<Player> viewers, Location location) {
         this(displays,location);
@@ -89,37 +95,21 @@ public class DisplayGroupData {
         if (location == null) return;
         this.location = location;
         this.attachedEntity = null;
+        if (attachedId != null) {
+            removeDisplayGroupMount(attachedId);
+        }
         this.attachedId = null;
         sendMovePacket();
     }
 
-    /**
-     * Attache le groupe à une entité. La position sera celle de l'entité.
-     */
-    public void setAttachedEntity(Entity entity) {
-        if (entity == null) return;
-        this.attachedEntity = entity;
-        this.location = null;
-        this.attachedId = entity.getEntityId();
-        sendMovePacket();
-        mount();
-    }
-
-    /**
-     * Attache le groupe à une entité via son ID.
-     */
-    public void setAttachedId(Location location, Integer entityId) {
-        if (entityId == null) return;
-        this.attachedEntity = null;
-        this.location = location.clone();
-        this.attachedId = entityId;
-        sendMovePacket();
-        mount();
-    }
-
     public Location getLocation() {
         if (attachedEntity != null) {
-            if (attachedEntity.isValid()) return (attachedEntity instanceof LivingEntity living) ? living.getEyeLocation().clone() : attachedEntity.getLocation().clone();
+            if (attachedEntity.isValid()) {
+                Location location = (attachedEntity instanceof LivingEntity living) ? living.getEyeLocation().clone() : attachedEntity.getLocation().clone();
+                location.setYaw(yaw);
+                location.setPitch(pitch);
+                return location;
+            }
             else {
                 sendDestroyPacket(displays, viewers);
                 return null;
@@ -175,7 +165,7 @@ public class DisplayGroupData {
                 if (currentPos != null && !viewers.isEmpty()) {
                     DisplayData.CompiledDisplayPacket packet = display.getSpawnPacket(currentPos);
                     if (packet != null) packet.sendToAll(viewers);
-                    if (attachedId != null) mountOnEntity(attachedId, viewers);
+                    if (attachedId != null) finalMount(viewers, attachedId);
                 }
             }
         }
@@ -223,9 +213,8 @@ public class DisplayGroupData {
         // 1. Spawn des entités
         sendSpawnPacket(List.of(player));
         
-        // 2. Montage automatique si une entité est définie
         if (attachedId != null) {
-            mountOnEntity(attachedId, List.of(player));
+            finalMount(List.of(player), attachedId);
         }
     }
 
@@ -263,7 +252,7 @@ public class DisplayGroupData {
             if (packet == null) return;
             packet.sendToAll(players);
             if (attachedId != null) {
-                mountOnEntity(attachedId, players);
+                finalMount(players, attachedId);
             }
         }
     }
@@ -367,16 +356,124 @@ public class DisplayGroupData {
      */
     public void mount() {
         if (attachedId != null && !viewers.isEmpty()) {
-            mountOnEntity(attachedId, viewers);
+            finalMount(viewers, attachedId);
+        }
+    }
+    
+    public static void addOtherMount(int vehicleId, int passengerId, List<Player> targetPlayers) {
+        entityOtherMount.computeIfAbsent(vehicleId, k -> new ArrayList<>()).add(passengerId);
+        finalMount(targetPlayers, vehicleId);
+    }
+
+    public static void addOtherMount(Entity vehicle, int passengerId, List<Player> targetPlayers) {
+        entityOtherMount.computeIfAbsent(vehicle.getEntityId(), k -> new ArrayList<>()).add(passengerId);
+        finalMount(targetPlayers, vehicle);
+    }
+
+    public static void removeOtherMount(int vehicleId, int passengerId, List<Player> targetPlayers) {
+        List<Integer> passengers = entityOtherMount.get(vehicleId);
+        if (passengers != null) {
+            passengers.remove(Integer.valueOf(passengerId));
+            if (passengers.isEmpty()) {
+                entityOtherMount.remove(vehicleId);
+            }
+            finalMount(targetPlayers, vehicleId);
         }
     }
 
-    private void mountOnEntity(int targetEntityId, List<Player> targetPlayers) {
-        if (displays.isEmpty() || targetPlayers.isEmpty()) return;
+    public static void removeOtherMount(Entity vehicle, int passengerId, List<Player> targetPlayers) {
+        List<Integer> passengers = entityOtherMount.get(vehicle.getEntityId());
+        if (passengers != null) {
+            passengers.remove(Integer.valueOf(passengerId));
+            if (passengers.isEmpty()) {
+                entityOtherMount.remove(vehicle.getEntityId());
+            }
+            finalMount(targetPlayers, vehicle);
+        }
+    }
+
+    private void addDisplayGroupMount(Integer entityId) {
+        entityGroupMount.computeIfAbsent(entityId, k -> new ArrayList<>()).add(this);
+        finalMount(viewers, entityId);
+    }
+
+    private void removeDisplayGroupMount(Integer entityId) {
+        if (entityId == null) return;
+        List<DisplayGroupData> list = entityGroupMount.get(entityId);
+        
+        if (list != null) {
+            list.remove(this);
+            
+            if (list.isEmpty()) {
+                entityGroupMount.remove(entityId);
+            }
+            finalMount(viewers, entityId);
+        }
+    }
+
+    /**
+     * Attache le groupe à une entité. La position sera celle de l'entité.
+     */
+    public void setAttachedEntity(Entity entity) {
+        if (entity == null) return;
+        this.attachedEntity = entity;
+        this.location = null;
+        setAttachedId(entity.getEntityId());
+        sendMovePacket();
+        finalMount(viewers, entity);
+    }
+
+    private void setAttachedId(Integer entityId) {
+        if (entityId == null) return;
+        if (attachedId != null) {
+            removeDisplayGroupMount(attachedId);
+        }
+        this.attachedId = entityId;
+        addDisplayGroupMount(attachedId);
+    }
+
+    /**
+     * Attache le groupe à une entité via son ID.
+     */
+    public void setAttachedId(Location location, Integer entityId) {
+        if (entityId == null) return;
+        this.attachedEntity = null;
+        this.location = location.clone();
+        setAttachedId(entityId);
+        addDisplayGroupMount(attachedId);
+        sendMovePacket();
+        finalMount(viewers, attachedId);
+    }
+
+
+    private static void finalMount(List<Player> targetPlayers, Entity vehicle) {
+        if (vehicle == null) return;
+        finalMount(targetPlayers, vehicle.getEntityId(), vehicle.getPassengers().stream()
+            .map(Entity::getEntityId)
+            .collect(Collectors.toList())
+);
+    }
+
+    private static void finalMount(List<Player> targetPlayers, int vehicleId) {
+        finalMount(targetPlayers, vehicleId, new ArrayList<>());
+    }
+
+    private static void finalMount(List<Player> targetPlayers, int vehicleId, List<Integer> passengerIds) {
+        Bukkit.getLogger().info("FinalMount: Véhicule ID " + vehicleId + " avec passagers " + passengerIds + " pour joueurs " + targetPlayers.stream().map(Player::getName).toList());
+        for (List<DisplayGroupData> groupList : entityGroupMount.values()) {
+            for (DisplayGroupData group : groupList) {
+                for (DisplayData display : group.getDisplays()) {
+                    passengerIds.add(display.getEntityId());
+                }
+            }
+        }
+        for (List<Integer> groupList : entityOtherMount.values()) {
+            passengerIds.addAll(groupList);
+        }
 
         WrapperPlayServerSetPassengers passengerPacket = new WrapperPlayServerSetPassengers(
-            targetEntityId,
-            displays.stream().mapToInt(DisplayData::getEntityId).toArray()
+            vehicleId,
+            passengerIds.stream().mapToInt(Integer::intValue).toArray()
         );
 
         for (Player player : targetPlayers) {
@@ -445,6 +542,12 @@ public class DisplayGroupData {
         sendDestroyPacket(displays, viewers);
         displays.clear();
         viewers.clear();
+        if (attachedId != null) {
+            removeDisplayGroupMount(attachedId);
+        }
+        attachedEntity = null;
+        location = null;
+        attachedId = null;
     }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -534,11 +637,10 @@ public class DisplayGroupData {
         // 1. Initialisation du clone selon le type d'ancrage d'origine
         if (this.attachedEntity != null) {
             clonedGroup = new DisplayGroupData(this.attachedEntity);
-        } else if (this.location != null) {
+        } else if (this.attachedId != null) {
             clonedGroup = new DisplayGroupData(this.location, this.attachedId);
         } else {
-            clonedGroup = new DisplayGroupData();
-            clonedGroup.attachedId = this.attachedId;
+            clonedGroup = new DisplayGroupData(this.location);
         }
 
         // 2. Duplication des attributs d'orientation
@@ -559,12 +661,20 @@ public class DisplayGroupData {
             // On l'ajoute au nouveau groupe (l'attachement à la GlobalTransformation du clone se fait ici)
             clonedGroup.addDisplay(clonedDisplay);
         }
-
+        clonedGroup.sendSpawnPacket(viewers);
         return clonedGroup;
     }
     
     public DisplayGroupData clone() {
         return clone(false, false, false);
+    }
+
+    // Cette méthode peut être appelée lors du départ d'un joueur pour nettoyer les références
+    // et éviter les fuites de mémoire. Elle doit être appelée depuis un listener de PlayerQuitEvent.
+    // Exemple d'utilisation : DisplayGroupData.clearEntityData(event.getEntity());
+    public static void clearEntityData(Entity entity) {
+        entityGroupMount.remove(entity.getEntityId());
+        entityOtherMount.remove(entity.getEntityId());
     }
 
 }

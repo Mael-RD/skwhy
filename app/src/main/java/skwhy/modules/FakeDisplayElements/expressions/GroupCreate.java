@@ -231,7 +231,7 @@ public class GroupCreate extends SimpleExpression<DisplayGroupData> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(GroupCreate.class, DisplayGroupData.class)
-                .addPattern("[a] [fake] display group at %location/entity% [(1:from %displaydatas%)] [(2:with %players%)]")
+                .addPattern("[a] [new] [fake] display group at %location/entity% [(1:from %displaydatas%)] [(2:with %players%)]")
                 .build()
         );
     }

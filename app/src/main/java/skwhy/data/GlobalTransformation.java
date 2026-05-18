@@ -118,7 +118,7 @@ public class GlobalTransformation {
      * @return
      */
     public Vec3 getTranslation(Vec3 displayTranslation) {
-        return displayTranslation.sub(centreRotation).rotate(rotation).add(translation).add(centreRotation);
+        return displayTranslation.sub(centreRotation).rotate(rotation).add(translation).add(centreRotation).mul(scale);
     }
 
     /**

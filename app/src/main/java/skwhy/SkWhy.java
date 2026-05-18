@@ -5,6 +5,7 @@ import me.tofaa.entitylib.APIConfig;
 import me.tofaa.entitylib.EntityLib;
 import me.tofaa.entitylib.spigot.SpigotEntityLibPlatform;
 
+import org.apache.maven.artifact.repository.metadata.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.skriptlang.skript.addon.SkriptAddon;
 
@@ -12,6 +13,8 @@ import com.github.retrooper.packetevents.PacketEvents;
 
 import skwhy.modules.FakeDisplayModule;
 import skwhy.modules.RandomStuffModule;
+
+
 // import com.github.retrooper.packetevents.PacketEvents;
 
 public class SkWhy extends JavaPlugin {
@@ -46,6 +49,7 @@ public class SkWhy extends JavaPlugin {
         // Chargement des modules
         skriptAddon.loadModules(new FakeDisplayModule());
         skriptAddon.loadModules(new RandomStuffModule());
+        getServer().getPluginManager().registerEvents(new EntityRemove(), this);
 
         getLogger().info("SkWhy activé avec succès !");
     }

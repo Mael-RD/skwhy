@@ -41,18 +41,20 @@ public class FakeDisplayModule implements AddonModule {
     @Override
     public void load(SkriptAddon addon) {
         DestroyGroup.register(addon);
+        Mirror.register(addon);
         MountGroup.register(addon);
         SendUpdate.register(addon);
         SetGroupDirection.register(addon);
 
+        CloneDisplays.register(addon);
         DisplayBlockData.register(addon);
         DisplayBoolean.register(addon);
+        DisplayFromReal.register(addon);
         DisplayId.register(addon);
         DisplayItem.register(addon);
         DisplayNumber.register(addon);
         DisplayRotation.register(addon);
         DisplayScale.register(addon);
-        DisplayFromReal.register(addon);
         DisplayText.register(addon);
 
         GroupCreate.register(addon);

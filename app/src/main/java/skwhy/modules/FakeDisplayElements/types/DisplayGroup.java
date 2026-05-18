@@ -24,6 +24,7 @@ public class DisplayGroup {
             .name("Display Group")
             .description("Un groupe de displays pouvant être contrôlées ensemble avec une position et une monture communes.")
             .usage("créé via 'new display group'")
+            .user("display ?groups?")
             .examples(
                 "set {_group} to new display group",
                 "add {_display} to {_group}",

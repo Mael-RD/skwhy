@@ -2,15 +2,12 @@ package skwhy.modules.FakeDisplayElements.sections;
 
 import ch.njol.skript.Skript;
 import ch.njol.skript.classes.Changer.ChangeMode;
-import ch.njol.skript.config.EntryNode;
 import ch.njol.skript.config.Node;
 import ch.njol.skript.config.SectionNode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
-import ch.njol.skript.lang.ParseContext;
 import ch.njol.skript.lang.Section;
 import ch.njol.skript.lang.TriggerItem;
-import ch.njol.skript.registrations.Classes;
 import ch.njol.util.Kleenean;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
@@ -31,7 +28,7 @@ import java.util.Map;
 public class CreateItemSection extends Section {
 
     private Expression<?> resultVar;
-    private final Map<String, String> fields = new LinkedHashMap<>();
+    private final Map<String, Expression<?>> fields = new LinkedHashMap<>();
 
     @Override
     public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed,
@@ -46,136 +43,121 @@ public class CreateItemSection extends Section {
         }
 
         for (Node node : sectionNode) {
-            if (node instanceof EntryNode entry) {
-                // Valeurs simples : block: oak_log, scale: 2, billboard: 0
-                fields.put(
-                    entry.getKey().toLowerCase().trim(),
-                    entry.getValue().trim()
-                );
+            String raw = node.getKey();
+            int colon = raw.indexOf(':');
+            if (colon <= 0) continue;
+
+            String key   = raw.substring(0, colon).toLowerCase().trim();
+            String value = raw.substring(colon + 1).trim();
+
+            Expression<?> expr = parseExpressionForKey(key, value);
+            if (expr != null) {
+                fields.put(key, expr);
             } else {
-                String raw = node.getKey();
-                int colon = raw.indexOf(':');
-                if (colon > 0) {
-                    fields.put(
-                        raw.substring(0, colon).toLowerCase().trim(),
-                        raw.substring(colon + 1).trim()
-                    );
-                }
+                Skript.error("Valeur invalide pour le champ '" + key + "' : " + value);
+                return false;
             }
         }
 
         return true;
     }
 
+    @Nullable
+    private Expression<?> parseExpressionForKey(String key, String value) {
+        int flags = SkriptParser.PARSE_EXPRESSIONS | SkriptParser.PARSE_LITERALS;
+        SkriptParser parser = new SkriptParser(value, flags);
+
+        return switch (key) {
+            case "scale", "translation" ->
+                parser.parseExpression(Vector.class, Number.class);
+            case "rotation", "leftrotation", "rightrotation" ->
+                parser.parseExpression(Quaternionf.class);
+            case "glow", "shadow", "shadowradius", "radius",
+                 "strength", "shadowstrength", "range", "viewrange",
+                 "billboard", "interpolation", "interpolationduration",
+                 "interpolationstart", "interpolationdelay" ->
+                parser.parseExpression(Number.class);
+            case "item", "itemstack", "material" ->
+                parser.parseExpression(
+                    ch.njol.skript.aliases.ItemType.class, 
+                    org.bukkit.inventory.ItemStack.class, 
+                    org.bukkit.Material.class, 
+                    String.class
+                );
+            case "mode", "displaymode" ->
+                parser.parseExpression(String.class, Number.class);
+            default ->
+                parser.parseExpression(Object.class);
+        };
+    }
+
     @Override
     protected @Nullable TriggerItem walk(Event event) {
         ItemDisplayData display = new ItemDisplayData();
 
-        fields.forEach((key, value) -> {
+        fields.forEach((key, expr) -> {
+            Object value = expr.getSingle(event);
+            if (value == null) return;
+
             switch (key) {
                 case "scale" -> {
-                    Vector v = Classes.parse(value, Vector.class, ParseContext.DEFAULT);
-                    if (v != null) {
-                        display.setScale(new Vec3(v));
-                    } else {
-                        Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                        if (n != null) display.setScale(new Vec3(n.floatValue()));
-                        else Skript.warning("Valeur invalide pour 'scale' : " + value);
-                    }
+                    if (value instanceof Vector v) display.setScale(new Vec3(v));
+                    else if (value instanceof Number n) display.setScale(new Vec3(n.floatValue()));
                 }
                 case "translation" -> {
-                    Vector v = Classes.parse(value, Vector.class, ParseContext.DEFAULT);
-                    if (v != null) {
-                        display.setTranslation(new Vec3(v));
-                    } else {
-                        Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                        if (n != null) display.setTranslation(new Vec3(n.floatValue()));
-                        else Skript.warning("Valeur invalide pour 'translation' : " + value);
-                    }
+                    if (value instanceof Vector v) display.setTranslation(new Vec3(v));
+                    else if (value instanceof Number n) display.setTranslation(new Vec3(n.floatValue()));
                 }
                 case "rotation", "leftrotation" -> {
-                    Quaternionf q = Classes.parse(value, Quaternionf.class, ParseContext.DEFAULT);
-                    if (q != null) {
-                        display.setLeftRotation(new Quat4(q));
-                    } else {
-                        // Format : "x, y, z, w"
-                        String[] parts = value.split(",");
-                        if (parts.length == 4) {
-                            try {
-                                display.setLeftRotation(
-                                    Float.parseFloat(parts[0].trim()),
-                                    Float.parseFloat(parts[1].trim()),
-                                    Float.parseFloat(parts[2].trim()),
-                                    Float.parseFloat(parts[3].trim())
-                                );
-                            } catch (NumberFormatException e) {
-                                Skript.warning("Quaternion invalide pour 'rotation' : " + value);
-                            }
-                        }
-                    }
+                    if (value instanceof Quaternionf q) display.setLeftRotation(new Quat4(q));
                 }
                 case "rightrotation" -> {
-                    Quaternionf q = Classes.parse(value, Quaternionf.class, ParseContext.DEFAULT);
-                    if (q != null) {
-                        display.setRightRotation(new Quat4(q));
-                    } else {
-                        // Format : "x, y, z, w"
-                        String[] parts = value.split(",");
-                        if (parts.length == 4) {
-                            try {
-                                display.setRightRotation(
-                                    Float.parseFloat(parts[0].trim()),
-                                    Float.parseFloat(parts[1].trim()),
-                                    Float.parseFloat(parts[2].trim()),
-                                    Float.parseFloat(parts[3].trim())
-                                );
-                            } catch (NumberFormatException e) {
-                                Skript.warning("Quaternion invalide pour 'rightrotation' : " + value);
-                            }
-                        }
-                    }
+                    if (value instanceof Quaternionf q) display.setRightRotation(new Quat4(q));
                 }
                 case "glow" -> {
-                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                    if (n != null) display.setGlowColor(n.intValue());
+                    if (value instanceof Number n) display.setGlowColor(n.intValue());
                 }
                 case "shadow", "shadowradius", "radius" -> {
-                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                    if (n != null) display.setShadowRadius(n.floatValue());
+                    if (value instanceof Number n) display.setShadowRadius(n.floatValue());
                 }
                 case "strength", "shadowstrength" -> {
-                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                    if (n != null) display.setShadowStrength(n.floatValue());
+                    if (value instanceof Number n) display.setShadowStrength(n.floatValue());
                 }
                 case "range", "viewrange" -> {
-                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                    if (n != null) display.setViewRange(n.floatValue());
+                    if (value instanceof Number n) display.setViewRange(n.floatValue());
                 }
                 case "billboard" -> {
-                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                    if (n != null) display.setBillboardMode(n.intValue());
+                    if (value instanceof Number n) display.setBillboardMode(n.intValue());
                 }
                 case "interpolation", "interpolationduration" -> {
-                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                    if (n != null) display.setInterpolationDuration(n.intValue());
+                    if (value instanceof Number n) display.setInterpolationDuration(n.intValue());
                 }
                 case "interpolationstart", "interpolationdelay" -> {
-                    Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                    if (n != null) display.setInterpolationStart(n.intValue());
+                    if (value instanceof Number n) display.setInterpolationStart(n.intValue());
                 }
-
-                case "item", "itemstack", "material" ->
-                    display.setItemStack(value.toUpperCase());
-
-                case "mode", "displaymode" ->
-                    display.setDisplayMode(parseDisplayMode(value));
-
-                default -> Skript.warning("Champ inconnu ignoré : '" + key + "'");
+                case "item", "itemstack", "material" -> {
+                    // Convertit en majuscule et remplace les espaces par des tirets du bas si c'est parsé comme texte classique depuis Skript
+                    if (value instanceof ch.njol.skript.aliases.ItemType it) {
+                        display.setItemStack(it.getMaterial().name());
+                    } else if (value instanceof org.bukkit.inventory.ItemStack is) {
+                        display.setItemStack(is.getType().name());
+                    } else if (value instanceof org.bukkit.Material m) {
+                        display.setItemStack(m.name());
+                    } else {
+                        display.setItemStack(value.toString().toUpperCase().replace(" ", "_"));
+                    }
+                }
+                case "mode", "displaymode" -> {
+                    if (value instanceof Number n) {
+                        display.setDisplayMode(Math.min(8, Math.max(0, n.intValue())));
+                    } else {
+                        display.setDisplayMode(parseDisplayMode(value.toString()));
+                    }
+                }
             }
         });
 
         resultVar.change(event, new Object[]{ display }, ChangeMode.SET);
-
         return getNext();
     }
 
@@ -190,10 +172,7 @@ public class CreateItemSection extends Section {
             case "gui"                   -> 6;
             case "ground"                -> 7;
             case "fixed"                 -> 8;
-            default -> {
-                Number n = Classes.parse(value, Number.class, ParseContext.DEFAULT);
-                yield (n != null) ? Math.min(8, Math.max(0, n.intValue())) : 0;
-            }
+            default -> 0;
         };
     }
 

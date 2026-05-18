@@ -1,11 +1,11 @@
 types:
   # DisplayData (classe de base)
-  displaydata: display data@display data
+  displaydata: display data@display datas
 
   # Sous-types
-  blockdisplay: block display@block display
-  itemdisplay: item display@item display
-  textdisplay: text display@text display
+  blockdisplay: block display data@block display datas
+  itemdisplay: item display data@item display datas
+  textdisplay: text display data@text display datas
 
   # Groupe
-  displaygroup: display group@display group
+  displaygroup: display group@display groups

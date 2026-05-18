@@ -6,6 +6,7 @@ import ch.njol.skript.classes.Serializer;
 import ch.njol.skript.lang.ParseContext;
 import ch.njol.skript.registrations.Classes;
 import ch.njol.yggdrasil.Fields;
+import org.skriptlang.skript.lang.converter.Converters;
 import skwhy.data.DisplayData;
 import skwhy.data.BlockDisplayData;
 import skwhy.data.ItemDisplayData;
@@ -29,9 +30,45 @@ public class Display {
         
         // Enregistrement de ItemDisplayData
         registerItemDisplayData();
-        
+
         // Enregistrement de TextDisplayData
         registerTextDisplayData();
+
+
+        // 2. ── ENREGISTREMENT DES CONVERTISSEURS POLYMORPHIQUES (NOUVELLE API) ──
+        // On utilise la classe statique "Converters" du package org.skriptlang
+        Converters.registerConverter(
+            BlockDisplayData.class, 
+            DisplayData.class, 
+            new org.skriptlang.skript.lang.converter.Converter<BlockDisplayData, DisplayData>() {
+                @Override
+                public DisplayData convert(BlockDisplayData blockData) {
+                    return blockData;
+                }
+            }
+        );
+
+        Converters.registerConverter(
+            ItemDisplayData.class, 
+            DisplayData.class, 
+            new org.skriptlang.skript.lang.converter.Converter<ItemDisplayData, DisplayData>() {
+                @Override
+                public DisplayData convert(ItemDisplayData itemData) {
+                    return itemData;
+                }
+            }
+        );
+
+        Converters.registerConverter(
+            TextDisplayData.class, 
+            DisplayData.class, 
+            new org.skriptlang.skript.lang.converter.Converter<TextDisplayData, DisplayData>() {
+                @Override
+                public DisplayData convert(TextDisplayData textData) {
+                    return textData;
+                }
+            }
+        );
     }
     
     /**
@@ -42,6 +79,7 @@ public class Display {
             .name("Display Data")
             .description("Représente les données d'une display entity Minecraft.")
             .usage("obtenu via les expressions de skwhy")
+            .user("display ?datas?")
             .examples(
                 "set {_data} to new block display",
                 "update {_data} with x = 100, y = 64"
@@ -117,31 +155,12 @@ public class Display {
             .name("Block Display")
             .description("Une display entity qui affiche un bloc.")
             .usage("créée via 'new block display'")
+            .user("display ?block ?datas?")
             .examples(
                 "set {_display} to new block display",
                 "set block data of {_display} to \"OAK_LOG[axis=y]\""
             )
             .since("1.0.0")
-            
-            .parser(new Parser<>() {
-                @Override
-                public @Nullable BlockDisplayData parse(String s, ParseContext context) {
-                    if (s.equalsIgnoreCase("block display")) {
-                        return new BlockDisplayData();
-                    }
-                    return null;
-                }
-
-                @Override
-                public String toString(BlockDisplayData data, int flags) {
-                    return "block display";
-                }
-
-                @Override
-                public String toVariableNameString(BlockDisplayData data) {
-                    return "blockdisplay:" + data.serialize();
-                }
-            })
             
             .serializer(new Serializer<>() {
                 @Override
@@ -223,31 +242,12 @@ public class Display {
             .name("Item Display")
             .description("Une display entity qui affiche un item.")
             .usage("créée via 'new item display'")
+            .user("display ?item ?datas?")
             .examples(
                 "set {_display} to new item display",
                 "set item stack of {_display} to \"DIAMOND_SWORD\""
             )
             .since("1.0.0")
-            
-            .parser(new Parser<>() {
-                @Override
-                public @Nullable ItemDisplayData parse(String s, ParseContext context) {
-                    if (s.equalsIgnoreCase("item display")) {
-                        return new ItemDisplayData();
-                    }
-                    return null;
-                }
-
-                @Override
-                public String toString(ItemDisplayData data, int flags) {
-                    return "item display [item=" + data.getItemStack() + ", mode=" + data.getDisplayModeName() + "]";
-                }
-
-                @Override
-                public String toVariableNameString(ItemDisplayData data) {
-                    return "itemdisplay:" + data.serialize();
-                }
-            })
             
             .serializer(new Serializer<>() {
                 @Override
@@ -331,31 +331,12 @@ public class Display {
             .name("Text Display")
             .description("Une display entity qui affiche du texte.")
             .usage("créée via 'new text display'")
+            .user("display ?text ?datas?")
             .examples(
                 "set {_display} to new text display",
                 "set text of {_display} to \"Hello World\""
             )
             .since("1.0.0")
-            
-            .parser(new Parser<>() {
-                @Override
-                public @Nullable TextDisplayData parse(String s, ParseContext context) {
-                    if (s.equalsIgnoreCase("text display")) {
-                        return new TextDisplayData();
-                    }
-                    return null;
-                }
-
-                @Override
-                public String toString(TextDisplayData data, int flags) {
-                    return "text display [text='" + data.getText() + "']";
-                }
-
-                @Override
-                public String toVariableNameString(TextDisplayData data) {
-                    return "textdisplay:" + data.serialize();
-                }
-            })
             
             .serializer(new Serializer<>() {
                 @Override

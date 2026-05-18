@@ -62,24 +62,15 @@ public class Mirror extends Effect {
         if (mirrorZ) axes.append("Z ");
         return "mirror " + targetExpr.toString(event, debug) + " on axes " + axes.toString().trim();
     }
-
+    
     public static void register(SkriptAddon addon) {
-        addon.syntaxRegistry().register(
-            SyntaxRegistry.EFFECT,
-            SyntaxInfo.builder(Mirror.class)
-                // Configuration du pattern avec des modificateurs binaires (1:x), (2:y), (4:z)
-                // Les choix optionnels et espacements [, ] permettent d'écrire indifféremment "x, y" ou "xyz"
-                .addPattern("mirror %displaydatas/displaygroups% (1:x)[[,] ](2:y)[[,] ](4:z)")
-                .addPattern("mirror %displaydatas/displaygroups% (1:x)[[,] ](4:z)[[,] ](2:y)")
-                .addPattern("mirror %displaydatas/displaygroups% (2:y)[[,] ](1:x)[[,] ](4:z)")
-                .addPattern("mirror %displaydatas/displaygroups% (2:y)[[,] ](4:z)[[,] ](1:x)")
-                .addPattern("mirror %displaydatas/displaygroups% (4:z)[[,] ](1:x)[[,] ](2:y)")
-                .addPattern("mirror %displaydatas/displaygroups% (4:z)[[,] ](2:y)[[,] ](1:x)")
-                // Raccourcis optionnels pour la saisie unique d'un axe
-                .addPattern("mirror %displaydatas/displaygroups% (1:x)")
-                .addPattern("mirror %displaydatas/displaygroups% (2:y)")
-                .addPattern("mirror %displaydatas/displaygroups% (4:z)")
-                .build()
-        );
-    }
+            addon.syntaxRegistry().register(
+                SyntaxRegistry.EFFECT,
+                SyntaxInfo.builder(Mirror.class)
+                    // Toutes les permutations possibles condensées en un seul bloc logique.
+                    // L'utilisateur devra attacher les lettres (ex: "xy", "yzx", etc.)
+                    .addPattern("mirror %displaydatas/displaygroups% [on [axis|axes]] (1:x|2:y|4:z|3:xy|3:yx|5:xz|5:zx|6:yz|6:zy|7:xyz|7:xzy|7:yxz|7:yzx|7:zxy|7:zyx)")
+                    .build()
+            );
+        }
 }
