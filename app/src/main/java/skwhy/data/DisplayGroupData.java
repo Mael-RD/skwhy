@@ -240,6 +240,19 @@ public class DisplayGroupData {
         viewers.clear();
     }
 
+    public void setViewers(List<Player> players) {
+        if (players == null) return;
+        List<Player> toRemove = viewers.stream()
+            .filter(v -> !players.contains(v))
+            .toList();
+        List<Player> toAdd = players.stream()
+            .filter(p -> !viewers.contains(p))
+            .toList();
+        
+        removeViewer(toRemove);
+        addViewer(toAdd);
+    }
+
     // ── Envoi des Paquets (Utilise l'état interne) ──
 
     public void sendSpawnPacket(List<Player> players) {

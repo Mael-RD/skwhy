@@ -32,22 +32,29 @@ public class FakeDisplayModule implements AddonModule {
     // init() : types en premier, avant toute syntaxe
     @Override
     public void init(SkriptAddon addon) {
-
+        Cosmetique.register();
         Display.register();
         DisplayGroup.register();
+        TailPart.register();
     }
 
     // load() : sections, effets, conditions, expressions
     @Override
     public void load(SkriptAddon addon) {
+        DeleteCosmetiquePart.register(addon);
+        DestroyCosmetique.register(addon);
         DestroyGroup.register(addon);
         Mirror.register(addon);
         MountGroup.register(addon);
         SendUpdate.register(addon);
+        SetCosmetiquePart.register(addon);
         SetGroupDirection.register(addon);
         SetGroupRotation.register(addon);
 
         CloneDisplays.register(addon);
+        CosmetiqueSelfVisibility.register(addon);
+        CosmetiqueCreate.register(addon);
+
         DisplayBlockData.register(addon);
         DisplayBoolean.register(addon);
         DisplayFromReal.register(addon);
@@ -63,6 +70,8 @@ public class FakeDisplayModule implements AddonModule {
         GroupLocation.register(addon);  
         GroupPlayers.register(addon);
         GroupTransformation.register(addon);
+
+        TailPartCreate.register(addon);
 
         CreateBlockSection.register(addon);
         CreateItemSection.register(addon);

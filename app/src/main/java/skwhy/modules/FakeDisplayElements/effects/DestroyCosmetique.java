@@ -9,39 +9,39 @@ import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
-import skwhy.data.DisplayGroupData;
+import skwhy.data.CosmetiqueData;
 
-public class DestroyGroup extends Effect {
+public class DestroyCosmetique extends Effect {
 
-    private Expression<DisplayGroupData> groupExpr;
+    private Expression<CosmetiqueData> cosmetiqueExpr;
 
     @Override
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        groupExpr = (Expression<DisplayGroupData>) exprs[0];
+        cosmetiqueExpr = (Expression<CosmetiqueData>) exprs[0];
         return true;
     }
 
     @Override
     protected void execute(Event event) {
-        DisplayGroupData[] groups = groupExpr.getAll(event);
-        if (groups == null) return;
-        for (DisplayGroupData group : groups) {
-            group.delete();
+        CosmetiqueData[] cosmetiques = cosmetiqueExpr.getAll(event);
+        if (cosmetiques == null) return;
+        for (CosmetiqueData cosmetique : cosmetiques) {
+            cosmetique.delete();
         }
     }
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return "destroy display group " + groupExpr.toString(event, debug);
+        return "destroy cosmetique " + cosmetiqueExpr.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EFFECT,
-            SyntaxInfo.builder(DestroyGroup.class)
-                .addPattern("destroy [display] group %displaygroups%")
+            SyntaxInfo.builder(DestroyCosmetique.class)
+                .addPattern("destroy [cosmetique] %cosmetiques%")
                 .build()
         );
     }

@@ -9,3 +9,7 @@ types:
 
   # Groupe
   displaygroup: display group@display groups
+
+  # Cosmétiques
+  cosmetique: cosmetique@cosmetiques
+  tailpart: tail part@tail parts

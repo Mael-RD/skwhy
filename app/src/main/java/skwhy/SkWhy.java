@@ -1,11 +1,10 @@
 package skwhy;
 
 import ch.njol.skript.Skript;
-import me.tofaa.entitylib.APIConfig;
-import me.tofaa.entitylib.EntityLib;
-import me.tofaa.entitylib.spigot.SpigotEntityLibPlatform;
+// import me.tofaa.entitylib.APIConfig;
+// import me.tofaa.entitylib.EntityLib;
+// import me.tofaa.entitylib.spigot.SpigotEntityLibPlatform;
 
-import org.apache.maven.artifact.repository.metadata.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.skriptlang.skript.addon.SkriptAddon;
 
@@ -33,12 +32,12 @@ public class SkWhy extends JavaPlugin {
             return;
         }
 
-        if (PacketEvents.getAPI() != null) {
-            SpigotEntityLibPlatform platform = new SpigotEntityLibPlatform(this);
-            APIConfig config = new APIConfig(PacketEvents.getAPI())
-                .usePlatformLogger();
-            EntityLib.init(platform, config);
-        }
+        // if (PacketEvents.getAPI() != null) {
+        //     SpigotEntityLibPlatform platform = new SpigotEntityLibPlatform(this);
+        //     APIConfig config = new APIConfig(PacketEvents.getAPI())
+        //         .usePlatformLogger();
+        //     EntityLib.init(platform, config);
+        // }
 
         skriptAddon = Skript.instance().registerAddon(SkWhy.class, "SkWhy");
         
