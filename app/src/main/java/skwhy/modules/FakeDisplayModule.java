@@ -48,12 +48,14 @@ public class FakeDisplayModule implements AddonModule {
         MountGroup.register(addon);
         SendUpdate.register(addon);
         SetCosmetiquePart.register(addon);
+        SetCosmetiqueTailRotation.register(addon);
         SetGroupDirection.register(addon);
         SetGroupRotation.register(addon);
 
         CloneDisplays.register(addon);
-        CosmetiqueSelfVisibility.register(addon);
         CosmetiqueCreate.register(addon);
+        CosmetiqueSelfVisibility.register(addon);
+        CosmetiqueTail.register(addon);
 
         DisplayBlockData.register(addon);
         DisplayBoolean.register(addon);
@@ -64,6 +66,7 @@ public class FakeDisplayModule implements AddonModule {
         DisplayRotation.register(addon);
         DisplayScale.register(addon);
         DisplayText.register(addon);
+        CosmetiqueTail.register(addon);
 
         GroupCreate.register(addon);
         GroupDisplays.register(addon);

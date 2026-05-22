@@ -347,6 +347,107 @@ public class CosmetiqueData {
         }
     }
 
+    // ─────── Paramètres de la Queue ───────
+
+    public Tail getTailParameters() {
+        return tail;
+    }
+
+    public float getTailRigidity() {
+        return tail != null ? tail.getRigidity() : 0f;
+    }
+    public void setTailRigidity(float value) {
+        if (tail != null) tail.setRigidity(value);
+    }
+
+    public float getTailDamping() {
+        return tail != null ? tail.getDamping() : 0f;
+    }
+    public void setTailDamping(float value) {
+        if (tail != null) tail.setDamping(value);
+    }
+
+    public float getTailVelocitySmoothing() {
+        return tail != null ? tail.getVelocitySmoothing() : 0f;
+    }
+    public void setTailVelocitySmoothing(float value) {
+        if (tail != null) tail.setVelocitySmoothing(value);
+    }
+
+    public float getTailVelocityInfluence() {
+        return tail != null ? tail.getVelocityInfluence() : 0f;
+    }
+    public void setTailVelocityInfluence(float value) {
+        if (tail != null) tail.setVelocityInfluence(value);
+    }
+
+    public float getTailMaxDeflectionAngle() {
+        return tail != null ? tail.getMaxDeflectionAngle() : 0f;
+    }
+    public void setTailMaxDeflectionAngle(float value) {
+        if (tail != null) tail.setMaxDeflectionAngle(value);
+    }
+
+    public float getTailDepthDeflectionFactor() {
+        return tail != null ? tail.getDepthDeflectionFactor() : 0f;
+    }
+    public void setTailDepthDeflectionFactor(float value) {
+        if (tail != null) tail.setDepthDeflectionFactor(value);
+    }
+
+    public float getTailUndulationAmplitude() {
+        return tail != null ? tail.getUndulationAmplitude() : 0f;
+    }
+    public void setTailUndulationAmplitude(float value) {
+        if (tail != null) tail.setUndulationAmplitude(value);
+    }
+
+    public float getTailUndulationFrequency() {
+        return tail != null ? tail.getUndulationFrequency() : 0f;
+    }
+    public void setTailUndulationFrequency(float value) {
+        if (tail != null) tail.setUndulationFrequency(value);
+    }
+
+    public float getTailUndulationPropagation() {
+        return tail != null ? tail.getUndulationPropagation() : 0f;
+    }
+    public void setTailUndulationPropagation(float value) {
+        if (tail != null) tail.setUndulationPropagation(value);
+    }
+
+    public float getTailRandomAmplitude() {
+        return tail != null ? tail.getRandomAmplitude() : 0f;
+    }
+    public void setTailRandomAmplitude(float value) {
+        if (tail != null) tail.setRandomAmplitude(value);
+    }
+
+    public float getTailRandomFrequency() {
+        return tail != null ? tail.getRandomFrequency() : 0f;
+    }
+    public void setTailRandomFrequency(float value) {
+        if (tail != null) tail.setRandomFrequency(value);
+    }
+
+    public float getTailVerticalVelocityInfluence() {
+        return tail != null ? tail.getVerticalVelocityInfluence() : 0f;
+    }
+    public void setTailVerticalVelocityInfluence(float value) {
+        if (tail != null) tail.setVerticalVelocityInfluence(value);
+    }
+
+    public float getTailMaxVerticalDeflectionAngle() {
+        return tail != null ? tail.getMaxVerticalDeflectionAngle() : 0f;
+    }
+    public void setTailMaxVerticalDeflectionAngle(float value) {
+        if (tail != null) tail.setMaxVerticalDeflectionAngle(value);
+    }
+
+    public void setTailRestRotation(List<Float> rotations) {
+        if (tail != null) tail.setRestRotation(rotations);
+    }
+
     // utilitaires
     public String serialize() {
         return "cosmetique:" + this.hashCode();

@@ -113,6 +113,20 @@ public class Tail {
     /** Fréquence du mouvement aléatoire, en Hz. */
     private float randomFrequency        = 0.35f;
 
+    /**
+     * Facteur de conversion de la vélocité verticale en angle de déflexion (rad / (bloc/s)).
+     * Quand le joueur saute, la queue s'affaisse ; quand il tombe, elle se soulève.
+     * Plus faible que {@code velocityInfluence} car les vitesses verticales Minecraft
+     * sont plus élevées que les vitesses horizontales.
+     */
+    private float verticalVelocityInfluence  = 0.08f;
+
+    /**
+     * Angle maximum de déflexion verticale en degrés.
+     * Évite que la queue parte à la verticale lors d'une chute libre.
+     */
+    private float maxVerticalDeflectionDeg   = 25f;
+
     // ─────────────────────────────────────────────────────────────────────────
     // État interne
     // ─────────────────────────────────────────────────────────────────────────
@@ -348,6 +362,90 @@ public class Tail {
     /** Fréquence du mouvement aléatoire en Hz. Défaut : 0.35 Hz. */
     public Tail setRandomFrequency(float v)       { randomFrequency = v;        return this; }
 
+    /**
+     * Influence de la vélocité verticale sur la déflexion (rad/(bloc/s)).
+     * Saut → queue s'affaisse ; chute libre → queue se soulève. Défaut : 0.08.
+     */
+    public Tail setVerticalVelocityInfluence(float v) { verticalVelocityInfluence = v; return this; }
+
+    /** Angle maximal de déflexion verticale en degrés. Défaut : 25°. */
+    public Tail setMaxVerticalDeflectionAngle(float deg) { maxVerticalDeflectionDeg = deg; return this; }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Getters publics des paramètres
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public float getRigidity()                    { return rigidity; }
+    public float getDamping()                     { return damping; }
+    public float getVelocitySmoothing()           { return velocitySmoothing; }
+    public float getVelocityInfluence()           { return velocityInfluence; }
+    public float getMaxDeflectionAngle()          { return maxDeflectionDeg; }
+    public float getDepthDeflectionFactor()       { return depthDeflectionFactor; }
+    public float getUndulationAmplitude()         { return undulationAmplitudeDeg; }
+    public float getUndulationFrequency()         { return undulationFrequency; }
+    public float getUndulationPropagation()       { return undulationPropagation; }
+    public float getRandomAmplitude()             { return randomAmplitudeDeg; }
+    public float getRandomFrequency()             { return randomFrequency; }
+    public float getVerticalVelocityInfluence()   { return verticalVelocityInfluence; }
+    public float getMaxVerticalDeflectionAngle()  { return maxVerticalDeflectionDeg; }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Modification des rotations repos en parcours profondeur d'abord (DFS)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Applique une liste de quaternions à tous les nœuds de la queue
+     * en suivant un parcours profondeur d'abord (DFS).
+     *
+     * <p>La liste doit contenir 4 floats (x, y, z, w) par nœud, dans l'ordre DFS.
+     * Si la liste est trop courte, les nœuds restants garderont leur rotation.
+     * Si la liste est trop longue, les floats supplémentaires seront ignorés.
+     *
+     * @param rotations Une liste de floats contenant les composantes (x, y, z, w)
+     *                  des quaternions pour chaque nœud, en ordre DFS.
+     *
+     * @example Pour une queue avec 3 nœuds (racine + 2 enfants directs) :
+     *          List.of(
+     *            0.1f, 0.2f, 0.3f, 0.9f,  // racine
+     *            0.0f, 0.0f, 0.5f, 0.87f, // enfant 1
+     *            0.1f, 0.1f, 0.2f, 0.96f  // enfant 2
+     *          )
+     */
+    public void setRestRotation(List<Float> rotations) {
+        if (rotations == null || rotations.isEmpty()) return;
+        int[] index = { 0 }; // Conteneur mutable pour tracker la position
+        setRestRotationDFS(root, rotations, index);
+    }
+
+    /**
+     * Parcours DFS récursif pour appliquer les rotations aux nœuds.
+     * Visite d'abord le nœud courant, puis récursivement tous ses enfants.
+     *
+     * @param node      Le nœud actuel à traiter.
+     * @param rotations La liste complète des floats.
+     * @param index     Un tableau contenant l'index courant [position].
+     *                  Modifié à chaque consommation de floats.
+     */
+    private void setRestRotationDFS(TailNode node, List<Float> rotations, int[] index) {
+        // Consommer 4 floats pour ce nœud (x, y, z, w)
+        if (index[0] + 3 < rotations.size()) {
+            float x = rotations.get(index[0]++);
+            float y = rotations.get(index[0]++);
+            float z = rotations.get(index[0]++);
+            float w = rotations.get(index[0]++);
+
+            // Appliquer la quaternion au restRotation du nœud
+            node.restRotation.set(x, y, z, w);
+            // Réinitialiser aussi la rotation courante pour qu'elle suive
+            node.currentRot.set(node.restRotation);
+        }
+
+        // Récursivement traiter tous les enfants (parcours DFS)
+        for (TailNode child : node.children) {
+            setRestRotationDFS(child, rotations, index);
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Point d'entrée principal : update par tick
     // ─────────────────────────────────────────────────────────────────────────
@@ -370,11 +468,20 @@ public class Tail {
      *                  Passer {@code 0.05f} pour un tick à 20 TPS.
      */
     public void nextFrame(Location location) {
+        nextFrame(location, 0.05f); // 20 TPS par défaut
+    }
+
+    /**
+     * Variante avec deltaTime explicite, utile si le serveur tourne à un TPS variable.
+     *
+     * @param location  Position actuelle de l'entité porteuse.
+     * @param deltaTime Temps écoulé en secondes depuis le dernier appel.
+     */
+    public void nextFrame(Location location, float deltaTime) {
         float x = (float) location.getX();
         float y = (float) location.getY();
         float z = (float) location.getZ();
-        float yaw = (float) location.getYaw();
-        float deltaTime = 0.05f; // valeur fixe pour 20 TPS ; adapter si nécessaire
+        float yaw = location.getYaw();
         if (deltaTime <= 0f) return;
         time += deltaTime;
 
@@ -462,6 +569,7 @@ public class Tail {
 
         // Vélocité monde brute (blocs/s)
         float vwx = (x - posLastX) / dt;
+        float vwy = (y - posLastY) / dt; // verticale : pas de rotation yaw à appliquer
         float vwz = (z - posLastZ) / dt;
         posLastX = x; posLastY = y; posLastZ = z;
 
@@ -474,9 +582,9 @@ public class Tail {
 
         // Lissage exponentiel (EWMA)
         float keep = velocitySmoothing, take = 1f - keep;
-        smoothedLocalVel.x = smoothedLocalVel.x * keep + lvx * take;
-        smoothedLocalVel.z = smoothedLocalVel.z * keep + lvz * take;
-        // smoothedLocalVel.y ignoré (vertical) — étendre ici si nécessaire
+        smoothedLocalVel.x = smoothedLocalVel.x * keep + lvx  * take;
+        smoothedLocalVel.y = smoothedLocalVel.y * keep + vwy  * take; // vertical lissé
+        smoothedLocalVel.z = smoothedLocalVel.z * keep + lvz  * take;
     }
 
     /**
@@ -531,9 +639,11 @@ public class Tail {
      * <p>La rotation cible est la composition de :
      * <ol>
      *   <li><b>Pose repos</b> : quaternion défini à la création du segment.</li>
-     *   <li><b>Déflexion vélocité</b> : rotation dont l'axe est perpendiculaire
+     *   <li><b>Déflexion horizontale</b> : rotation dont l'axe est perpendiculaire
      *       à la direction de déplacement dans le plan XZ, de sorte que l'extrémité
      *       de la queue traîne derrière ({@code vel × down = (nz, 0, -nx)}).</li>
+     *   <li><b>Déflexion verticale</b> : rotation autour de l'axe +X local ;
+     *       saut → queue s'affaisse, chute → queue se soulève.</li>
      *   <li><b>Ondulation sinusoïdale</b> : deux sinus déphasés de π/2 sur X et Z,
      *       avec décalage de phase progressif entre segments.</li>
      *   <li><b>Mouvement aléatoire</b> : deux sinus basse fréquence avec phases
@@ -567,6 +677,22 @@ public class Tail {
             // à l'opposé de la direction de déplacement (physique de pendule).
             qTemp.identity().rotateAxis(angle, nz, 0f, -nx);
             qTemp.mul(out, out); // out = qTemp × out
+        }
+
+        // ── 1b. Déflexion due à la vélocité verticale ────────────────────────
+        // Saut (vy > 0) : la queue traîne en bas  → rotation +X (tip vers -Y).
+        // Chute (vy < 0) : la queue flotte vers le haut → rotation -X (tip vers +Y).
+        // L'axe +X local (droite joueur) est perpendiculaire au plan vertical de déplacement
+        // et produit un affaissement/soulèvement symétrique quelle que soit la direction.
+        float vy = smoothedLocalVel.y;
+        if (Math.abs(vy) > 0.1f) {
+            float maxVertRad = (float) Math.toRadians(maxVerticalDeflectionDeg);
+            float vAngle = vy > 0f
+                ? Math.min( vy * verticalVelocityInfluence,  maxVertRad)
+                : Math.max( vy * verticalVelocityInfluence, -maxVertRad);
+            vAngle *= (1f + node.depth * depthDeflectionFactor);
+            qTemp.identity().rotateAxis(vAngle, 1f, 0f, 0f);
+            qTemp.mul(out, out);
         }
 
         // ── 2. Ondulation lente (deux composantes déphasées) ─────────────────
