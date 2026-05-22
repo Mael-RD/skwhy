@@ -33,6 +33,9 @@ public class RandomStuffModule implements AddonModule {
     public void load(SkriptAddon addon) {
         BodyYaw.register(addon);
         EntityTrackers.register(addon);
+        FutureDirection.register(addon);
+        GenerateId.register(addon);
         SplitRegex.register(addon);
+        TrackedEntities.register(addon);
     }
 }

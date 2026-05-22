@@ -3,7 +3,6 @@ package skwhy.data;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 
 import com.github.retrooper.packetevents.util.Vector3d;

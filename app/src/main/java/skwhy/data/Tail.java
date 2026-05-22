@@ -307,6 +307,22 @@ public class Tail {
     /** Renvoie le nœud racine de l'arbre. */
     public TailNode getRoot() { return root; }
 
+    /**
+     * Compte récursivement le nombre total de displays (DisplayGroupData) dans l'arbre.
+     * @return Le nombre total de nœuds/displays dans la queue.
+     */
+    public int getDisplayCount() {
+        return countDisplaysRecursive(root);
+    }
+
+    private int countDisplaysRecursive(TailNode node) {
+        int count = 1; // Le nœud courant
+        for (TailNode child : node.children) {
+            count += countDisplaysRecursive(child);
+        }
+        return count;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Setters fluides
     // ─────────────────────────────────────────────────────────────────────────
@@ -497,6 +513,11 @@ public class Tail {
     // ─────────────────────────────────────────────────────────────────────────
     // Gestion des viewers (délégation vers tous les displays)
     // ─────────────────────────────────────────────────────────────────────────
+
+
+    public List<Player> getViewers() {
+        return root.display.getViewers();
+    }
 
     /** Ajoute un viewer à tous les segments de la queue. */
     public void addViewer(Player player) {

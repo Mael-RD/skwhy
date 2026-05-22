@@ -1,6 +1,5 @@
 package skwhy.data;
 
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import java.util.List;
@@ -27,6 +26,7 @@ public class CosmetiqueData {
     public CosmetiqueData(Entity entity, boolean selfHats, boolean selfBack, boolean selfTail) {
         this.entity = entity;
         this.hats = new ArrayList<CosmetiqueHat>();
+        this.viewers = new ArrayList<Player>();
         this.selfHats = selfHats;
         this.selfBack = selfBack;
         this.selfTail = selfTail;
@@ -119,11 +119,11 @@ public class CosmetiqueData {
         if (back != null) back.delete();
         if (back2 != null) back2.delete();
         if (tail != null) tail.delete();
-        if (entity != null) entity.remove();
         hats.clear();
         back = null;
         back2 = null;
         tail = null;
+        entity = null;
         viewers.clear();
     }
 
@@ -188,7 +188,7 @@ public class CosmetiqueData {
                 data.updateMetadata();
             }
             if (horizontalRotation) {
-                data.setYawPitch(futureYaw, 0);
+                data.setYawPitch(futureYaw+180, 0);
                 data.sendRotation();
             }
         }
@@ -447,7 +447,44 @@ public class CosmetiqueData {
     }
 
     // utilitaires
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Cosmetique[");
+        
+        // Hats
+        sb.append("hats: ").append(hats.size()).append(" (");
+        for (int i = 0; i < hats.size(); i++) {
+            CosmetiqueHat hat = hats.get(i);
+            sb.append(hat.data.getDisplays().size()).append(" displays");
+            if (i < hats.size() - 1) sb.append(", ");
+        }
+        sb.append(")");
+        
+        // Back
+        sb.append(", back: ");
+        if (back != null) {
+            sb.append(back.getDisplays().size()).append(" displays, ")
+              .append(back.getViewers().size()).append(" viewers");
+        } else {
+            sb.append("null");
+        }
+        
+        // Tail
+        sb.append(", tail: ");
+        if (tail != null) {
+            int tailDisplayCount = tail.getDisplayCount();
+            sb.append(tailDisplayCount).append(" displays, ")
+              .append(tail.getViewers().size()).append(" viewers");
+        } else {
+            sb.append("null");
+        }
+        
+        sb.append(", viewers: ").append(viewers.size()).append("]");
+        return sb.toString();
+    }
+
     public String serialize() {
-        return "cosmetique:" + this.hashCode();
+        return toString();
     }
 }

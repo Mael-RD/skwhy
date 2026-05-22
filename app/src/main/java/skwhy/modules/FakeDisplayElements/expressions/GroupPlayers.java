@@ -44,13 +44,14 @@ public class GroupPlayers extends SimpleExpression<Player> {
 
         return null;
     }
-
-    @Override
-    public Class<?>[] acceptChange(ChangeMode mode) {
-        return switch (mode) {
-            case ADD, REMOVE, REMOVE_ALL -> new Class<?>[]{Player[].class};
-            default          -> null;
-        };
+@Override
+    public @Nullable Class<?>[] acceptChange(ChangeMode mode) {
+        // On indique à Skript que notre expression accepte d'être modifiée (SET, ADD, REMOVE, REMOVE_ALL)
+        // et que l'objet qu'on va lui passer (le delta) doit être un Player
+        if (mode == ChangeMode.SET || mode == ChangeMode.ADD || mode == ChangeMode.REMOVE || mode == ChangeMode.REMOVE_ALL) {
+            return new Class<?>[] { Player.class }; // C'est cette ligne qui débloque le "set viewers of ... to player"
+        }
+        return null;
     }
 
     @Override

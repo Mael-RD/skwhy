@@ -30,12 +30,12 @@ public class Cosmetique {
 
                 @Override
                 public String toString(CosmetiqueData data, int flags) {
-                    return this.toString();
+                    return data.toString();
                 }
 
                 @Override
                 public String toVariableNameString(CosmetiqueData data) {
-                    return "cosmetique:" + data.serialize();
+                    return data.toString();
                 }
             })
             .parser(new Parser<CosmetiqueData>() {
@@ -57,7 +57,7 @@ public class Cosmetique {
 
                 @Override
                 public String toVariableNameString(CosmetiqueData o) {
-                    return "cosmetique:" + o.toString();
+                    return o.toString();
                 }
             })
             

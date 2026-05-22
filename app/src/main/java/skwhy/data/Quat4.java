@@ -14,6 +14,7 @@ public class Quat4 {
         this.y = y;
         this.z = z;
         this.w = w;
+        canonical_form();
     }
 
     public Quat4(Quaternion4f q) {
@@ -23,6 +24,7 @@ public class Quat4 {
         this.y = q.getY();
         this.z = q.getZ();
         this.w = q.getW();
+        canonical_form();
     }
 
     public Quat4(Quaternionf q) {
@@ -30,6 +32,7 @@ public class Quat4 {
         this.y = q.y;
         this.z = q.z;
         this.w = q.w;
+        canonical_form();
     }
 
     // ── Addition (+) ──
@@ -68,6 +71,15 @@ public class Quat4 {
     @Override
     public String toString() {
         return String.format("(%.2f, %.2f, %.2f, %.2f)", x, y, z, w);
+    }
+
+    public void canonical_form() {
+        if (w < 0) {
+            x = -x;
+            y = -y;
+            z = -z;
+            w = -w;
+        }
     }
 
     /**

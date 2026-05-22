@@ -55,14 +55,14 @@ public class GroupLocation extends SimpleExpression<Location> {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return "location of " + groupExpr.toString(event, debug);
+        return "group location of " + groupExpr.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(GroupLocation.class, Location.class)
-                .addPattern("[the] location of %displaygroup%")
+                .addPattern("[the] group location of %displaygroup%")
                 .build()
         );
     }

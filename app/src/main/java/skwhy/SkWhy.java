@@ -48,6 +48,10 @@ public class SkWhy extends JavaPlugin {
         skriptAddon.loadModules(new RandomStuffModule());
         getServer().getPluginManager().registerEvents(new EntityRemove(), this);
         getServer().getPluginManager().registerEvents(new BodyTracker(), this);
+        getServer().getPluginManager().registerEvents(new FutureRotationTracker(), this);
+        getServer().getPluginManager().registerEvents(new TrackedBy(), this);
+        FutureRotationTracker.startTracking(this);
+        TrackedBy.startTracking(this);
 
         getLogger().info("SkWhy activé avec succès !");
     }
