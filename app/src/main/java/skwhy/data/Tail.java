@@ -219,6 +219,8 @@ public class Tail {
         // ─────────────────────────────────────────────────────────────────────
 
         private TailNode(DisplayGroupData display, Vec3 restTrans, Quat4 restRot, int depth) {
+            display.setInterpolationDuration(2);
+            display.setTeleportationDuration(2);
             this.display = display;
             this.depth   = depth;
 

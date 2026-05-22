@@ -8,8 +8,6 @@ import ch.njol.skript.Skript;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.skriptlang.skript.addon.SkriptAddon;
 
-import com.github.retrooper.packetevents.PacketEvents;
-
 import skwhy.modules.FakeDisplayModule;
 import skwhy.modules.RandomStuffModule;
 
@@ -49,6 +47,7 @@ public class SkWhy extends JavaPlugin {
         skriptAddon.loadModules(new FakeDisplayModule());
         skriptAddon.loadModules(new RandomStuffModule());
         getServer().getPluginManager().registerEvents(new EntityRemove(), this);
+        getServer().getPluginManager().registerEvents(new BodyTracker(), this);
 
         getLogger().info("SkWhy activé avec succès !");
     }

@@ -138,19 +138,19 @@ public class TailPartCreate extends SimpleExpression<TailNode> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(TailPartCreate.class, TailNode.class)
-                .addPattern("[a] [new] tail[ ]part from %displaygroup% with offset %Vector% and rot %Quaternionf% " +
-                           "[, [connected] to parent %-tailpart%] " +
-                           "[, rigidity %-number%] " +
-                           "[, damping %-number%] " +
-                           "[, velocity smoothing %-number%] " +
-                           "[, velocity influence %-number%] " +
-                           "[, max deflection %-number%] " +
-                           "[, depth deflection %-number%] " +
-                           "[, undulation amp[litude] %-number%] " +
-                           "[, undulation freq[uency] %-number%] " +
-                           "[, undulation prop[agation] %-number%] " +
-                           "[, random amp[litude] %-number%] " +
-                           "[, random freq[uency] %-number%]")
+                .addPattern("[a] [new] tail[ ]part from %displaygroup% with offset %vector% and rot %quaternion% " +
+                           "[[,] [connected] to parent %-tailpart%] " +
+                           "[[,] [with] rigidity %-number%] " +
+                           "[[,] [with] damping %-number%] " +
+                           "[[,] [with] velocity smoothing %-number%] " +
+                           "[[,] [with] velocity influence %-number%] " +
+                           "[[,] [with] max deflection %-number%] " +
+                           "[[,] [with] depth deflection %-number%] " +
+                           "[[,] [with] undulation amp[litude] %-number%] " +
+                           "[[,] [with] undulation freq[uency] %-number%] " +
+                           "[[,] [with] undulation prop[agation] %-number%] " +
+                           "[[,] [with] random amp[litude] %-number%] " +
+                           "[[,] [with] random freq[uency] %-number%]")
                 .build()
         );
     }

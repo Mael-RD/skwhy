@@ -37,6 +37,7 @@ public abstract class DisplayData {
     protected int   billboardMode = 0;    // 0=fixed, 1=vertical, 2=horizontal, 3=center
     protected int   interpolationStart = 0;
     protected int   interpolationDuration = 0;
+    protected int   teleportationDuration = 0;
     protected GlobalTransformation globalTransformation;
 
     // ── Cache du packet compilé ───────────────────────────────────────────────
@@ -176,6 +177,8 @@ public abstract class DisplayData {
 
         // Index 9  – interpolation duration
         data.add(new EntityData<>(9, EntityDataTypes.INT, interpolationDuration));
+
+        data.add(new EntityData<>(10, EntityDataTypes.INT, teleportationDuration));
 
         // Index 11 – translation offset
         data.add(new EntityData<>(11, EntityDataTypes.VECTOR3F, globalTransformation.getTranslation(translation).toVector3f()));
@@ -340,6 +343,13 @@ public abstract class DisplayData {
         cachedData.add(new EntityData<>(9, EntityDataTypes.INT, interpolationDuration));
     }
 
+    public int getTeleportationDuration() { return teleportationDuration; }
+    public void setTeleportationDuration(int v) {
+        teleportationDuration = v;
+        cachedDataRemove(10);
+        cachedData.add(new EntityData<>(10, EntityDataTypes.INT, teleportationDuration));
+    }
+
     /**
      * Applique un effet miroir sur les axes spécifiés (X, Y, Z).
      * Modifie uniquement la translation et les quaternions de rotation.
@@ -378,7 +388,7 @@ public abstract class DisplayData {
         cloned.billboardMode = this.billboardMode;
         cloned.interpolationStart = this.interpolationStart;
         cloned.interpolationDuration = this.interpolationDuration;
-        
+        cloned.teleportationDuration = this.teleportationDuration;
         // Note : globalTransformation n'est volontairement pas copié machinalement ici 
         // car le clone possède son propre cycle de vie et d'attachement réseau.
 

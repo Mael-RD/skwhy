@@ -76,14 +76,17 @@ public class DisplayGroupData {
     public DisplayGroupData(List<DisplayData> displays, List<Player> viewers, Location location) {
         this(displays,location);
         this.viewers.addAll(viewers);
+        this.sendSpawnPacket(viewers);
     }
     public DisplayGroupData(List<DisplayData> displays, List<Player> viewers, Entity attachedEntity) {
         this(displays,attachedEntity);
         this.viewers.addAll(viewers);
+        this.sendSpawnPacket(viewers);
     }
     public DisplayGroupData(List<DisplayData> displays, List<Player> viewers, Location location, Integer attachedId) {
         this(displays, location, attachedId);
         this.viewers.addAll(viewers);
+        this.sendSpawnPacket(viewers);
     }
 
     // ── Gestion de la Position et de l'Attache ──
@@ -211,15 +214,21 @@ public class DisplayGroupData {
         
         // 1. Spawn des entités
         sendSpawnPacket(List.of(player));
-        
-        if (attachedId != null) {
-            finalMount(List.of(player), attachedId);
-        }
     }
 
     public void addViewer(List<Player> players) {
         if (players == null) return;
-        for (Player p : players) addViewer(p);
+        List<Player> finalplayers = new ArrayList<>();
+        for (Player p : players) {
+            if (p != null && !viewers.contains(p)) {
+                viewers.add(p);
+                finalplayers.add(p);
+            }
+        }
+        
+        Location spawnLoc = getLocation();
+        if (spawnLoc == null) return;
+        sendSpawnPacket(finalplayers);
     }
 
     public void removeViewer(Player player) {
@@ -263,9 +272,9 @@ public class DisplayGroupData {
             DisplayData.CompiledDisplayPacket packet = display.getSpawnPacket(spawnLoc);
             if (packet == null) return;
             packet.sendToAll(players);
-            if (attachedId != null) {
-                finalMount(players, attachedId);
-            }
+        }
+        if (attachedId != null) {
+            finalMount(players, attachedId);
         }
     }
 
@@ -467,16 +476,15 @@ public class DisplayGroupData {
 
     private static void finalMount(List<Player> targetPlayers, int vehicleId, List<Integer> passengerIds) {
         Bukkit.getLogger().info("FinalMount: Véhicule ID " + vehicleId + " avec passagers " + passengerIds + " pour joueurs " + targetPlayers.stream().map(Player::getName).toList());
-        for (List<DisplayGroupData> groupList : entityGroupMount.values()) {
-            for (DisplayGroupData group : groupList) {
-                for (DisplayData display : group.getDisplays()) {
-                    passengerIds.add(display.getEntityId());
-                }
+        if (targetPlayers.isEmpty()) return;
+        List<DisplayGroupData> groupList = entityGroupMount.get(vehicleId);
+        for (DisplayGroupData group : groupList) {
+            for (DisplayData display : group.getDisplays()) {
+                passengerIds.add(display.getEntityId());
             }
         }
-        for (List<Integer> groupList : entityOtherMount.values()) {
-            passengerIds.addAll(groupList);
-        }
+        List<Integer> otherList = entityOtherMount.get(vehicleId);
+        if (otherList != null) passengerIds.addAll(otherList);
         Bukkit.getLogger().info("FinalMount: Liste passagers finaux : " + passengerIds + " pour joueurs " + targetPlayers.stream().map(Player::getName).toList());
 
         WrapperPlayServerSetPassengers passengerPacket = new WrapperPlayServerSetPassengers(
@@ -545,6 +553,23 @@ public class DisplayGroupData {
         return globalTransformation.getScale();
     }
 
+    public void setInterpolationStart(int value) {
+        for (DisplayData display : displays) {
+            display.setInterpolationStart(value);
+        }
+    }
+
+    public void setInterpolationDuration(int value) {
+        for (DisplayData display : displays) {
+            display.setInterpolationDuration(value);
+        }
+    }
+
+    public void setTeleportationDuration(int value) {
+        for (DisplayData display : displays) {
+            display.setTeleportationDuration(value);
+        }
+    }
 
     public void delete() {
         sendDestroyPacket(displays, viewers);
@@ -641,19 +666,23 @@ public class DisplayGroupData {
      */
     public DisplayGroupData clone(boolean mirrorX, boolean mirrorY, boolean mirrorZ) {
         DisplayGroupData clonedGroup;
-
+        List<DisplayData> displays = new ArrayList<DisplayData>();
+        for (DisplayData display : this.displays) {
+            displays.add(display.clone());
+        }
         // 1. Initialisation du clone selon le type d'ancrage d'origine
         if (this.attachedEntity != null) {
-            clonedGroup = new DisplayGroupData(this.attachedEntity);
+            clonedGroup = new DisplayGroupData(displays, viewers, this.attachedEntity);
         } else if (this.attachedId != null) {
-            clonedGroup = new DisplayGroupData(this.location, this.attachedId);
+            clonedGroup = new DisplayGroupData(displays, viewers, this.location, this.attachedId);
         } else {
-            clonedGroup = new DisplayGroupData(this.location);
+            clonedGroup = new DisplayGroupData(displays, viewers, this.location);
         }
 
         // 2. Duplication des attributs d'orientation
         clonedGroup.yaw = this.yaw;
         clonedGroup.pitch = this.pitch;
+        clonedGroup.sendRotation();
 
         // 3. Duplication de la matrice de transformation globale
         clonedGroup.globalTransformation.setScale(this.getScale());
@@ -662,14 +691,8 @@ public class DisplayGroupData {
         clonedGroup.globalTransformation.setRotation(this.getRotation());
 
         // 4. Clonage individuel et application du miroir sur chaque display
-        for (DisplayData originalDisplay : this.displays) {
-            // Utilise la méthode polymorphique d'instance écrite sur DisplayData
-            DisplayData clonedDisplay = originalDisplay.clone(mirrorX, mirrorY, mirrorZ);
-            
-            // On l'ajoute au nouveau groupe (l'attachement à la GlobalTransformation du clone se fait ici)
-            clonedGroup.addDisplay(clonedDisplay);
-        }
-        clonedGroup.sendSpawnPacket(viewers);
+        for (DisplayData clonedDisplay : clonedGroup.displays) clonedDisplay.mirror(mirrorX, mirrorY, mirrorZ);
+        clonedGroup.updateMetadata();
         return clonedGroup;
     }
     

@@ -43,6 +43,7 @@ public class SetCosmetiquePart extends Effect {
         else if (patternIndex == 1) {
             // Pattern 1: set back ...
             this.displayGroupExpr = (Expression<DisplayGroupData>) exprs[1];
+            this.slotExpr = (Expression<String>) exprs[2];
         } 
         else if (patternIndex == 2) {
             // Pattern 2: set tail ...
@@ -58,6 +59,7 @@ public class SetCosmetiquePart extends Effect {
         if (cosmetique == null) return;
 
         if (patternIndex == 0) {
+            if (displayGroupExpr == null || slotExpr == null || verticalRotExpr == null || horizontalRotExpr == null) return;
             DisplayGroupData group = displayGroupExpr.getSingle(event);
             String slot = slotExpr.getSingle(event);
             Boolean vRot = verticalRotExpr.getSingle(event);
@@ -68,12 +70,15 @@ public class SetCosmetiquePart extends Effect {
             }
         } 
         else if (patternIndex == 1) {
+            if (displayGroupExpr == null || slotExpr == null) return;
             DisplayGroupData group = displayGroupExpr.getSingle(event);
-            if (group != null) {
-                cosmetique.setBack(group);
+            String type = slotExpr.getSingle(event);
+            if (group != null && type != null) {
+                cosmetique.setBack(group, type);
             }
         } 
         else if (patternIndex == 2) {
+            if (tailNodeExpr == null) return;
             TailNode tail = tailNodeExpr.getSingle(event);
             if (tail != null) {
                 cosmetique.setTail(tail);
@@ -99,7 +104,7 @@ public class SetCosmetiquePart extends Effect {
                 // Pattern 0 (index 0)
                 .addPattern("set hat of %cosmetique% to %displaygroup% in [slot] %string% with [[vertical] rot[ation]] %boolean%[[,] [and] [[horizontal] rot[ation]]] %boolean%")
                 // Pattern 1 (index 1)
-                .addPattern("set back of %cosmetique% to %displaygroup%")
+                .addPattern("set back of %cosmetique% to %displaygroup% [with type] %string%")
                 // Pattern 2 (index 2)
                 .addPattern("set tail of %cosmetique% to %tailpart%")
                 .build()

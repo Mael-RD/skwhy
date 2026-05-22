@@ -1,11 +1,8 @@
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-
 version = "1.0.0" 
 
 plugins {
     java
     application
-    id("com.gradleup.shadow") version "9.0.0-beta15"
 }
 
 repositories {
@@ -13,7 +10,7 @@ repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://repo.skriptlang.org/releases")
     maven("https://repo.codemc.io/repository/maven-public/")
-    maven("https://maven.pvphub.me/tofaa")
+    // maven("https://maven.pvphub.me/tofaa")
 }
 
 dependencies {
@@ -23,11 +20,11 @@ dependencies {
 
     compileOnly("com.github.retrooper:packetevents-spigot:2.11.2")
 
-    implementation("io.github.tofaa2:spigot:3.0.3-SNAPSHOT")
+    // implementation("io.github.tofaa2:spigot:3.0.3-SNAPSHOT")
 }
 
 tasks.register<Copy>("copyJarToPlugins") {
-    from(tasks.shadowJar)
+    from(tasks.jar)
     into("C:/Users/orimi/Desktop/proxti/plugins") 
 }
 
@@ -54,21 +51,9 @@ tasks {
     startScripts { enabled = false }
     distZip { enabled = false }
     distTar { enabled = false }
-    shadowJar {
-        archiveBaseName.set("skwhy")
-        archiveVersion.set(version.toString())
-        archiveClassifier.set("")
-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-        relocate("me.tofaa.entitylib", "skwhy.libs.entitylib")
-        archiveClassifier.set("")
-    }
-
-    jar {
-        enabled = false
-    }
 
     build {
-        dependsOn(shadowJar)
+        finalizedBy("copyJarToPlugins")
     }
 }
 

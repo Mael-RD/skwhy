@@ -92,4 +92,13 @@ public class Quat4 {
             this.y = -this.y;
         }
     }
+
+    public Quat4 clone() {
+        return new Quat4(this.x, this.y, this.z, this.w);
+    }
+    public Quat4 clone(boolean mirrorX, boolean mirrorY, boolean mirrorZ) {
+        Quat4 cloned = this.clone();
+        cloned.mirror(mirrorX, mirrorY, mirrorZ);
+        return cloned;
+    }
 }

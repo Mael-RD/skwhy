@@ -31,6 +31,7 @@ public class RandomStuffModule implements AddonModule {
     // load() : sections, effets, conditions, expressions
     @Override
     public void load(SkriptAddon addon) {
+        BodyYaw.register(addon);
         EntityTrackers.register(addon);
         SplitRegex.register(addon);
     }
