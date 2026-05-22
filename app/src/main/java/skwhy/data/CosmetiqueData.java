@@ -10,6 +10,7 @@ import org.bukkit.Location;
 
 import skwhy.BodyTracker;
 import skwhy.data.Tail.TailNode;
+import skwhy.FutureRotationTracker;
 
 public class CosmetiqueData {
     private List<CosmetiqueHat> hats;
@@ -78,14 +79,19 @@ public class CosmetiqueData {
     }
 
     public void update() {
-        for (CosmetiqueHat hat : hats) {
-            hat.update();
-        }
-        float yaw;
+        float yaw, futureYaw, futurePitch;
         if (entity instanceof Player p) {
             yaw = BodyTracker.getCustomBodyYaw(p)+180;
+            float[] predicted = FutureRotationTracker.getPredictedRotation(p);
+            futureYaw = predicted[0];
+            futurePitch = predicted[1];
         } else {
             yaw = entity.getLocation().getYaw()+180;
+            futureYaw = yaw;
+            futurePitch = entity.getLocation().getPitch();
+        }
+        for (CosmetiqueHat hat : hats) {
+            hat.update(futureYaw, futurePitch);
         }
         if (type.equals("wings") && back != null && back2 != null) {
             back.setRotation(new Quat4(calculateWingRotation()));
@@ -176,13 +182,13 @@ public class CosmetiqueData {
         private String getSlot() {
             return slot;
         }
-        private void update() {
+        private void update(float futureYaw, float futurePitch) {
             if (verticalRotation) {
-                data.setRotation(new Quat4(new Quaternionf().rotationXYZ((float) Math.toRadians(entity.getLocation().getPitch()), 0f, 0f)));
+                data.setRotation(new Quat4(new Quaternionf().rotationXYZ((float) Math.toRadians(futurePitch), 0f, 0f)));
                 data.updateMetadata();
             }
             if (horizontalRotation) {
-                data.setYawPitch(entity.getLocation().getYaw(), 0);
+                data.setYawPitch(futureYaw, 0);
                 data.sendRotation();
             }
         }
