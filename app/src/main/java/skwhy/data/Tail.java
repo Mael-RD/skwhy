@@ -232,7 +232,7 @@ public class Tail {
 
         // ─────────────────────────────────────────────────────────────────────
 
-        private TailNode(DisplayGroupData display, Vec3 restTrans, Quat4 restRot, int depth) {
+        private TailNode(DisplayGroupData display, Vec3 restTrans, int depth) {
             display.setInterpolationDuration(2);
             display.setTeleportationDuration(2);
             this.display = display;
@@ -240,7 +240,7 @@ public class Tail {
 
             // Vec3 / Quat4 → JOML (champs publics x, y, z, w supposés)
             this.restTranslation = new Vector3f(restTrans.x, restTrans.y, restTrans.z);
-            this.restRotation    = new Quaternionf(restRot.x, restRot.y, restRot.z, restRot.w);
+            this.restRotation    = new Quaternionf(0, 0, 0, 1);
             this.currentRot      = new Quaternionf(restRotation);
 
             // Phases : propagation le long de la chaîne + bruit aléatoire par nœud
@@ -269,8 +269,8 @@ public class Tail {
      * @param restTrans   Offset repos depuis le point d'attache (ex. {@code Vec3(0, -0.12f, -0.25f)}).
      * @param restRot     Rotation repos de la racine, yaw exclu.
      */
-    public Tail(DisplayGroupData rootDisplay, Vec3 restTrans, Quat4 restRot) {
-        this.root = new TailNode(rootDisplay, restTrans, restRot, 0);
+    public Tail(DisplayGroupData rootDisplay, Vec3 restTrans) {
+        this.root = new TailNode(rootDisplay, restTrans, 0);
         // Position et rotation initiales de la racine
         root.worldPosBuf.set(root.restTranslation);
         root.globalRot.set(root.currentRot); // parentRot = identité
@@ -294,8 +294,8 @@ public class Tail {
      * @return Le nouveau {@link TailNode} créé et ajouté à l'arbre.
      */
     public TailNode addSegment(TailNode parent, DisplayGroupData display,
-                               Vec3 restTrans, Quat4 restRot) {
-        TailNode node = new TailNode(display, restTrans, restRot, parent.depth + 1);
+                               Vec3 restTrans) {
+        TailNode node = new TailNode(display, restTrans, parent.depth + 1);
         parent.children.add(node);
         // Initialisation : position et rotation au repos
         node.worldPosBuf.set(node.restTranslation).rotate(parent.globalRot).add(parent.worldPosBuf);

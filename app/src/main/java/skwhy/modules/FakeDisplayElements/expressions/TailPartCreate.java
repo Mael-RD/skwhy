@@ -14,17 +14,14 @@ import skwhy.data.DisplayGroupData;
 import skwhy.data.Tail;
 import skwhy.data.Tail.TailNode;
 import skwhy.data.Vec3;
-import skwhy.data.Quat4;
 
 import org.bukkit.util.Vector;
-import org.joml.Quaternionf;
 
 public class TailPartCreate extends SimpleExpression<TailNode> {
 
     // Éléments requis de base
     private Expression<DisplayGroupData> displayExpr;
     private Expression<Vector> transExpr;
-    private Expression<Quaternionf> rotExpr;
 
     // Chaînage (Optionnel : si spécifié -> Segment, si absent -> Racine)
     private Expression<TailNode> parentExpr;
@@ -50,21 +47,20 @@ public class TailPartCreate extends SimpleExpression<TailNode> {
         
         this.displayExpr = (Expression<DisplayGroupData>) exprs[0];
         this.transExpr = (Expression<Vector>) exprs[1];
-        this.rotExpr = (Expression<Quaternionf>) exprs[2];
         
         // Extraction des expressions du pattern
-        this.parentExpr = (Expression<TailNode>) exprs[3];
-        this.rigidityExpr = (Expression<Number>) exprs[4];
-        this.dampingExpr = (Expression<Number>) exprs[5];
-        this.velSmoothingExpr = (Expression<Number>) exprs[6];
-        this.velInfluenceExpr = (Expression<Number>) exprs[7];
-        this.maxDeflectionExpr = (Expression<Number>) exprs[8];
-        this.depthDeflectionExpr = (Expression<Number>) exprs[9];
-        this.undulationAmpExpr = (Expression<Number>) exprs[10];
-        this.undulationFreqExpr = (Expression<Number>) exprs[11];
-        this.undulationPropExpr = (Expression<Number>) exprs[12];
-        this.randomAmpExpr = (Expression<Number>) exprs[13];
-        this.randomFreqExpr = (Expression<Number>) exprs[14];
+        this.parentExpr = (Expression<TailNode>) exprs[2];
+        this.rigidityExpr = (Expression<Number>) exprs[3];
+        this.dampingExpr = (Expression<Number>) exprs[4];
+        this.velSmoothingExpr = (Expression<Number>) exprs[5];
+        this.velInfluenceExpr = (Expression<Number>) exprs[6];
+        this.maxDeflectionExpr = (Expression<Number>) exprs[7];
+        this.depthDeflectionExpr = (Expression<Number>) exprs[8];
+        this.undulationAmpExpr = (Expression<Number>) exprs[9];
+        this.undulationFreqExpr = (Expression<Number>) exprs[10];
+        this.undulationPropExpr = (Expression<Number>) exprs[11];
+        this.randomAmpExpr = (Expression<Number>) exprs[12];
+        this.randomFreqExpr = (Expression<Number>) exprs[13];
 
         return true;
     }
@@ -74,9 +70,8 @@ public class TailPartCreate extends SimpleExpression<TailNode> {
     protected TailNode[] get(Event event) {
         DisplayGroupData display = displayExpr.getSingle(event);
         Vector trans = transExpr.getSingle(event);
-        Quaternionf rot = rotExpr.getSingle(event);
 
-        if (display == null || trans == null || rot == null) return null;
+        if (display == null || trans == null) return null;
 
         TailNode parentNode = parentExpr != null ? parentExpr.getSingle(event) : null;
         TailNode node;
@@ -85,7 +80,7 @@ public class TailPartCreate extends SimpleExpression<TailNode> {
         // 1. Détermination s'il s'agit d'une racine ou d'un enfant
         if (parentNode == null) {
             // Création d'une nouvelle structure de Queue (Racine)
-            tailInstance = new Tail(display, new Vec3(trans), new Quat4(rot));
+            tailInstance = new Tail(display, new Vec3(trans));
             node = tailInstance.getRoot();
         } else {
             // Ajout à une queue existante (Pour retrouver l'instance de Tail depuis un TailNode,
@@ -104,7 +99,7 @@ public class TailPartCreate extends SimpleExpression<TailNode> {
                 return null; // Échec de récupération de l'instance principale
             }
 
-            node = tailInstance.addSegment(parentNode, display, new Vec3(trans), new Quat4(rot));
+            node = tailInstance.addSegment(parentNode, display, new Vec3(trans));
         }
 
         // 2. Application des configurations fluides de Tail.java (uniquement si spécifiées)
@@ -138,7 +133,7 @@ public class TailPartCreate extends SimpleExpression<TailNode> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(TailPartCreate.class, TailNode.class)
-                .addPattern("[a] [new] tail[ ]part from %displaygroup% with offset %vector% and rot %quaternion% " +
+                .addPattern("[a] [new] tail[ ]part from %displaygroup% with offset %vector% " +
                            "[[,] [connected] to parent %-tailpart%] " +
                            "[[,] [with] rigidity %-number%] " +
                            "[[,] [with] damping %-number%] " +

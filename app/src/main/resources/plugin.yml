@@ -4,3 +4,4 @@ main: skwhy.SkWhy
 api-version: '1.21'
 author: Whity
 description: Système de cosmétiques en display entity
+depend: [Skript, packetevents]

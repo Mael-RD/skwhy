@@ -93,7 +93,7 @@ public class CosmetiqueData {
         for (CosmetiqueHat hat : hats) {
             hat.update(futureYaw, futurePitch);
         }
-        if (type.equals("wings") && back != null && back2 != null) {
+        if ("wings".equals(type) && back != null && back2 != null) {
             back.setRotation(new Quat4(calculateWingRotation()));
             back2.setRotation(back.getRotation().clone(true, false, false));
             // Utiliser un yaw lisse pour eviter les saccades lors de changements brusques
@@ -233,13 +233,11 @@ public class CosmetiqueData {
         if (entity instanceof Player p && selfBack) finalViewers.add(p);
         back.setViewers(finalViewers);
         this.back = back;
-        if (type.equals("wings")) {
-            Bukkit.getLogger().info("Setting wings with back group " + back.serialize());
+        if ("wings".equals(type)) {
             this.back2 = back.clone(true, false, false);
         } else {
             this.back2 = null;
         }
-        Bukkit.getLogger().info("Debug 6");
     }
 
     private float time = 0f;

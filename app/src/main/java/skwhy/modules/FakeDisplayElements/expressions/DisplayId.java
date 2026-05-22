@@ -58,7 +58,7 @@ public class DisplayId extends SimpleExpression<Object> {
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayId.class, Object.class)
                 .addPattern("[the] entity id of %displaydata%")   // 0
-                .addPattern("[the] [entity] uuid of %displaydata%") // 1
+                .addPattern("[the] entity uuid of %displaydata%") // 1
                 .build()
         );
     }

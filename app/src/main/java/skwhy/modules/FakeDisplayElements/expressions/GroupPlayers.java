@@ -130,7 +130,7 @@ public class GroupPlayers extends SimpleExpression<Player> {
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(GroupPlayers.class, Player.class)
                 // Le pattern accepte maintenant les displaygroups ou les cosmetiques enregistrés dans Skript
-                .addPattern("[the] players of %displaygroups/cosmetiques%")
+                .addPattern("[the] viewers of %displaygroups/cosmetiques%")
                 .build()
         );
     }

@@ -475,7 +475,6 @@ public class DisplayGroupData {
     }
 
     private static void finalMount(List<Player> targetPlayers, int vehicleId, List<Integer> passengerIds) {
-        Bukkit.getLogger().info("FinalMount: Véhicule ID " + vehicleId + " avec passagers " + passengerIds + " pour joueurs " + targetPlayers.stream().map(Player::getName).toList());
         if (targetPlayers.isEmpty()) return;
         List<DisplayGroupData> groupList = entityGroupMount.get(vehicleId);
         for (DisplayGroupData group : groupList) {
@@ -485,7 +484,6 @@ public class DisplayGroupData {
         }
         List<Integer> otherList = entityOtherMount.get(vehicleId);
         if (otherList != null) passengerIds.addAll(otherList);
-        Bukkit.getLogger().info("FinalMount: Liste passagers finaux : " + passengerIds + " pour joueurs " + targetPlayers.stream().map(Player::getName).toList());
 
         WrapperPlayServerSetPassengers passengerPacket = new WrapperPlayServerSetPassengers(
             vehicleId,
