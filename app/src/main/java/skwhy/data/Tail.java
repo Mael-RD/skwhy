@@ -406,6 +406,24 @@ public class Tail {
     public float getMaxVerticalDeflectionAngle()  { return maxVerticalDeflectionDeg; }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Scale management
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Applique un facteur d'échelle à tous les segments de la queue.
+     *
+     * @param scale Le facteur d'échelle à appliquer (1.0 = taille normale).
+     */
+    public void setScale(float scale) {
+        setScaleNode(root, scale);
+    }
+
+    private void setScaleNode(TailNode node, float scale) {
+        node.display.setScale(scale);
+        for (TailNode child : node.children) setScaleNode(child, scale);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Modification des rotations repos en parcours profondeur d'abord (DFS)
     // ─────────────────────────────────────────────────────────────────────────
 

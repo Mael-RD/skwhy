@@ -55,6 +55,7 @@ public class FakeDisplayModule implements AddonModule {
         CloneDisplays.register(addon);
         CosmetiqueCreate.register(addon);
         CosmetiqueSelfVisibility.register(addon);
+        CosmetiqueScale.register(addon);
         CosmetiqueTail.register(addon);
 
         DisplayBlockData.register(addon);

@@ -476,9 +476,11 @@ public class DisplayGroupData {
     private static void finalMount(List<Player> targetPlayers, int vehicleId, List<Integer> passengerIds) {
         if (targetPlayers.isEmpty()) return;
         List<DisplayGroupData> groupList = entityGroupMount.get(vehicleId);
-        for (DisplayGroupData group : groupList) {
-            for (DisplayData display : group.getDisplays()) {
-                passengerIds.add(display.getEntityId());
+        if (groupList != null) {
+            for (DisplayGroupData group : groupList) {
+                for (DisplayData display : group.getDisplays()) {
+                    passengerIds.add(display.getEntityId());
+                }
             }
         }
         List<Integer> otherList = entityOtherMount.get(vehicleId);
@@ -665,7 +667,7 @@ public class DisplayGroupData {
         DisplayGroupData clonedGroup;
         List<DisplayData> displays = new ArrayList<DisplayData>();
         for (DisplayData display : this.displays) {
-            displays.add(display.clone());
+            displays.add(display.clone(mirrorX, mirrorY, mirrorZ));
         }
         // 1. Initialisation du clone selon le type d'ancrage d'origine
         if (this.attachedEntity != null) {
@@ -682,13 +684,11 @@ public class DisplayGroupData {
         clonedGroup.sendRotation();
 
         // 3. Duplication de la matrice de transformation globale
-        clonedGroup.globalTransformation.setScale(this.getScale());
-        clonedGroup.globalTransformation.setTranslation(this.getTranslation());
-        clonedGroup.globalTransformation.setCentreRotation(this.getCenter());
-        clonedGroup.globalTransformation.setRotation(this.getRotation());
+        clonedGroup.setScale(this.getScale());
+        clonedGroup.setTranslation(this.getTranslation().clone(mirrorX, mirrorY, mirrorZ));
+        clonedGroup.setCenter(this.getCenter().clone(mirrorX, mirrorY, mirrorZ));
+        clonedGroup.setRotation(this.getRotation().clone(mirrorX, mirrorY, mirrorZ));
 
-        // 4. Clonage individuel et application du miroir sur chaque display
-        for (DisplayData clonedDisplay : clonedGroup.displays) clonedDisplay.mirror(mirrorX, mirrorY, mirrorZ);
         clonedGroup.updateMetadata();
         return clonedGroup;
     }

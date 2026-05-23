@@ -66,10 +66,10 @@ public class FutureRotationTracker implements Listener {
         }
 
         // Prédiction : Position actuelle + Vélocité angulaire
-        float predYaw = normalizeAngle(loc.getYaw() + 2*state.deltaYaw);
+        float predYaw = normalizeAngle(loc.getYaw() + state.deltaYaw);
         
         // Le pitch dans Minecraft est strictement bloqué entre -90 (haut) et 90 (bas)
-        float predPitch = Math.max(-90.0f, Math.min(90.0f, loc.getPitch() + 2*state.deltaPitch));
+        float predPitch = Math.max(-90.0f, Math.min(90.0f, loc.getPitch() + state.deltaPitch));
 
         return new float[]{ predYaw, predPitch };
     }

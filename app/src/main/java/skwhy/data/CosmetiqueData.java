@@ -22,6 +22,7 @@ public class CosmetiqueData {
     private boolean selfHats;
     private boolean selfBack;
     private boolean selfTail;
+    private float scale;
 
     public CosmetiqueData(Entity entity, boolean selfHats, boolean selfBack, boolean selfTail) {
         this.entity = entity;
@@ -30,6 +31,7 @@ public class CosmetiqueData {
         this.selfHats = selfHats;
         this.selfBack = selfBack;
         this.selfTail = selfTail;
+        this.scale = 1.0f;
     }
 
     public void addViewer(Player player) {
@@ -184,7 +186,7 @@ public class CosmetiqueData {
         }
         private void update(float futureYaw, float futurePitch) {
             if (verticalRotation) {
-                data.setRotation(new Quat4(new Quaternionf().rotationXYZ((float) Math.toRadians(futurePitch), 0f, 0f)));
+                data.setRotation(new Quat4(new Quaternionf().rotationXYZ((float) Math.toRadians(-futurePitch), 0f, 0f)));
                 data.updateMetadata();
             }
             if (horizontalRotation) {
@@ -444,6 +446,25 @@ public class CosmetiqueData {
 
     public void setTailRestRotation(List<Float> rotations) {
         if (tail != null) tail.setRestRotation(rotations);
+    }
+
+    // ─────── SCALE ───────
+
+    public float getScale() {
+        return scale;
+    }
+
+    public void setScale(float value) {
+        this.scale = value;
+        // Appliquer le scale à tous les groupes du cosmétique
+        for (CosmetiqueHat hat : hats) {
+            hat.data.setScale(value);
+        }
+        if (back != null) back.setScale(value);
+        if (back2 != null) back2.setScale(value);
+        if (tail != null) {
+            tail.setScale(value);
+        }
     }
 
     // utilitaires

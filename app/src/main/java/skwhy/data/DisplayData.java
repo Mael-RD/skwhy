@@ -364,10 +364,14 @@ public abstract class DisplayData {
         translation.mirror(x, y, z);
         leftRotation.mirror(x, y, z);
         rightRotation.mirror(x, y, z);
-
         updateGlobalTransformation(true, true, false);
     }
 
+
+    public DisplayData clone() {
+        return clone(false, false, false);
+    }
+    
     /**
      * Crée une copie conforme de cette display, applique le miroir sur les axes demandés
      * et génère de nouveaux identifiants d'entité réseau uniques.
@@ -378,9 +382,9 @@ public abstract class DisplayData {
 
         // 2. Copie de l'intégralité des propriétés visuelles communes
         cloned.scale = new Vec3(this.scale.x, this.scale.y, this.scale.z);
-        cloned.translation = new Vec3(this.translation.x, this.translation.y, this.translation.z);
-        cloned.leftRotation = new Quat4(this.leftRotation.x, this.leftRotation.y, this.leftRotation.z, this.leftRotation.w);
-        cloned.rightRotation = new Quat4(this.rightRotation.x, this.rightRotation.y, this.rightRotation.z, this.rightRotation.w);
+        cloned.translation = this.translation.clone(mirrorX, mirrorY, mirrorZ);
+        cloned.leftRotation = this.leftRotation.clone_for_display(mirrorX, mirrorY, mirrorZ);
+        cloned.rightRotation = this.rightRotation.clone(mirrorX, mirrorY, mirrorZ);
         cloned.glowColor = this.glowColor;
         cloned.shadowRadius = this.shadowRadius;
         cloned.shadowStrength = this.shadowStrength;
@@ -389,11 +393,6 @@ public abstract class DisplayData {
         cloned.interpolationStart = this.interpolationStart;
         cloned.interpolationDuration = this.interpolationDuration;
         cloned.teleportationDuration = this.teleportationDuration;
-        // Note : globalTransformation n'est volontairement pas copié machinalement ici 
-        // car le clone possède son propre cycle de vie et d'attachement réseau.
-
-        // 3. Application du miroir sur le clone
-        cloned.mirror(mirrorX, mirrorY, mirrorZ);
 
         return cloned;
     }
@@ -438,9 +437,5 @@ public abstract class DisplayData {
                 cachedData.add(new EntityData<>(12, EntityDataTypes.VECTOR3F, globalTransformation.getScale(this.scale).toVector3f()));
             }
         }
-    }
-
-    public DisplayData clone() {
-        return clone(false, false, false);
     }
 }

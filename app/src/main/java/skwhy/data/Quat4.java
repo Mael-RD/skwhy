@@ -14,7 +14,6 @@ public class Quat4 {
         this.y = y;
         this.z = z;
         this.w = w;
-        canonical_form();
     }
 
     public Quat4(Quaternion4f q) {
@@ -24,7 +23,6 @@ public class Quat4 {
         this.y = q.getY();
         this.z = q.getZ();
         this.w = q.getW();
-        canonical_form();
     }
 
     public Quat4(Quaternionf q) {
@@ -32,7 +30,6 @@ public class Quat4 {
         this.y = q.y;
         this.z = q.z;
         this.w = q.w;
-        canonical_form();
     }
 
     // ── Addition (+) ──
@@ -73,15 +70,6 @@ public class Quat4 {
         return String.format("(%.2f, %.2f, %.2f, %.2f)", x, y, z, w);
     }
 
-    public void canonical_form() {
-        if (w < 0) {
-            x = -x;
-            y = -y;
-            z = -z;
-            w = -w;
-        }
-    }
-
     /**
      * Applique un effet miroir directement sur ce quaternion selon les axes spécifiés.
      * Modifie l'état interne de cette instance.
@@ -113,4 +101,31 @@ public class Quat4 {
         cloned.mirror(mirrorX, mirrorY, mirrorZ);
         return cloned;
     }
+    public Quat4 clone_for_display(boolean mirrorX, boolean mirrorY, boolean mirrorZ) {
+        Quat4 cloned = this.clone();
+        if (mirrorX) {
+            float tempX = cloned.x;
+            cloned.x = cloned.z;
+            cloned.z = tempX;
+            float tempY = cloned.y;
+            cloned.y = cloned.w;
+            cloned.w = tempY;
+        }
+        if (mirrorY) {
+            float tempX = cloned.x;
+            cloned.x = cloned.w;
+            cloned.w = tempX;
+            float tempY = cloned.y;
+            cloned.y = -cloned.z;
+            cloned.z = -tempY;
+        }
+        if (mirrorZ) {
+            cloned.x = -cloned.x;
+            cloned.y = -cloned.y;
+        }
+
+        return cloned;
+    }
+
+    
 }

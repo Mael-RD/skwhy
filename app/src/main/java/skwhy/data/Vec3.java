@@ -99,4 +99,13 @@ public class Vec3 {
         if (y) this.y = -this.y;
         if (z) this.z = -this.z;
     }
+    public Vec3 clone(boolean mirrorX, boolean mirrorY, boolean mirrorZ) {
+        Vec3 cloned = new Vec3(this.x, this.y, this.z);
+        cloned.mirror(mirrorX, mirrorY, mirrorZ);
+        return cloned;
+    }
+    
+    public Vec3 clone() {
+        return new Vec3(this.x, this.y, this.z);
+    }
 }
