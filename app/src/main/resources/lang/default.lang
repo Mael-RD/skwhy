@@ -1,3 +1,5 @@
+version: 1.0.0
+
 types:
   # DisplayData (classe de base)
   displaydata: display data@display datas

@@ -23,6 +23,7 @@ public class CosmetiqueData {
     private boolean selfBack;
     private boolean selfTail;
     private float scale;
+    private boolean ocilator = false;
 
     public CosmetiqueData(Entity entity, boolean selfHats, boolean selfBack, boolean selfTail) {
         this.entity = entity;
@@ -95,23 +96,33 @@ public class CosmetiqueData {
         for (CosmetiqueHat hat : hats) {
             hat.update(futureYaw, futurePitch);
         }
+        float smoothedYaw = smoothYaw(yaw, 0.5f);  // 0.5f = 50% vers la cible par frame
+        ocilator = !ocilator;
         if ("wings".equals(type) && back != null && back2 != null) {
-            back.setRotation(new Quat4(calculateWingRotation()));
-            back2.setRotation(back.getRotation().clone(true, false, false));
+            if (ocilator) {
+                back.setRotation(new Quat4(calculateWingRotation()));
+                back2.setRotation(back.getRotation().clone(true, false, false));
+                if (back != null) {
+                    back.updateMetadata();
+                }
+                if (back2 != null) {
+                    back2.updateMetadata();
+                }
+            }
             // Utiliser un yaw lisse pour eviter les saccades lors de changements brusques
-            float smoothedYaw = smoothYaw(yaw, 0.5f);  // 0.5f = 50% vers la cible par frame
             back.setYawPitch(smoothedYaw, 0);
             back2.setYawPitch(smoothedYaw, 0);
         }
-        if (back != null) {
-            back.updateMetadata();
-        }
-        if (back2 != null) {
-            back2.updateMetadata();
-        }
         Location location = entity.getLocation();
-        location.setYaw(yaw);
-        if (tail != null) tail.nextFrame(entity.getLocation());
+        location.setYaw(futureYaw);
+        if (tail != null) {
+            tail.nextFrame(location);
+            tail.setYawPitch(yaw+180, 0);
+        }
+    }
+
+    public void mount() {
+        update();
     }
 
     public void delete() {
@@ -138,8 +149,14 @@ public class CosmetiqueData {
         return selfHats;
     }
     public void setSelfHats(boolean selfHats) {
+        if (selfHats == this.selfHats) return; // Pas de changement
         this.selfHats = selfHats;
+        if (entity instanceof Player p) {
+            if (selfHats) for (CosmetiqueHat hat : hats) hat.data.addViewer(p);
+            else for (CosmetiqueHat hat : hats) hat.data.removeViewer(p);
+        }
     }
+
     public void setHat(DisplayGroupData data, String slot, boolean verticalRotation, boolean horizontalRotation) {
         removeHat(slot);
         this.hats.add(new CosmetiqueHat(data, slot, verticalRotation, horizontalRotation));
@@ -206,7 +223,17 @@ public class CosmetiqueData {
         return selfBack;
     }
     public void setSelfBack(boolean selfBack) {
+        if (selfBack == this.selfBack) return;
         this.selfBack = selfBack;
+        if (entity instanceof Player p && back != null) {
+            if (selfBack) {
+                back.addViewer(p);
+                if (back2 != null) back2.addViewer(p);
+            } else {
+                back.removeViewer(p);
+                if (back2 != null) back2.removeViewer(p);
+            }
+        }
     }
     public void removeBack() {
         if (back != null) {
@@ -222,7 +249,7 @@ public class CosmetiqueData {
     public void setBack(DisplayGroupData back, String type) {
         removeBack();
         back.setCenter(new Vec3(0f, -0.5f, 0.15f));
-        back.setInterpolationDuration(2);
+        back.setInterpolationDuration(3);
         back.setTeleportationDuration(2);
         if (entity instanceof Player p) {
             back.setYawPitch(BodyTracker.getCustomBodyYaw(p), 0);
@@ -283,7 +310,7 @@ public class CosmetiqueData {
     }
 
     private Quaternionf calculateWingRotation() {
-        this.time += 0.05f;
+        this.time += 0.1f;
 
         // --- 1. HARMONIQUES ADDITIVES (Respiration naturelle et asynchrone) ---
         // Axe Y (Yaw) : Ouverture / Fermeture de l'aile
@@ -334,11 +361,28 @@ public class CosmetiqueData {
         return selfTail;
     }
     public void setSelfTail(boolean selfTail) {
+        if (selfTail == this.selfTail) return;
         this.selfTail = selfTail;
+        if (entity instanceof Player p && tail != null) {
+            if (selfTail) tail.addViewer(p);
+            else tail.removeViewer(p);
+        }
     }
     public void setTail(TailNode tail) {
+        removeTail();
+      
         this.tail = tail.getTailFromNode();
-        this.tail.setViewers(viewers != null ? viewers : List.of());
+        this.tail.setAttachedEntity(entity);
+        this.tail.setInterpolationDuration(2);
+        this.tail.setTeleportationDuration(2);
+        if (entity instanceof Player p) {
+            this.tail.setYawPitch(BodyTracker.getCustomBodyYaw(p), 0);
+        } else {
+            this.tail.setYawPitch(entity.getLocation().getYaw(), 0);
+        }
+        List<Player> finalViewers = new ArrayList<>(viewers != null ? viewers : List.of());
+        if (entity instanceof Player p && selfHats) finalViewers.add(p);
+        this.tail.setViewers(finalViewers);
     }
     public void removeTail() {
         if (tail != null) {
@@ -353,6 +397,7 @@ public class CosmetiqueData {
         return tail;
     }
 
+    // Ressort
     public float getTailRigidity() {
         return tail != null ? tail.getRigidity() : 0f;
     }
@@ -374,11 +419,33 @@ public class CosmetiqueData {
         if (tail != null) tail.setVelocitySmoothing(value);
     }
 
-    public float getTailVelocityInfluence() {
-        return tail != null ? tail.getVelocityInfluence() : 0f;
+    // Déflexion vélocité
+    public float getTailVelocityInfluenceForward() {
+        return tail != null ? tail.getVelocityInfluenceForward() : 0f;
     }
-    public void setTailVelocityInfluence(float value) {
-        if (tail != null) tail.setVelocityInfluence(value);
+    public void setTailVelocityInfluenceForward(float value) {
+        if (tail != null) tail.setVelocityInfluenceForward(value);
+    }
+
+    public float getTailVelocityInfluenceLateral() {
+        return tail != null ? tail.getVelocityInfluenceLateral() : 0f;
+    }
+    public void setTailVelocityInfluenceLateral(float value) {
+        if (tail != null) tail.setVelocityInfluenceLateral(value);
+    }
+
+    public float getTailVelocityInfluenceVertical() {
+        return tail != null ? tail.getVelocityInfluenceVertical() : 0f;
+    }
+    public void setTailVelocityInfluenceVertical(float value) {
+        if (tail != null) tail.setVelocityInfluenceVertical(value);
+    }
+
+    public float getTailVelocityInfluenceYaw() {
+        return tail != null ? tail.getVelocityInfluenceYaw() : 0f;
+    }
+    public void setTailVelocityInfluenceYaw(float value) {
+        if (tail != null) tail.setVelocityInfluenceYaw(value);
     }
 
     public float getTailMaxDeflectionAngle() {
@@ -395,11 +462,48 @@ public class CosmetiqueData {
         if (tail != null) tail.setDepthDeflectionFactor(value);
     }
 
-    public float getTailUndulationAmplitude() {
-        return tail != null ? tail.getUndulationAmplitude() : 0f;
+    // Impulsions
+    public float getTailImpulseInfluenceForward() {
+        return tail != null ? tail.getImpulseInfluenceForward() : 0f;
     }
-    public void setTailUndulationAmplitude(float value) {
-        if (tail != null) tail.setUndulationAmplitude(value);
+    public void setTailImpulseInfluenceForward(float value) {
+        if (tail != null) tail.setImpulseInfluenceForward(value);
+    }
+
+    public float getTailImpulseInfluenceLateral() {
+        return tail != null ? tail.getImpulseInfluenceLateral() : 0f;
+    }
+    public void setTailImpulseInfluenceLateral(float value) {
+        if (tail != null) tail.setImpulseInfluenceLateral(value);
+    }
+
+    public float getTailImpulseInfluenceVertical() {
+        return tail != null ? tail.getImpulseInfluenceVertical() : 0f;
+    }
+    public void setTailImpulseInfluenceVertical(float value) {
+        if (tail != null) tail.setImpulseInfluenceVertical(value);
+    }
+
+    // Ondulation
+    public float getTailUndulationAmplitudeX() {
+        return tail != null ? tail.getUndulationAmplitudeX() : 0f;
+    }
+    public void setTailUndulationAmplitudeX(float value) {
+        if (tail != null) tail.setUndulationAmplitudeX(value);
+    }
+
+    public float getTailUndulationAmplitudeY() {
+        return tail != null ? tail.getUndulationAmplitudeY() : 0f;
+    }
+    public void setTailUndulationAmplitudeY(float value) {
+        if (tail != null) tail.setUndulationAmplitudeY(value);
+    }
+
+    public float getTailUndulationAmplitudeZ() {
+        return tail != null ? tail.getUndulationAmplitudeZ() : 0f;
+    }
+    public void setTailUndulationAmplitudeZ(float value) {
+        if (tail != null) tail.setUndulationAmplitudeZ(value);
     }
 
     public float getTailUndulationFrequency() {
@@ -416,6 +520,7 @@ public class CosmetiqueData {
         if (tail != null) tail.setUndulationPropagation(value);
     }
 
+    // Bruit aléatoire
     public float getTailRandomAmplitude() {
         return tail != null ? tail.getRandomAmplitude() : 0f;
     }
@@ -430,21 +535,7 @@ public class CosmetiqueData {
         if (tail != null) tail.setRandomFrequency(value);
     }
 
-    public float getTailVerticalVelocityInfluence() {
-        return tail != null ? tail.getVerticalVelocityInfluence() : 0f;
-    }
-    public void setTailVerticalVelocityInfluence(float value) {
-        if (tail != null) tail.setVerticalVelocityInfluence(value);
-    }
-
-    public float getTailMaxVerticalDeflectionAngle() {
-        return tail != null ? tail.getMaxVerticalDeflectionAngle() : 0f;
-    }
-    public void setTailMaxVerticalDeflectionAngle(float value) {
-        if (tail != null) tail.setMaxVerticalDeflectionAngle(value);
-    }
-
-    public void setTailRestRotation(List<Float> rotations) {
+    public void setTailRestRotation(List<Quaternionf> rotations) {
         if (tail != null) tail.setRestRotation(rotations);
     }
 

@@ -39,7 +39,7 @@ public class TailPart {
 
                 @Override
                 public String toString(TailNode node, int flags) {
-                    return "TailPart[Depth: " + node.depth + ", DisplayGroup: " + node.display.toString() + "]";
+                    return node.toString();
                 }
 
                 @Override

@@ -287,6 +287,7 @@ public class DisplayGroupData {
             var user = PacketEvents.getAPI().getPlayerManager().getUser(player);
             if (user != null) user.sendPacket(destroyPacket);
         }
+        finalMount(targetPlayers, attachedId);
     }
 
     /**
@@ -588,6 +589,7 @@ public class DisplayGroupData {
 
     /**
      * Affichage NORMAL : Format compact, idéal pour les logs standards ou l'affichage en jeu.
+     * Inclut les informations de GlobalTransformation.
      */
     @Override
     public String toString() {
@@ -610,9 +612,24 @@ public class DisplayGroupData {
             coords = "Inconnue ou non initialisée";
         }
 
+        // Informations de GlobalTransformation
+        Vec3 translation = getTranslation();
+        Vec3 center = getCenter();
+        Quat4 rotation = getRotation();
+        float scale = getScale();
+        
+        String globalTransformInfo = String.format(
+            "Translation[%.2f, %.2f, %.2f]; Rotation[%s]; Center[%.2f, %.2f, %.2f]; Scale[%.2f]",
+            translation.x, translation.y, translation.z,
+            rotation.toString(),
+            center.x, center.y, center.z,
+            scale
+        );
+
         return "DisplayGroup[Target: " + target + 
                "; Pos: [" + coords + "]" +
                "; Yaw/Pitch: " + String.format("%.1f°/%.1f°", yaw, pitch) +
+               "; GlobalTransform: " + globalTransformInfo +
                "; Displays: " + displays.size() + 
                "; Viewers: " + viewers.size() + "]";
     }

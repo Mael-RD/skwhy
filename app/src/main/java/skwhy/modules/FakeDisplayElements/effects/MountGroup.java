@@ -13,6 +13,7 @@ import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
+import skwhy.data.CosmetiqueData;
 
 import java.util.Arrays;
 import java.util.List;
@@ -56,8 +57,13 @@ public class MountGroup extends Effect {
         Object[] targets = targetsExpr.getArray(event);
         if (targets == null || targets.length == 0) return;
 
-        // Pattern 0 : make displays %displaygroups% mount
+        // Pattern 0 : make displays %displaygroups/cosmetiques% mount
         if (matchedPattern == 0) {
+            if (targets.length == 1 && targets[0] instanceof CosmetiqueData cosme) {
+                cosme.mount();
+                return;
+            }
+
             for (Object target : targets) {
                 if (target instanceof DisplayGroupData group) {
                     group.mount();
@@ -162,7 +168,7 @@ public class MountGroup extends Effect {
             SyntaxRegistry.EFFECT,
             SyntaxInfo.builder(MountGroup.class)
                 // 0
-                .addPattern("make fake %displaygroups% mount")
+                .addPattern("make fake %displaygroups/cosmetiques% mount")
                 // 1
                 .addPattern("make fake %displaygroups% mount on %entity%")
                 // 2

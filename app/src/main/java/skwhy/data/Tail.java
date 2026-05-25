@@ -1,9 +1,9 @@
 package skwhy.data;
 
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
-import org.bukkit.Location;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,811 +12,461 @@ import java.util.Random;
 /**
  * Queue animée composée d'un arbre de {@link TailNode}.
  *
- * <h3>Physique</h3>
- * Chaque segment suit un <b>ressort angulaire amorti</b> vers une rotation cible
- * composée de :
- * <ul>
- *   <li>la pose repos (quaternion défini à la création),</li>
- *   <li>une déflexion opposée à la vélocité locale du joueur,</li>
- *   <li>une ondulation lente sinusoïdale avec propagation le long de la chaîne,</li>
- *   <li>un mouvement aléatoire basse fréquence par nœud.</li>
- * </ul>
+ * Chaque segment suit un ressort angulaire amorti vers une rotation cible composée de :
+ * la pose repos, une déflexion liée à la vélocité locale, une ondulation sinusoïdale
+ * et un bruit aléatoire basse fréquence.
  *
- * <h3>Repère</h3>
- * Le yaw du joueur est géré par l'attache de l'entité ({@code setAttachedEntity}).
- * Toutes les rotations de cette classe sont donc en <b>espace local joueur, yaw exclu</b>.
- * La vélocité monde est transformée dans ce repère avant utilisation.
- *
- * <h3>Intégration dans CosmetiqueData</h3>
- * <pre>
- * // Dans CosmetiqueData, remplacer le champ :
- * //   private DisplayGroupData tail;
- * // par :
- * //   private Tail tail;
- * //
- * // Exemple de création :
- * Tail tail = new Tail(rootDisplay, restTrans, restRot)
- *     .setRigidity(8f)
- *     .setUndulationAmplitude(7f);
- * TailNode seg1 = tail.addSegment(tail.getRoot(), display1, trans1, rot1);
- * TailNode seg2 = tail.addSegment(seg1,           display2, trans2, rot2);
- *
- * // Chaque tick (ex. BukkitRunnable à 20 Hz) :
- * Location loc = entity.getLocation();
- * tail.nextFrame((float) loc.getX(), (float) loc.getY(), (float) loc.getZ(),
- *                loc.getYaw(), 0.05f);
- * </pre>
- *
- * <h3>Hypothèses sur Vec3 / Quat4</h3>
- * Le code accède aux composantes via des champs publics {@code x, y, z} (Vec3)
- * et {@code x, y, z, w} (Quat4). Adapter si ce sont des méthodes ({@code getX()}, etc.).
+ * Le yaw est géré par l'entité attachée ; toutes les rotations ici sont en espace
+ * local joueur (yaw exclu). Appeler {@link #nextFrame} une fois par tick.
  */
 public class Tail {
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Paramètres – modifiables via les setters fluides
-    // ─────────────────────────────────────────────────────────────────────────
+    // =========================================================================
+    // PARAMÈTRES MODIFIABLES
+    // =========================================================================
 
-    /**
-     * Raideur du ressort angulaire (rad·s⁻²·rad⁻¹).
-     * Plus la valeur est élevée, plus la queue revient vite vers sa pose repos.
-     * Valeurs typiques : 4 (souple) à 16 (rigide).
-     */
-    private float rigidity              = 8f;
+    // ── Ressort angulaire ─────────────────────────────────────────────────────
+    private float rigidity          = 8f;    // Raideur (4=souple, 16=rigide)
+    private float damping           = 5.5f;  // Amortissement (~2×√rigidity pour éviter les oscillations)
+    private float velocitySmoothing = 0.85f; // Lissage EWMA de la vélocité [0–1]
 
-    /**
-     * Coefficient d'amortissement (rad·s⁻¹).
-     * Pour éviter les oscillations infinies, viser environ 2 × √rigidity.
-     * Défaut : 5.5 ≈ 2 × √8.
-     */
-    private float damping               = 5.5f;
+    // ── Déflexion par vélocité ────────────────────────────────────────────────
+    private float velocityInfluenceForward  = 0.30f; // Influence vitesse avant/arrière (local Z) en rad/(bloc·s⁻¹)
+    private float velocityInfluenceLateral  = 0.30f; // Influence vitesse gauche/droite (local X)
+    private float velocityInfluenceVertical = 0.20f; // Influence vitesse verticale (Y) → saut/chute
+    private float velocityInfluenceYaw      = 0.07f; // Influence rotation yaw → faible car les virages peuvent être brusques
+    private float maxDeflectionDeg          = 20f;   // Angle max déflexion horizontale (deg)
+    private float depthDeflectionFactor     = 0.15f; // Amplification par niveau de profondeur (0=uniforme)
 
-    /**
-     * Lissage exponentiel de la vélocité [0–1].
-     * 0 = vélocité brute, proche de 1 = très lissée (réponse plus lente).
-     */
-    private float velocitySmoothing     = 0.85f;
+    // ── Chocs / impulsions (accélération brusque) ─────────────────────────────
+    private float impulseInfluenceForward  = 0.4f; // Impulsion choc avant/arrière (local Z)
+    private float impulseInfluenceLateral  = 0.4f; // Impulsion choc gauche/droite (local X)
+    private float impulseInfluenceVertical = 0.7f; // Impulsion choc vertical (Y) → atterrissage/saut
 
-    /**
-     * Facteur de conversion vitesse → angle de déflexion (rad / (bloc/tick·20)).
-     * Augmenter pour que la queue penche davantage lors des déplacements rapides.
-     */
-    private float velocityInfluence     = 0.30f;
+    private float impulseSmoothing = 0.6f; // Lissage du choc [0-1] (0.6 = très étalé sur ~2-3 ticks)
+    private float impulseDeadzone  = 0.4f; // Vélocité minimale (blocs/s) pour déclencher un choc (filtre le lag)
+    // ── Ondulation sinusoïdale ────────────────────────────────────────────────
+    private float undulationAmplitudeX  = 7.0f;  // Amplitude ondulation axe X (deg) → tangage
+    private float undulationAmplitudeY  = 4.2f;  // Amplitude ondulation axe Y (deg) → lacet
+    private float undulationAmplitudeZ  = 2.8f;  // Amplitude ondulation axe Z (deg) → roulis
+    private float undulationFrequency   = 1.0f;  // Fréquence de l'ondulation (Hz)
+    private float undulationPropagation = 0.45f; // Décalage de phase entre segments (rad) → effet de vague
 
-    /**
-     * Angle maximum de déflexion dû à la vélocité, en degrés.
-     * Évite les postures absurdes à grande vitesse.
-     */
-    private float maxDeflectionDeg      = 40f;
+    // ── Mouvement aléatoire basse fréquence ──────────────────────────────────
+    private float randomAmplitudeDeg = 4f;    // Amplitude du bruit aléatoire par nœud (deg)
+    private float randomFrequency    = 0.35f; // Fréquence du bruit aléatoire (Hz)
 
-    /**
-     * Amplification de la déflexion par niveau de profondeur.
-     * 0 = uniforme, 0.15 = l'extrémité penche 15 % de plus par niveau que son parent.
-     */
-    private float depthDeflectionFactor = 0.15f;
+    // =========================================================================
+    // ÉTAT INTERNE (calculs uniquement — ne pas modifier directement)
+    // =========================================================================
 
-    /** Amplitude de l'ondulation principale, en degrés. */
-    private float undulationAmplitudeDeg = 7f;
+    private float posLastX = Float.NaN, posLastY, posLastZ; // Position précédente pour dériver la vélocité
+    private float lastYaw      = Float.NaN;                 // Yaw précédent pour dériver la vitesse angulaire
+    private float yawVelocity  = 0f;                        // Vitesse angulaire de rotation (degrés/s, lissée)
+    private float lastRawVelX  = Float.NaN;                 // Vélocité locale brute X du tick précédent
+    private float lastRawVelY, lastRawVelZ;                 // Vélocité locale brute Y/Z du tick précédent
 
-    /** Fréquence de l'ondulation principale, en Hz. */
-    private float undulationFrequency    = 1.0f;
+    private final Vector3f    smoothedLocalVel   = new Vector3f();    // Vélocité lissée en espace local (yaw retiré)
+    private final Vector3f    deltaLocalVel      = new Vector3f();    // Delta de vélocité locale (détection choc)
+    private final Quaternionf velocityTargetQuat = new Quaternionf(); // Quaternion cible calculé depuis la vélocité pondérée par les influences
+    private       float       velocityImpact     = 0f;                // Poids du quaternion cible [0–1], proportionnel à la vitesse brute
+    private final Quaternionf qTemp              = new Quaternionf(); // Buffer partagé — uniquement dans computeTargetRotation
 
-    /**
-     * Décalage de phase de l'ondulation entre niveaux successifs (radians).
-     * Crée l'effet de propagation de vague le long de la queue.
-     */
-    private float undulationPropagation  = 0.45f;
-
-    /** Amplitude du mouvement aléatoire basse fréquence, en degrés. */
-    private float randomAmplitudeDeg     = 4f;
-
-    /** Fréquence du mouvement aléatoire, en Hz. */
-    private float randomFrequency        = 0.35f;
-
-    /**
-     * Facteur de conversion de la vélocité verticale en angle de déflexion (rad / (bloc/s)).
-     * Quand le joueur saute, la queue s'affaisse ; quand il tombe, elle se soulève.
-     * Plus faible que {@code velocityInfluence} car les vitesses verticales Minecraft
-     * sont plus élevées que les vitesses horizontales.
-     */
-    private float verticalVelocityInfluence  = 0.08f;
-
-    /**
-     * Angle maximum de déflexion verticale en degrés.
-     * Évite que la queue parte à la verticale lors d'une chute libre.
-     */
-    private float maxVerticalDeflectionDeg   = 25f;
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // État interne
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private final TailNode  root;
-    private final Random    rng  = new Random();
-    private       float     time = 0f;
-
-    // Suivi de la position pour le calcul de vélocité
-    private float posLastX = Float.NaN, posLastY, posLastZ;
-
-    // Vélocité lissée en espace local joueur (yaw retiré)
-    private final Vector3f smoothedLocalVel = new Vector3f();
-
-    // Buffer quaternion partagé — utilisé UNIQUEMENT dans computeTargetRotation
-    // (méthode non récursive). Ne jamais l'utiliser dans applySpring ni updateNode.
-    private final Quaternionf qTemp = new Quaternionf();
-
-    // Quaternion identité immuable — ne jamais modifier
     private static final Quaternionf IDENTITY = new Quaternionf();
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Nœud de l'arbre
-    // ─────────────────────────────────────────────────────────────────────────
+    private final TailNode root;
+    private final Random   rng  = new Random();
+    private       float    time = 0f;
+    // Temps de la dernière mise à jour pour cette instance (nano secondes)
+    private       long     lastUpdateNanos = 0L;
 
-    /**
-     * Représente un segment de la queue dans l'arbre.
-     *
-     * <p>Chaque nœud possède :
-     * <ul>
-     *   <li>un {@link DisplayGroupData} (le rendu visuel),</li>
-     *   <li>une translation repos relative à son parent,</li>
-     *   <li>une rotation repos (pose neutre, yaw exclu),</li>
-     *   <li>une liste d'enfants (arbre N-aire),</li>
-     *   <li>un état physique propre (rotation courante + vitesse angulaire).</li>
-     * </ul>
-     *
-     * <p>Tous les buffers internes sont pré-alloués à la construction pour
-     * éviter toute allocation par tick.
-     */
+    // =========================================================================
+    // NŒUD
+    // =========================================================================
+
     public final class TailNode {
 
         // ── Définition ───────────────────────────────────────────────────────
-
-        /** Display visuel associé à ce segment. */
         public final DisplayGroupData display;
+        public final List<TailNode>   children     = new ArrayList<>();
+        public final int              depth;
+        public       TailNode         parent;
+        final        Vector3f         offset;       // Translation repos relative au parent
+        final        Quaternionf      restRotation; // Pose neutre (yaw exclu)
 
-        /**
-         * Translation repos de ce segment par rapport à son parent
-         * (ou au point d'attache pour la racine), en espace local parent.
-         */
-        final Vector3f restTranslation;
-
-        /**
-         * Rotation repos en espace local parent, yaw exclu.
-         * Définit la pose neutre autour de laquelle toutes les animations oscillent.
-         */
-        final Quaternionf restRotation;
-
-        /** Segments enfants dans l'arbre de la queue. */
-        public final List<TailNode> children = new ArrayList<>();
-
-        /** Profondeur dans l'arbre (0 = racine). */
-        public final int depth;
-
-        // ── Phases d'animation (aléatoires, fixes par nœud) ─────────────────
-
-        final float phaseUndX; // phase ondulation axe X
-        final float phaseUndZ; // phase ondulation axe Z (déphasée de π/2 pour mouvement 3D)
-        final float phaseRndX; // phase aléatoire axe X
-        final float phaseRndZ; // phase aléatoire axe Z
+        // ── Phases d'animation (fixes par nœud, initialisées aléatoirement) ─
+        final float phaseUndX; // Phase ondulation axe X
+        final float phaseUndY; // Phase ondulation axe Y (déphasée de π/2 pour effet 3D)
+        final float phaseRndX; // Phase bruit aléatoire X
+        final float phaseRndY; // Phase bruit aléatoire Y
 
         // ── État physique ────────────────────────────────────────────────────
-
-        /**
-         * Rotation courante en espace local parent, yaw exclu.
-         * Initialisée à la pose repos ; évolue sous l'effet du ressort.
-         */
-        final Quaternionf currentRot;
-
-        /**
-         * Vitesse angulaire courante (rad/s).
-         * Représentée comme vecteur axe × vitesse en espace monde local.
-         */
-        final Vector3f angVel = new Vector3f();
+        final Quaternionf currentRot;              // Rotation courante en espace local parent
+        final Vector3f    angVel = new Vector3f(); // Vitesse angulaire (rad/s)
 
         // ── Buffers pré-alloués (zéro allocation par tick) ──────────────────
+        final Quaternionf targetBuf      = new Quaternionf(); // Rotation cible calculée
+        final Quaternionf errorBuf       = new Quaternionf(); // Quaternion d'erreur ressort
+        final Quaternionf errPremul      = new Quaternionf(); // Buffer intermédiaire premul
+        final Quaternionf diffBuf        = new Quaternionf(); // Différence rotation globale prospective → quaternion cible vélocité
+        final Vector3f    springBuf      = new Vector3f();    // Force résultante du ressort
+        final Quaternionf globalRot      = new Quaternionf(); // Rotation globale accumulée (parentRot × currentRot)
+        final Vector3f    currentOrigin  = new Vector3f();    // Position globale du nœud
+        final Vector3f    rotatedOffsetBuf = new Vector3f();  // Buffer pour l'offset tourné (calcul d'origine)
 
-        final Quaternionf targetBuf   = new Quaternionf(); // rotation cible calculée
-        final Quaternionf errorBuf    = new Quaternionf(); // quaternion d'erreur ressort
-        final Vector3f    springBuf   = new Vector3f();    // vecteur force résultante
-        final Quaternionf errPremul   = new Quaternionf(); // buffer intermédiaire premul
-        /**
-         * Rotation globale accumulée depuis la racine (parentRot × currentRot).
-         * Utilisée pour calculer la position des segments enfants.
-         */
-        final Quaternionf globalRot   = new Quaternionf();
-        /**
-         * Position monde locale de ce nœud (dans l'espace joueur, yaw exclu).
-         * Mise à jour chaque frame ; passée aux enfants pour le chaînage.
-         */
-        final Vector3f    worldPosBuf = new Vector3f();
-
-        // ─────────────────────────────────────────────────────────────────────
-
-        private TailNode(DisplayGroupData display, Vec3 restTrans, int depth) {
+        private TailNode(DisplayGroupData display, Vec3 offset, int depth) {
             display.setInterpolationDuration(2);
             display.setTeleportationDuration(2);
-            this.display = display;
-            this.depth   = depth;
-
-            // Vec3 / Quat4 → JOML (champs publics x, y, z, w supposés)
-            this.restTranslation = new Vector3f(restTrans.x, restTrans.y, restTrans.z);
-            this.restRotation    = new Quaternionf(0, 0, 0, 1);
-            this.currentRot      = new Quaternionf(restRotation);
-
-            // Phases : propagation le long de la chaîne + bruit aléatoire par nœud
-            this.phaseUndX = depth * undulationPropagation;
-            this.phaseUndZ = depth * undulationPropagation + (float) Math.PI * 0.5f;
-            this.phaseRndX = rng.nextFloat() * (float) (Math.PI * 2);
-            this.phaseRndZ = rng.nextFloat() * (float) (Math.PI * 2);
+            this.display      = display;
+            this.depth        = depth;
+            this.parent       = null;
+            this.offset       = new Vector3f(offset.x, offset.y, offset.z);
+            this.restRotation = new Quaternionf(0, 0, 0, 1);
+            this.currentRot   = new Quaternionf(restRotation);
+            this.phaseUndX    = depth * undulationPropagation;
+            this.phaseUndY    = depth * undulationPropagation + (float) Math.PI * 0.5f;
+            this.phaseRndX    = rng.nextFloat() * (float) (Math.PI * 2);
+            this.phaseRndY    = rng.nextFloat() * (float) (Math.PI * 2);
         }
-        public Tail getTailFromNode() {
-            return Tail.this; // Permet aux classes externes d'accéder à l'instance parente
+
+        /** Retourne l'instance Tail parente. */
+        public Tail getTailFromNode() { return Tail.this; }
+
+        @Override public String toString() { return toStringRecursive(0); }
+
+        private String toStringRecursive(int indent) {
+            StringBuilder sb  = new StringBuilder();
+            String        pad = "  ".repeat(indent);
+            sb.append(pad).append("TailNode[depth=").append(depth)
+              .append(", offset=(")
+              .append(String.format("%.2f", offset.x)).append(", ")
+              .append(String.format("%.2f", offset.y)).append(", ")
+              .append(String.format("%.2f", offset.z))
+              .append("), children=").append(children.size()).append("]\n");
+            for (TailNode child : children) sb.append(child.toStringRecursive(indent + 1));
+            return sb.toString();
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Constructeur
-    // ─────────────────────────────────────────────────────────────────────────
+    // =========================================================================
+    // CONSTRUCTEUR & ARBRE
+    // =========================================================================
 
-    /**
-     * Crée une queue avec un seul segment racine.
-     *
-     * <p>Le {@code DisplayGroupData} doit déjà avoir été configuré avec
-     * {@code setCenter()} et {@code setAttachedEntity()} avant d'appeler
-     * cette méthode (comme dans {@code CosmetiqueData.setTail()}).
-     *
-     * @param rootDisplay Display du segment racine.
-     * @param restTrans   Offset repos depuis le point d'attache (ex. {@code Vec3(0, -0.12f, -0.25f)}).
-     * @param restRot     Rotation repos de la racine, yaw exclu.
-     */
-    public Tail(DisplayGroupData rootDisplay, Vec3 restTrans) {
-        this.root = new TailNode(rootDisplay, restTrans, 0);
-        // Position et rotation initiales de la racine
-        root.worldPosBuf.set(root.restTranslation);
-        root.globalRot.set(root.currentRot); // parentRot = identité
+    public Tail(DisplayGroupData rootDisplay, Vec3 offset) {
+        this.root = new TailNode(rootDisplay, offset, 0);
+        root.globalRot.set(root.currentRot);
         applyNodeTransform(root);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Ajout de segments
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Ajoute un segment enfant à un nœud existant.
-     *
-     * <p>L'arbre peut être linéaire (queue simple) ou en fourche (queue multiple).
-     * Chaque segment possède son propre {@code DisplayGroupData} et sa propre pose repos.
-     *
-     * @param parent    Nœud auquel rattacher le nouveau segment.
-     * @param display   Display du nouveau segment (déjà configuré).
-     * @param restTrans Translation repos par rapport au parent (offset dans l'espace local parent).
-     * @param restRot   Rotation repos (yaw exclu).
-     * @return Le nouveau {@link TailNode} créé et ajouté à l'arbre.
-     */
-    public TailNode addSegment(TailNode parent, DisplayGroupData display,
-                               Vec3 restTrans) {
-        TailNode node = new TailNode(display, restTrans, parent.depth + 1);
+    /** Ajoute un segment enfant à un nœud existant. L'arbre peut être linéaire ou en fourche. */
+    public TailNode addSegment(TailNode parent, DisplayGroupData display, Vec3 offset) {
+        TailNode node = new TailNode(display, offset, parent.depth + 1);
+        node.parent = parent;
         parent.children.add(node);
-        // Initialisation : position et rotation au repos
-        node.worldPosBuf.set(node.restTranslation).rotate(parent.globalRot).add(parent.worldPosBuf);
         node.globalRot.set(parent.globalRot).mul(node.currentRot);
         applyNodeTransform(node);
         return node;
     }
 
-    /** Renvoie le nœud racine de l'arbre. */
-    public TailNode getRoot() { return root; }
+    public TailNode getRoot()         { return root; }
+    public int      getDisplayCount() { return countDisplays(root); }
 
-    /**
-     * Compte récursivement le nombre total de displays (DisplayGroupData) dans l'arbre.
-     * @return Le nombre total de nœuds/displays dans la queue.
-     */
-    public int getDisplayCount() {
-        return countDisplaysRecursive(root);
+    private int countDisplays(TailNode node) {
+        int c = 1;
+        for (TailNode child : node.children) c += countDisplays(child);
+        return c;
     }
 
-    private int countDisplaysRecursive(TailNode node) {
-        int count = 1; // Le nœud courant
-        for (TailNode child : node.children) {
-            count += countDisplaysRecursive(child);
-        }
-        return count;
-    }
+    // =========================================================================
+    // POINT D'ENTRÉE : nextFrame
+    // =========================================================================
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Setters fluides
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Raideur du ressort angulaire.
-     * Valeurs typiques : 4 (souple/organique) – 16 (rigide/mécanique). Défaut : 8.
-     */
-    public Tail setRigidity(float v)              { rigidity = v;               return this; }
-
-    /**
-     * Coefficient d'amortissement.
-     * Trop bas = oscillations parasites ; trop haut = mouvement mort. Défaut : 5.5.
-     */
-    public Tail setDamping(float v)               { damping = v;                return this; }
-
-    /**
-     * Lissage exponentiel de la vélocité [0–1].
-     * 0.85 donne un comportement fluide sans trop de délai. Défaut : 0.85.
-     */
-    public Tail setVelocitySmoothing(float v)     { velocitySmoothing = v;      return this; }
-
-    /**
-     * Influence de la vitesse sur l'angle de déflexion (rad/(bloc/s)).
-     * Augmenter pour une queue plus expressive. Défaut : 0.30.
-     */
-    public Tail setVelocityInfluence(float v)     { velocityInfluence = v;      return this; }
-
-    /** Angle maximal de déflexion en degrés. Défaut : 40°. */
-    public Tail setMaxDeflectionAngle(float deg)  { maxDeflectionDeg = deg;     return this; }
-
-    /**
-     * Amplification de la déflexion par niveau (0 = uniforme). Défaut : 0.15.
-     * L'extrémité de la queue penche davantage que la base lors du mouvement.
-     */
-    public Tail setDepthDeflectionFactor(float v) { depthDeflectionFactor = v;  return this; }
-
-    /** Amplitude de l'ondulation en degrés. Défaut : 7°. */
-    public Tail setUndulationAmplitude(float deg) { undulationAmplitudeDeg = deg; return this; }
-
-    /** Fréquence de l'ondulation en Hz. Défaut : 1.0 Hz. */
-    public Tail setUndulationFrequency(float v)   { undulationFrequency = v;    return this; }
-
-    /**
-     * Décalage de phase entre segments successifs (radians).
-     * Crée l'effet de vague qui se propage le long de la queue. Défaut : 0.45 rad.
-     */
-    public Tail setUndulationPropagation(float v) { undulationPropagation = v;  return this; }
-
-    /** Amplitude du mouvement aléatoire en degrés. Défaut : 4°. */
-    public Tail setRandomAmplitude(float deg)     { randomAmplitudeDeg = deg;   return this; }
-
-    /** Fréquence du mouvement aléatoire en Hz. Défaut : 0.35 Hz. */
-    public Tail setRandomFrequency(float v)       { randomFrequency = v;        return this; }
-
-    /**
-     * Influence de la vélocité verticale sur la déflexion (rad/(bloc/s)).
-     * Saut → queue s'affaisse ; chute libre → queue se soulève. Défaut : 0.08.
-     */
-    public Tail setVerticalVelocityInfluence(float v) { verticalVelocityInfluence = v; return this; }
-
-    /** Angle maximal de déflexion verticale en degrés. Défaut : 25°. */
-    public Tail setMaxVerticalDeflectionAngle(float deg) { maxVerticalDeflectionDeg = deg; return this; }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Getters publics des paramètres
-    // ─────────────────────────────────────────────────────────────────────────
-
-    public float getRigidity()                    { return rigidity; }
-    public float getDamping()                     { return damping; }
-    public float getVelocitySmoothing()           { return velocitySmoothing; }
-    public float getVelocityInfluence()           { return velocityInfluence; }
-    public float getMaxDeflectionAngle()          { return maxDeflectionDeg; }
-    public float getDepthDeflectionFactor()       { return depthDeflectionFactor; }
-    public float getUndulationAmplitude()         { return undulationAmplitudeDeg; }
-    public float getUndulationFrequency()         { return undulationFrequency; }
-    public float getUndulationPropagation()       { return undulationPropagation; }
-    public float getRandomAmplitude()             { return randomAmplitudeDeg; }
-    public float getRandomFrequency()             { return randomFrequency; }
-    public float getVerticalVelocityInfluence()   { return verticalVelocityInfluence; }
-    public float getMaxVerticalDeflectionAngle()  { return maxVerticalDeflectionDeg; }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Scale management
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Applique un facteur d'échelle à tous les segments de la queue.
-     *
-     * @param scale Le facteur d'échelle à appliquer (1.0 = taille normale).
-     */
-    public void setScale(float scale) {
-        setScaleNode(root, scale);
-    }
-
-    private void setScaleNode(TailNode node, float scale) {
-        node.display.setScale(scale);
-        for (TailNode child : node.children) setScaleNode(child, scale);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Modification des rotations repos en parcours profondeur d'abord (DFS)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Applique une liste de quaternions à tous les nœuds de la queue
-     * en suivant un parcours profondeur d'abord (DFS).
-     *
-     * <p>La liste doit contenir 4 floats (x, y, z, w) par nœud, dans l'ordre DFS.
-     * Si la liste est trop courte, les nœuds restants garderont leur rotation.
-     * Si la liste est trop longue, les floats supplémentaires seront ignorés.
-     *
-     * @param rotations Une liste de floats contenant les composantes (x, y, z, w)
-     *                  des quaternions pour chaque nœud, en ordre DFS.
-     *
-     * @example Pour une queue avec 3 nœuds (racine + 2 enfants directs) :
-     *          List.of(
-     *            0.1f, 0.2f, 0.3f, 0.9f,  // racine
-     *            0.0f, 0.0f, 0.5f, 0.87f, // enfant 1
-     *            0.1f, 0.1f, 0.2f, 0.96f  // enfant 2
-     *          )
-     */
-    public void setRestRotation(List<Float> rotations) {
-        if (rotations == null || rotations.isEmpty()) return;
-        int[] index = { 0 }; // Conteneur mutable pour tracker la position
-        setRestRotationDFS(root, rotations, index);
-    }
-
-    /**
-     * Parcours DFS récursif pour appliquer les rotations aux nœuds.
-     * Visite d'abord le nœud courant, puis récursivement tous ses enfants.
-     *
-     * @param node      Le nœud actuel à traiter.
-     * @param rotations La liste complète des floats.
-     * @param index     Un tableau contenant l'index courant [position].
-     *                  Modifié à chaque consommation de floats.
-     */
-    private void setRestRotationDFS(TailNode node, List<Float> rotations, int[] index) {
-        // Consommer 4 floats pour ce nœud (x, y, z, w)
-        if (index[0] + 3 < rotations.size()) {
-            float x = rotations.get(index[0]++);
-            float y = rotations.get(index[0]++);
-            float z = rotations.get(index[0]++);
-            float w = rotations.get(index[0]++);
-
-            // Appliquer la quaternion au restRotation du nœud
-            node.restRotation.set(x, y, z, w);
-            // Réinitialiser aussi la rotation courante pour qu'elle suive
-            node.currentRot.set(node.restRotation);
-        }
-
-        // Récursivement traiter tous les enfants (parcours DFS)
-        for (TailNode child : node.children) {
-            setRestRotationDFS(child, rotations, index);
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Point d'entrée principal : update par tick
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Calcule la frame suivante de l'animation et envoie les mises à jour
-     * aux viewers de chaque segment.
-     *
-     * <p>Appeler une fois par tick (typiquement toutes les 50 ms à 20 TPS).
-     * Aucune allocation heap n'est effectuée dans cette méthode ni dans les
-     * méthodes qu'elle appelle, à l'exception des deux objets {@code Vec3} et
-     * {@code Quat4} nécessaires aux setters de {@link DisplayGroupData}.
-     *
-     * @param x         Position monde X de l'entité porteuse.
-     * @param y         Position monde Y (non utilisé pour la vélocité XZ,
-     *                  conservé pour de futures extensions verticales).
-     * @param z         Position monde Z de l'entité porteuse.
-     * @param yaw       Yaw Minecraft de l'entité (degrés, 0 = sud +Z, croît horaire).
-     * @param deltaTime Temps écoulé depuis le dernier appel, en secondes.
-     *                  Passer {@code 0.05f} pour un tick à 20 TPS.
-     */
+    /** Met à jour l'animation (calcul automatique du delta-time par instance). */
     public void nextFrame(Location location) {
-        nextFrame(location, 0.05f); // 20 TPS par défaut
+        long now = System.nanoTime();
+        float dt;
+        if (lastUpdateNanos <= 0L) {
+            dt = 0.05f; // première exécution -> valeur par défaut
+        } else {
+            dt = (now - lastUpdateNanos) / 1_000_000_000.0f;
+            if (dt <= 0f) dt = 0.05f;
+            if (dt > 0.5f) dt = 0.5f; // clamp pour éviter des sauts trop grands
+        }
+        lastUpdateNanos = now;
+        nextFrame(location, dt);
     }
 
-    /**
-     * Variante avec deltaTime explicite, utile si le serveur tourne à un TPS variable.
-     *
-     * @param location  Position actuelle de l'entité porteuse.
-     * @param deltaTime Temps écoulé en secondes depuis le dernier appel.
-     */
-    public void nextFrame(Location location, float deltaTime) {
-        float x = (float) location.getX();
-        float y = (float) location.getY();
-        float z = (float) location.getZ();
+    /** Met à jour l'animation avec un deltaTime explicite. Utile pour un TPS variable. */
+    public void nextFrame(Location location, float dt) {
+        if (dt <= 0f) return;
+        float x   = (float) location.getX();
+        float y   = (float) location.getY();
+        float z   = (float) location.getZ();
         float yaw = location.getYaw();
-        if (deltaTime <= 0f) return;
-        time += deltaTime;
-
-        // 1. Calcul de la vélocité locale lissée
-        updateSmoothedVelocity(x, y, z, yaw, deltaTime);
-
-        // 2. Mise à jour récursive de l'arbre
-        //    La racine part de sa translation repos (offset depuis l'attache joueur)
-        root.worldPosBuf.set(root.restTranslation);
-        updateNode(root, IDENTITY, deltaTime);
+        time += dt;
+        updateSmoothedVelocity(x, y, z, yaw, dt);
+        updateNode(root, dt);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Gestion des viewers (délégation vers tous les displays)
-    // ─────────────────────────────────────────────────────────────────────────
-
-
-    public List<Player> getViewers() {
-        return root.display.getViewers();
-    }
-
-    /** Ajoute un viewer à tous les segments de la queue. */
-    public void addViewer(Player player) {
-        addViewerNode(root, player);
-    }
-
-    private void addViewerNode(TailNode node, Player player) {
-        node.display.addViewer(player);
-        for (TailNode child : node.children) addViewerNode(child, player);
-    }
-
-    /** Remplace les viewers de tous les segments de la queue. */
-    public void setViewers(List<Player> viewers) {
-        setViewersNode(root, viewers);
-    }
-
-    private void setViewersNode(TailNode node, List<Player> viewers) {
-        node.display.setViewers(viewers);
-        for (TailNode child : node.children) setViewersNode(child, viewers);
-    }
-
-    /** Retire un viewer de tous les segments de la queue. */
-    public void removeViewer(Player player) {
-        removeViewerNode(root, player);
-    }
-
-    private void removeViewerNode(TailNode node, Player player) {
-        node.display.removeViewer(player);
-        for (TailNode child : node.children) removeViewerNode(child, player);
-    }
-
-    public void clearViewers() {
-        clearViewersNode(root);
-    }
-
-    private void clearViewersNode(TailNode node) {
-        node.display.clearViewers();
-        for (TailNode child : node.children) clearViewersNode(child);
-    }
-
-    /** Supprime tous les displays de la queue. */
-    public void delete() {
-        deleteNode(root);
-    }
-
-    private void deleteNode(TailNode node) {
-        node.display.delete();
-        for (TailNode child : node.children) deleteNode(child);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Logique interne — aucune allocation heap en dehors des Vec3/Quat4 finaux
-    // ─────────────────────────────────────────────────────────────────────────
+    // =========================================================================
+    // LOGIQUE INTERNE
+    // =========================================================================
 
     /**
-     * Transforme la vélocité monde en espace local joueur (yaw retiré)
-     * et applique le lissage exponentiel.
-     *
-     * <p>Convention Minecraft : yaw 0 = sud (+Z), croît dans le sens horaire vu du dessus.
-     * <ul>
-     *   <li>Local +X = droite du joueur</li>
-     *   <li>Local +Z = devant du joueur</li>
-     * </ul>
+     * Transforme la vélocité monde en espace local (yaw retiré) et applique le lissage EWMA.
+     * Convention Minecraft : yaw 0 = sud (+Z), croît dans le sens horaire vu du dessus.
      */
     private void updateSmoothedVelocity(float x, float y, float z, float yaw, float dt) {
         if (Float.isNaN(posLastX)) {
             posLastX = x; posLastY = y; posLastZ = z;
+            lastYaw  = yaw;
             return;
         }
 
         // Vélocité monde brute (blocs/s)
         float vwx = (x - posLastX) / dt;
-        float vwy = (y - posLastY) / dt; // verticale : pas de rotation yaw à appliquer
+        float vwy = (y - posLastY) / dt;
         float vwz = (z - posLastZ) / dt;
         posLastX = x; posLastY = y; posLastZ = z;
 
-        // Rotation inverse du yaw → espace local
+        // Rotation vers l'espace local joueur : local X = droite, local Z = avant
         float yr  = (float) Math.toRadians(yaw);
         float cos = (float) Math.cos(yr);
         float sin = (float) Math.sin(yr);
-        float lvx =  vwx * cos + vwz * sin; // composante droite/gauche
-        float lvz = -vwx * sin + vwz * cos; // composante avant/arrière
+        float lvx = -vwx * cos - vwz * sin;
+        float lvz = -vwx * sin + vwz * cos;
+
 
         // Lissage exponentiel (EWMA)
         float keep = velocitySmoothing, take = 1f - keep;
-        smoothedLocalVel.x = smoothedLocalVel.x * keep + lvx  * take;
-        smoothedLocalVel.y = smoothedLocalVel.y * keep + vwy  * take; // vertical lissé
-        smoothedLocalVel.z = smoothedLocalVel.z * keep + lvz  * take;
+        smoothedLocalVel.x = smoothedLocalVel.x * keep + lvx * take;
+        smoothedLocalVel.y = smoothedLocalVel.y * keep + vwy * take;
+        smoothedLocalVel.z = smoothedLocalVel.z * keep + lvz * take;
+
+        // Delta de vélocité locale = choc détecté ce tick
+        if (Float.isNaN(lastRawVelX)) {
+            deltaLocalVel.zero();
+        } else {
+            // 1. Calcul du delta brut (accélération/choc instantané)
+            float rawDeltaX = lvx - lastRawVelX;
+            float rawDeltaY = vwy - lastRawVelY;
+            float rawDeltaZ = lvz - lastRawVelZ;
+
+            // 2. Application de la Deadzone (on ignore les variations dues aux micro-lags)
+            if (Math.abs(rawDeltaX) < impulseDeadzone) rawDeltaX = 0f;
+            if (Math.abs(rawDeltaY) < impulseDeadzone) rawDeltaY = 0f;
+            if (Math.abs(rawDeltaZ) < impulseDeadzone) rawDeltaZ = 0f;
+
+            // 3. Lissage du Delta (étalement de l'impulsion sur plusieurs frames)
+            float iKeep = impulseSmoothing;
+            float iTake = 1f - iKeep;
+            
+            deltaLocalVel.x = deltaLocalVel.x * iKeep + rawDeltaX * iTake;
+            deltaLocalVel.y = deltaLocalVel.y * iKeep + rawDeltaY * iTake;
+            deltaLocalVel.z = deltaLocalVel.z * iKeep + rawDeltaZ * iTake;
+        }
+        lastRawVelX = lvx; lastRawVelY = vwy; lastRawVelZ = lvz;
+
+        // --- ABSORPTION D'INERTIE LORS D'UN FREINAGE OU D'UN CHOC ---
+        // Si la force du choc (deltaLocalVel) s'oppose au mouvement actuel (smoothedLocalVel),
+        // on draine la vélocité lissée pour éviter l'effet "mémoire/rebond".
+        
+        // Axe X (Latéral)
+        if (smoothedLocalVel.x * deltaLocalVel.x < 0) {
+            smoothedLocalVel.x += deltaLocalVel.x;
+            // Si la soustraction a inversé le sens de la vélocité lissée, on la bloque à 0
+            if (Math.signum(smoothedLocalVel.x) == Math.signum(deltaLocalVel.x)) smoothedLocalVel.x = 0f;
+        }
+        
+        // Axe Y (Vertical : Chute et Atterrissage)
+        if (smoothedLocalVel.y * deltaLocalVel.y < 0) {
+            smoothedLocalVel.y += deltaLocalVel.y;
+            if (Math.signum(smoothedLocalVel.y) == Math.signum(deltaLocalVel.y)) smoothedLocalVel.y = 0f;
+        }
+        
+        // Axe Z (Frontal : Course et Collision contre un mur)
+        if (smoothedLocalVel.z * deltaLocalVel.z < 0) {
+            smoothedLocalVel.z += deltaLocalVel.z;
+            if (Math.signum(smoothedLocalVel.z) == Math.signum(deltaLocalVel.z)) smoothedLocalVel.z = 0f;
+        }
+
+        // Vitesse angulaire (yaw) lissée — normalisation pour éviter le saut ±180°
+        float deltaYaw = yaw - lastYaw;
+        while (deltaYaw >  180f) deltaYaw -= 360f;
+        while (deltaYaw < -180f) deltaYaw += 360f;
+        yawVelocity = yawVelocity * keep + (deltaYaw / dt) * take;
+        lastYaw = yaw;
+
+        // Quaternion cible : On combine la vélocité continue (smoothedLocalVel) ET le choc (deltaLocalVel)
+        float tx = (smoothedLocalVel.x * velocityInfluenceLateral)  + (deltaLocalVel.x * impulseInfluenceLateral);
+        float ty = (smoothedLocalVel.y * velocityInfluenceVertical) + (deltaLocalVel.y * impulseInfluenceVertical);
+        float tz = (smoothedLocalVel.z * velocityInfluenceForward)  + (deltaLocalVel.z * impulseInfluenceForward);
+        float wLenSq = tx*tx + ty*ty + tz*tz;
+        if (wLenSq > 1e-6f) {
+            velocityTargetQuat.rotationTo(0f, 0f, 1f, -tx, ty, tz); // rotationTo normalise en interne
+        } else {
+            velocityTargetQuat.identity();
+        }
+
+        velocityImpact = Math.min((float) Math.log(1+wLenSq) * velocityInfluenceForward * velocityInfluenceLateral * velocityInfluenceVertical, 1f);
     }
 
-    /**
-     * Met à jour récursivement un nœud et ses enfants.
-     *
-     * <p>Ordre des opérations pour chaque nœud :
-     * <ol>
-     *   <li>Calcul de la rotation cible (repos + vélocité + ondulation).</li>
-     *   <li>Intégration du ressort angulaire → mise à jour de {@code currentRot}.</li>
-     *   <li>Calcul de la rotation globale accumulée.</li>
-     *   <li>Envoi de la transformation au {@code DisplayGroupData}.</li>
-     *   <li>Calcul de la position de chaque enfant puis récursion.</li>
-     * </ol>
-     *
-     * <p><b>Buffers :</b> chaque nœud possède ses propres buffers ({@code targetBuf},
-     * {@code errorBuf}, etc.) ce qui rend la récursion sans conflit d'alias.
-     * Le seul buffer partagé ({@code qTemp}) n'est utilisé que dans
-     * {@code computeTargetRotation}, qui est appelée avant toute récursion.
-     *
-     * @param node      Nœud courant.
-     * @param parentRot Rotation globale accumulée du parent (yaw exclu).
-     * @param dt        Delta-temps en secondes.
-     */
-    private void updateNode(TailNode node, Quaternionf parentRot, float dt) {
-
-        // A. Rotation cible = repos + déflexion vélocité + ondulation
+    /** Mise à jour récursive du nœud et de ses enfants. */
+    private void updateNode(TailNode node, float dt) {
         computeTargetRotation(node, node.targetBuf);
 
-        // B. Ressort angulaire amortisseur → node.currentRot et node.angVel mis à jour
         applySpring(node, node.targetBuf, dt);
 
-        // C. Rotation globale de ce nœud = parentRot × currentRot
-        node.globalRot.set(parentRot).mul(node.currentRot);
+        // ── Application du quaternion cible vélocité ──────────────────────────
+        // 1. Rotation globale prospective (après ressort, avant correction)
+        Quaternionf parentGlobal = (node.parent == null) ? IDENTITY : node.parent.globalRot;
+        node.globalRot.set(parentGlobal).mul(node.currentRot);
 
-        // D. Envoi de la transformation au display
+        // 2. Différence entre rotation globale prospective et quaternion cible :
+        //    diff = globalProspective⁻¹ × velocityTargetQuat
+        //    représente la rotation manquante pour atteindre l'objectif en espace global.
+        node.diffBuf.set(node.globalRot).conjugate().mul(velocityTargetQuat);
+
+        // 3. Fraction de la différence à appliquer, amplifiée par la profondeur.
+        //    L'extrémité de la queue suit davantage la cible que la base.
+        float nodeImpact = Math.min(velocityImpact * (1f + node.depth * depthDeflectionFactor), 1f);
+        // slerp(diffBuf, IDENTITY, 1−nodeImpact) : à nodeImpact=0 → identité, à 1 → diff entière
+        node.diffBuf.slerp(IDENTITY, 1f - nodeImpact);
+
+        // 4. La correction est en espace global ; ramené en local :
+        //    newGlobal = globalProspective × scaledDiff
+        //    newCurrentRot = parentGlobal⁻¹ × newGlobal = currentRot × scaledDiff
+        node.currentRot.mul(node.diffBuf).normalize();
+
+        // --- 5. LIMITATION DE L'ANGLE LOCAL (SWING X/Y) ---
+        // A. Calcul de la déviation par rapport à la pose de repos (Deviation = currentRot * restRotation^-1)
+        node.errorBuf.set(node.restRotation).conjugate();
+        node.errorBuf.premul(node.currentRot);
+
+        // On s'assure que W est positif pour emprunter le chemin le plus court
+        if (node.errorBuf.w < 0f) node.errorBuf.mul(-1f);
+
+        // B. Décomposition Swing-Twist (Twist = rotation sur l'axe Z)
+        float twistLen = (float) Math.sqrt(node.errorBuf.z * node.errorBuf.z + node.errorBuf.w * node.errorBuf.w);
+        float twZ = 0f, twW = 1f;
+        if (twistLen > 1e-6f) {
+            twZ = node.errorBuf.z / twistLen;
+            twW = node.errorBuf.w / twistLen;
+        }
+
+        // C. Extraction du Swing (Pliage X/Y) : Swing = Deviation * Twist^-1
+        node.diffBuf.set(0f, 0f, -twZ, twW); // Twist^-1
+        node.errPremul.set(node.errorBuf).mul(node.diffBuf); // errPremul = Swing
+
+        // D. Vérification de l'angle du Swing (W représente le cosinus de la moitié de l'angle)
+        float maxRad = (float) Math.toRadians(maxDeflectionDeg);
+        float cosHalfMax = (float) Math.cos(maxRad * 0.5f);
+
+        if (node.errPremul.w < cosHalfMax) {
+            // L'angle de pliage dépasse maxDeflectionDeg ! On le bride (Clamp).
+            float sinHalfMax = (float) Math.sin(maxRad * 0.5f);
+            float currentSinHalf = (float) Math.sqrt(node.errPremul.x * node.errPremul.x + node.errPremul.y * node.errPremul.y);
+            
+            if (currentSinHalf > 1e-6f) {
+                float scale = sinHalfMax / currentSinHalf;
+                node.errPremul.x *= scale;
+                node.errPremul.y *= scale;
+                node.errPremul.z = 0f; // Sécurité pour garder un pur Swing
+                node.errPremul.w = cosHalfMax;
+            }
+        }
+
+        // E. Recombinaison : Nouvelle Déviation = Swing_Clamped * Twist
+        node.diffBuf.set(0f, 0f, twZ, twW); // Twist normal
+        node.errorBuf.set(node.errPremul).mul(node.diffBuf);
+
+        // F. Application de la déviation bridée à la rotation courante
+        node.currentRot.set(node.errorBuf).mul(node.restRotation).normalize();
+        
+        // G. Recalcul indispensable de la rotation globale avec ce nouveau currentRot sécurisé
+        node.globalRot.set(parentGlobal).mul(node.currentRot);
+        // ----------
+
+
+        updateNodeOrigin(node);
         applyNodeTransform(node);
 
-        // E. Récursion : position des enfants déduite du chaînage
-        for (TailNode child : node.children) {
-            // Position enfant = position parent + globalRot × restTranslation enfant
-            child.worldPosBuf
-                .set(child.restTranslation)
-                .rotate(node.globalRot)
-                .add(node.worldPosBuf);
-            updateNode(child, node.globalRot, dt);
-        }
+        for (TailNode child : node.children) updateNode(child, dt);
     }
 
     /**
-     * Calcule la rotation cible pour un nœud et l'écrit dans {@code out}.
-     *
-     * <p>La rotation cible est la composition de :
-     * <ol>
-     *   <li><b>Pose repos</b> : quaternion défini à la création du segment.</li>
-     *   <li><b>Déflexion horizontale</b> : rotation dont l'axe est perpendiculaire
-     *       à la direction de déplacement dans le plan XZ, de sorte que l'extrémité
-     *       de la queue traîne derrière ({@code vel × down = (nz, 0, -nx)}).</li>
-     *   <li><b>Déflexion verticale</b> : rotation autour de l'axe +X local ;
-     *       saut → queue s'affaisse, chute → queue se soulève.</li>
-     *   <li><b>Ondulation sinusoïdale</b> : deux sinus déphasés de π/2 sur X et Z,
-     *       avec décalage de phase progressif entre segments.</li>
-     *   <li><b>Mouvement aléatoire</b> : deux sinus basse fréquence avec phases
-     *       aléatoires propres à chaque nœud.</li>
-     * </ol>
-     *
-     * <p>Utilise {@link #qTemp} comme buffer temporaire. Ne jamais appeler
-     * de méthode récursive avant la fin de cette méthode.
+     * Calcule la rotation cible du nœud (pose repos + ondulation + bruit + yaw).
+     * La déflexion due à la vélocité est gérée séparément dans {@link #updateNode}
+     * via le quaternion cible global. Utilise {@code qTemp} comme buffer interne.
      */
     private void computeTargetRotation(TailNode node, Quaternionf out) {
-
-        // Partir de la pose repos
         out.set(node.restRotation);
 
-        // ── 1. Déflexion due à la vélocité (plan XZ) ────────────────────────
-        float speedXZ = (float) Math.sqrt(
-            smoothedLocalVel.x * smoothedLocalVel.x
-          + smoothedLocalVel.z * smoothedLocalVel.z);
+        float depthFactor = 1f + node.depth * depthDeflectionFactor;
 
-        if (speedXZ > 0.05f) {
-            float maxRad = (float) Math.toRadians(maxDeflectionDeg);
-            // Amplification progressive le long de la chaîne
-            float angle  = Math.min(speedXZ * velocityInfluence, maxRad)
-                           * (1f + node.depth * depthDeflectionFactor);
+        // ── Ondulation sinusoïdale (3 axes, fréquences légèrement différentes) ─
+        float undX = (float) Math.toRadians(undulationAmplitudeX)
+                     * (float) Math.sin(time * undulationFrequency          + node.phaseUndX);
+        float undY = (float) Math.toRadians(undulationAmplitudeY)
+                     * (float) Math.sin(time * undulationFrequency * 0.73f  + node.phaseUndY);
+        float undZ = (float) Math.toRadians(undulationAmplitudeZ)
+                     * (float) Math.sin(time * undulationFrequency * 1.37f  + node.phaseUndX + node.phaseUndY);
 
-            float nx = smoothedLocalVel.x / speedXZ; // direction normalisée X
-            float nz = smoothedLocalVel.z / speedXZ; // direction normalisée Z
-
-            // Axe = vel × down = (nx,0,nz) × (0,-1,0) = (nz, 0, -nx)
-            // Une rotation positive autour de cet axe fait traîner l'extrémité
-            // à l'opposé de la direction de déplacement (physique de pendule).
-            qTemp.identity().rotateAxis(angle, nz, 0f, -nx);
-            qTemp.mul(out, out); // out = qTemp × out
-        }
-
-        // ── 1b. Déflexion due à la vélocité verticale ────────────────────────
-        // Saut (vy > 0) : la queue traîne en bas  → rotation +X (tip vers -Y).
-        // Chute (vy < 0) : la queue flotte vers le haut → rotation -X (tip vers +Y).
-        // L'axe +X local (droite joueur) est perpendiculaire au plan vertical de déplacement
-        // et produit un affaissement/soulèvement symétrique quelle que soit la direction.
-        float vy = smoothedLocalVel.y;
-        if (Math.abs(vy) > 0.1f) {
-            float maxVertRad = (float) Math.toRadians(maxVerticalDeflectionDeg);
-            float vAngle = vy > 0f
-                ? Math.min( vy * verticalVelocityInfluence,  maxVertRad)
-                : Math.max( vy * verticalVelocityInfluence, -maxVertRad);
-            vAngle *= (1f + node.depth * depthDeflectionFactor);
-            qTemp.identity().rotateAxis(vAngle, 1f, 0f, 0f);
-            qTemp.mul(out, out);
-        }
-
-        // ── 2. Ondulation lente (deux composantes déphasées) ─────────────────
-        float undAmp = (float) Math.toRadians(undulationAmplitudeDeg);
-        float undX   = undAmp        * (float) Math.sin(time * undulationFrequency         + node.phaseUndX);
-        float undZ   = undAmp * 0.6f * (float) Math.sin(time * undulationFrequency * 0.73f + node.phaseUndZ);
-
-        // ── 3. Mouvement aléatoire basse fréquence ───────────────────────────
+        // ── Bruit aléatoire basse fréquence ──────────────────────────────────
         float rndAmp = (float) Math.toRadians(randomAmplitudeDeg);
-        float rndX   = rndAmp * (float) Math.sin(time * randomFrequency          + node.phaseRndX);
-        float rndZ   = rndAmp * (float) Math.sin(time * randomFrequency * 1.37f  + node.phaseRndZ);
+        float rndX   = rndAmp * (float) Math.sin(time * randomFrequency         + node.phaseRndX);
+        float rndY   = rndAmp * (float) Math.sin(time * randomFrequency * 1.37f + node.phaseRndY);
+        float rndZ   = rndAmp * (float) Math.sin(time * randomFrequency * 0.73f + node.phaseRndX + node.phaseRndY);
 
         float totalX = undX + rndX;
+        float totalY = undY + rndY + (float) Math.toRadians(yawVelocity * velocityInfluenceYaw) * depthFactor;
         float totalZ = undZ + rndZ;
 
-        if (Math.abs(totalX) > 1e-4f || Math.abs(totalZ) > 1e-4f) {
+        if (Math.abs(totalX) > 1e-4f || Math.abs(totalY) > 1e-4f || Math.abs(totalZ) > 1e-4f) {
             qTemp.identity()
                  .rotateAxis(totalX, 1f, 0f, 0f)
+                 .rotateAxis(totalY, 0f, 1f, 0f)
                  .rotateAxis(totalZ, 0f, 0f, 1f);
             qTemp.mul(out, out);
         }
     }
 
     /**
-     * Applique la dynamique de ressort angulaire amorti et intègre la rotation.
-     *
-     * <h3>Algorithme</h3>
-     * <ol>
-     *   <li>Calcul du quaternion d'erreur : {@code error = target × current⁻¹}.</li>
-     *   <li>Extraction de l'axe-angle pour obtenir le vecteur angulaire d'erreur.</li>
-     *   <li>Force = rigidity × axeAngle − damping × vitesseAngulaire.</li>
-     *   <li>Intégration de la vitesse angulaire (Euler explicite).</li>
-     *   <li>Intégration du quaternion : {@code dq/dt = ½ · Ω̂ · q} (espace monde local).</li>
-     * </ol>
-     *
-     * <p>La formule d'intégration du quaternion dérive de la dérivée de la
-     * contrainte unitaire : multiplier un quaternion pur {@code (0, wx, wy, wz)}
-     * à gauche donne la variation dans le repère monde.
+     * Ressort angulaire amorti : intègre la rotation et la vitesse angulaire du nœud.
+     * Erreur quaternion → axe-angle → force = rigidity×err − damping×angVel → intégration Euler.
      */
     private void applySpring(TailNode node, Quaternionf target, float dt) {
+        // Erreur = target × current⁻¹
+        node.errorBuf.set(node.currentRot).conjugate();
+        node.errPremul.set(target).mul(node.errorBuf, node.errorBuf);
 
-        // Erreur : error = target × current⁻¹
-        // Pour un quaternion unitaire, l'inverse = conjugué.
-        node.errorBuf.set(node.currentRot).conjugate();        // errorBuf = current⁻¹
-        node.errPremul.set(target).mul(node.errorBuf, node.errorBuf); // errorBuf = target × current⁻¹
-
-        // Extraction du vecteur axe × angle depuis le quaternion d'erreur
-        // error = (cos(θ/2),  sin(θ/2)·axis)  →  |xyz| = sin(θ/2)
+        // Extraction de l'axe-angle : |xyz| = sin(θ/2)
         float sinHalf = (float) Math.sqrt(
-            node.errorBuf.x * node.errorBuf.x
-          + node.errorBuf.y * node.errorBuf.y
-          + node.errorBuf.z * node.errorBuf.z);
+            node.errorBuf.x * node.errorBuf.x +
+            node.errorBuf.y * node.errorBuf.y +
+            node.errorBuf.z * node.errorBuf.z);
 
         if (sinHalf > 1e-6f) {
-            // θ = 2·atan2(sinHalf, w)    ;    axis·θ = xyz/sinHalf · θ
-            float theta = 2f * (float) Math.atan2(sinHalf, node.errorBuf.w);
-            float s     = theta / sinHalf * rigidity; // facteur de mise à l'échelle
-            node.springBuf.set(
-                node.errorBuf.x * s,
-                node.errorBuf.y * s,
-                node.errorBuf.z * s);
+            float s = 2f * (float) Math.atan2(sinHalf, node.errorBuf.w) / sinHalf * rigidity;
+            node.springBuf.set(node.errorBuf.x * s, node.errorBuf.y * s, node.errorBuf.z * s);
         } else {
-            node.springBuf.zero(); // quasi-aligné : aucune force
+            node.springBuf.zero();
         }
 
-        // Soustraction de l'amortissement
+        // Force = ressort − amortissement
         node.springBuf.x -= node.angVel.x * damping;
         node.springBuf.y -= node.angVel.y * damping;
         node.springBuf.z -= node.angVel.z * damping;
 
-        // Intégration de la vitesse angulaire (Euler explicite)
+        // Intégration Euler de la vitesse angulaire
         node.angVel.x += node.springBuf.x * dt;
         node.angVel.y += node.springBuf.y * dt;
         node.angVel.z += node.springBuf.z * dt;
 
         // Intégration du quaternion : dq/dt = ½ · (0,wx,wy,wz) · q
-        // Produit du quaternion pur Ω = (0,wx,wy,wz) par q = (qw,qx,qy,qz) :
-        //   Ω·q = ( -wx·qx - wy·qy - wz·qz,
-        //            wx·qw + wz·qy - wy·qz,
-        //            wy·qw - wz·qx + wx·qz,
-        //            wz·qw + wy·qx - wx·qy )
         float wx = node.angVel.x, wy = node.angVel.y, wz = node.angVel.z;
         float qw = node.currentRot.w, qx = node.currentRot.x,
               qy = node.currentRot.y, qz = node.currentRot.z;
-
         node.currentRot.set(
             qx + 0.5f * ( wx*qw + wz*qy - wy*qz) * dt,
             qy + 0.5f * ( wy*qw - wz*qx + wx*qz) * dt,
@@ -825,35 +475,114 @@ public class Tail {
         ).normalize();
     }
 
-    /**
-     * Envoie la position et la rotation courantes du nœud au {@link DisplayGroupData}.
-     *
-     * <p>Crée deux objets {@code Vec3} et {@code Quat4} par appel — inévitable
-     * car les setters de {@code DisplayGroupData} l'exigent. Pour 8 segments à
-     * 20 TPS et 50 joueurs simultanés, cela représente ~8 000 petits objets/s,
-     * largement dans les capacités du GC.
-     */
+    /** Calcule la position globale du nœud à partir de son parent. */
+    private void updateNodeOrigin(TailNode node) {
+        if (node.parent == null) {
+            node.currentOrigin.set(0f, -1f, -0.1f);
+        } else {
+            node.rotatedOffsetBuf.set(node.offset).rotate(node.parent.globalRot);
+            node.currentOrigin.set(node.parent.currentOrigin).add(node.rotatedOffsetBuf);
+        }
+    }
+
+    /** Envoie la position et la rotation courantes au DisplayGroupData. */
     private void applyNodeTransform(TailNode node) {
-        Vector3f   p = node.worldPosBuf;
-        Quaternionf r = node.currentRot;
-        node.display.setTranslation(new Vec3(p.x, p.y, p.z));
+        Quaternionf r = node.globalRot;
+        node.display.setTranslation(new Vec3(node.currentOrigin));
         node.display.setRotation(new Quat4(new Quaternionf(r.x, r.y, r.z, r.w)));
         node.display.updateMetadata();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Utilitaires
-    // ─────────────────────────────────────────────────────────────────────────
+    // =========================================================================
+    // GESTION DE L'ARBRE (délégation récursive)
+    // =========================================================================
+
+    public List<Player> getViewers()                   { return root.display.getViewers(); }
+    public void addViewer(Player player)               { addViewerNode(root, player); }
+    public void setViewers(List<Player> viewers)       { setViewersNode(root, viewers); }
+    public void removeViewer(Player player)            { removeViewerNode(root, player); }
+    public void clearViewers()                         { clearViewersNode(root); }
+    public void delete()                               { deleteNode(root); }
+    public void setScale(float scale)                  { setScaleNode(root, scale); }
+    public void setInterpolationDuration(int duration) { setInterpolationDurationNode(root, duration); }
+    public void setTeleportationDuration(int duration) { setTeleportationDurationNode(root, duration); }
+    public void setAttachedEntity(org.bukkit.entity.Entity entity) { setAttachedEntityNode(root, entity); }
+
+    public void setYawPitch(float yaw, float pitch) { setYawPitchNode(root, yaw, pitch); }
+
+    private void addViewerNode(TailNode node, Player player) {
+        node.display.addViewer(player);
+        for (TailNode c : node.children) addViewerNode(c, player);
+    }
+    private void setViewersNode(TailNode node, List<Player> viewers) {
+        node.display.setViewers(viewers);
+        for (TailNode c : node.children) setViewersNode(c, viewers);
+    }
+    private void removeViewerNode(TailNode node, Player player) {
+        node.display.removeViewer(player);
+        for (TailNode c : node.children) removeViewerNode(c, player);
+    }
+    private void clearViewersNode(TailNode node) {
+        node.display.clearViewers();
+        for (TailNode c : node.children) clearViewersNode(c);
+    }
+    private void deleteNode(TailNode node) {
+        node.display.delete();
+        for (TailNode c : node.children) deleteNode(c);
+    }
+    private void setScaleNode(TailNode node, float scale) {
+        node.display.setScale(scale);
+        for (TailNode c : node.children) setScaleNode(c, scale);
+    }
+    private void setInterpolationDurationNode(TailNode node, int duration) {
+        node.display.setInterpolationDuration(duration);
+        for (TailNode c : node.children) setInterpolationDurationNode(c, duration);
+    }
+    private void setTeleportationDurationNode(TailNode node, int duration) {
+        node.display.setTeleportationDuration(duration);
+        for (TailNode c : node.children) setTeleportationDurationNode(c, duration);
+    }
+    private void setAttachedEntityNode(TailNode node, org.bukkit.entity.Entity entity) {
+        node.display.setAttachedEntity(entity);
+        for (TailNode c : node.children) setAttachedEntityNode(c, entity);
+    }
+    private void setYawPitchNode(TailNode node, float yaw, float pitch) {
+        node.display.setYawPitch(yaw, pitch);
+        for (TailNode c : node.children) setYawPitchNode(c, yaw, pitch);
+    }
+
+    // =========================================================================
+    // ROTATIONS REPOS (parcours DFS)
+    // =========================================================================
 
     /**
-     * Remet tous les segments à leur pose repos, annule les vitesses angulaires
-     * et remet le compteur de temps à zéro.
-     * Utile lors d'une téléportation ou d'un changement de cosmétique.
+     * Applique une liste de quaternions (x,y,z,w par nœud, 4 floats chacun) en ordre DFS.
+     * Les nœuds sans entrée correspondante conservent leur rotation actuelle.
      */
+    public void setRestRotation(List<Quaternionf> rotations) {
+        if (rotations == null || rotations.isEmpty()) return;
+        int[] idx = {0};
+        setRestRotationDFS(root, rotations, idx);
+    }
+
+    private void setRestRotationDFS(TailNode node, List<Quaternionf> rots, int[] idx) {
+        if (idx[0] < rots.size()) {
+            node.restRotation.set(rots.get(idx[0]++));
+            node.currentRot.mul(node.restRotation);
+        }
+        for (TailNode child : node.children) setRestRotationDFS(child, rots, idx);
+    }
+
+    // =========================================================================
+    // RESET
+    // =========================================================================
+
+    /** Remet tous les segments à la pose repos. Appeler après téléportation ou changement de cosmétique. */
     public void reset() {
         time = 0f;
-        posLastX = Float.NaN;
+        posLastX = lastRawVelX = lastYaw = Float.NaN;
         smoothedLocalVel.zero();
+        deltaLocalVel.zero();
         resetNode(root);
     }
 
@@ -861,8 +590,64 @@ public class Tail {
         node.currentRot.set(node.restRotation);
         node.angVel.zero();
         node.globalRot.set(node.currentRot);
-        node.worldPosBuf.set(node.restTranslation);
         applyNodeTransform(node);
         for (TailNode child : node.children) resetNode(child);
     }
+
+    // =========================================================================
+    // SETTERS FLUIDES
+    // =========================================================================
+
+    // Ressort
+    public Tail setRigidity(float v)          { rigidity = v;          return this; }
+    public Tail setDamping(float v)           { damping = v;           return this; }
+    public Tail setVelocitySmoothing(float v) { velocitySmoothing = v; return this; }
+
+    // Déflexion vélocité
+    public Tail setVelocityInfluenceForward(float v)     { velocityInfluenceForward = v;  return this; }
+    public Tail setVelocityInfluenceLateral(float v)     { velocityInfluenceLateral = v;  return this; }
+    public Tail setVelocityInfluenceVertical(float v)    { velocityInfluenceVertical = v; return this; }
+    public Tail setVelocityInfluenceYaw(float v)         { velocityInfluenceYaw = v;      return this; }
+    public Tail setMaxDeflectionAngle(float deg)         { maxDeflectionDeg = deg;        return this; }
+    public Tail setDepthDeflectionFactor(float v)        { depthDeflectionFactor = v;     return this; }
+
+    // Impulsions
+    public Tail setImpulseInfluenceForward(float v)  { impulseInfluenceForward = v;  return this; }
+    public Tail setImpulseInfluenceLateral(float v)  { impulseInfluenceLateral = v;  return this; }
+    public Tail setImpulseInfluenceVertical(float v) { impulseInfluenceVertical = v; return this; }
+
+    // Ondulation
+    public Tail setUndulationAmplitudeX(float deg)  { undulationAmplitudeX = deg;    return this; }
+    public Tail setUndulationAmplitudeY(float deg)  { undulationAmplitudeY = deg;    return this; }
+    public Tail setUndulationAmplitudeZ(float deg)  { undulationAmplitudeZ = deg;    return this; }
+    public Tail setUndulationFrequency(float v)     { undulationFrequency = v;       return this; }
+    public Tail setUndulationPropagation(float v)   { undulationPropagation = v;     return this; }
+
+    // Bruit aléatoire
+    public Tail setRandomAmplitude(float deg) { randomAmplitudeDeg = deg; return this; }
+    public Tail setRandomFrequency(float v)   { randomFrequency = v;      return this; }
+
+    // =========================================================================
+    // GETTERS
+    // =========================================================================
+
+    public float getRigidity()                  { return rigidity; }
+    public float getDamping()                   { return damping; }
+    public float getVelocitySmoothing()         { return velocitySmoothing; }
+    public float getVelocityInfluenceForward()  { return velocityInfluenceForward; }
+    public float getVelocityInfluenceLateral()  { return velocityInfluenceLateral; }
+    public float getVelocityInfluenceVertical() { return velocityInfluenceVertical; }
+    public float getVelocityInfluenceYaw()      { return velocityInfluenceYaw; }
+    public float getMaxDeflectionAngle()        { return maxDeflectionDeg; }
+    public float getDepthDeflectionFactor()     { return depthDeflectionFactor; }
+    public float getImpulseInfluenceForward()   { return impulseInfluenceForward; }
+    public float getImpulseInfluenceLateral()   { return impulseInfluenceLateral; }
+    public float getImpulseInfluenceVertical()  { return impulseInfluenceVertical; }
+    public float getUndulationAmplitudeX()      { return undulationAmplitudeX; }
+    public float getUndulationAmplitudeY()      { return undulationAmplitudeY; }
+    public float getUndulationAmplitudeZ()      { return undulationAmplitudeZ; }
+    public float getUndulationFrequency()       { return undulationFrequency; }
+    public float getUndulationPropagation()     { return undulationPropagation; }
+    public float getRandomAmplitude()           { return randomAmplitudeDeg; }
+    public float getRandomFrequency()           { return randomFrequency; }
 }

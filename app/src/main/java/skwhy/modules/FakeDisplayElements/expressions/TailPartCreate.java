@@ -4,6 +4,8 @@ import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
 import ch.njol.util.Kleenean;
+
+import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.addon.SkriptAddon;
@@ -26,19 +28,6 @@ public class TailPartCreate extends SimpleExpression<TailNode> {
     // Chaînage (Optionnel : si spécifié -> Segment, si absent -> Racine)
     private Expression<TailNode> parentExpr;
 
-    // Paramètres de configuration (Optionnels)
-    private Expression<Number> rigidityExpr;
-    private Expression<Number> dampingExpr;
-    private Expression<Number> velSmoothingExpr;
-    private Expression<Number> velInfluenceExpr;
-    private Expression<Number> maxDeflectionExpr;
-    private Expression<Number> depthDeflectionExpr;
-    private Expression<Number> undulationAmpExpr;
-    private Expression<Number> undulationFreqExpr;
-    private Expression<Number> undulationPropExpr;
-    private Expression<Number> randomAmpExpr;
-    private Expression<Number> randomFreqExpr;
-
     @Override
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed, ParseResult pr) {
@@ -47,20 +36,7 @@ public class TailPartCreate extends SimpleExpression<TailNode> {
         
         this.displayExpr = (Expression<DisplayGroupData>) exprs[0];
         this.transExpr = (Expression<Vector>) exprs[1];
-        
-        // Extraction des expressions du pattern
         this.parentExpr = (Expression<TailNode>) exprs[2];
-        this.rigidityExpr = (Expression<Number>) exprs[3];
-        this.dampingExpr = (Expression<Number>) exprs[4];
-        this.velSmoothingExpr = (Expression<Number>) exprs[5];
-        this.velInfluenceExpr = (Expression<Number>) exprs[6];
-        this.maxDeflectionExpr = (Expression<Number>) exprs[7];
-        this.depthDeflectionExpr = (Expression<Number>) exprs[8];
-        this.undulationAmpExpr = (Expression<Number>) exprs[9];
-        this.undulationFreqExpr = (Expression<Number>) exprs[10];
-        this.undulationPropExpr = (Expression<Number>) exprs[11];
-        this.randomAmpExpr = (Expression<Number>) exprs[12];
-        this.randomFreqExpr = (Expression<Number>) exprs[13];
 
         return true;
     }
@@ -76,7 +52,6 @@ public class TailPartCreate extends SimpleExpression<TailNode> {
         TailNode parentNode = parentExpr != null ? parentExpr.getSingle(event) : null;
         TailNode node;
         Tail tailInstance;
-
         // 1. Détermination s'il s'agit d'une racine ou d'un enfant
         if (parentNode == null) {
             // Création d'une nouvelle structure de Queue (Racine)
@@ -102,19 +77,6 @@ public class TailPartCreate extends SimpleExpression<TailNode> {
             node = tailInstance.addSegment(parentNode, display, new Vec3(trans));
         }
 
-        // 2. Application des configurations fluides de Tail.java (uniquement si spécifiées)
-        if (rigidityExpr != null) tailInstance.setRigidity(rigidityExpr.getSingle(event).floatValue());
-        if (dampingExpr != null) tailInstance.setDamping(dampingExpr.getSingle(event).floatValue());
-        if (velSmoothingExpr != null) tailInstance.setVelocitySmoothing(velSmoothingExpr.getSingle(event).floatValue());
-        if (velInfluenceExpr != null) tailInstance.setVelocityInfluence(velInfluenceExpr.getSingle(event).floatValue());
-        if (maxDeflectionExpr != null) tailInstance.setMaxDeflectionAngle(maxDeflectionExpr.getSingle(event).floatValue());
-        if (depthDeflectionExpr != null) tailInstance.setDepthDeflectionFactor(depthDeflectionExpr.getSingle(event).floatValue());
-        if (undulationAmpExpr != null) tailInstance.setUndulationAmplitude(undulationAmpExpr.getSingle(event).floatValue());
-        if (undulationFreqExpr != null) tailInstance.setUndulationFrequency(undulationFreqExpr.getSingle(event).floatValue());
-        if (undulationPropExpr != null) tailInstance.setUndulationPropagation(undulationPropExpr.getSingle(event).floatValue());
-        if (randomAmpExpr != null) tailInstance.setRandomAmplitude(randomAmpExpr.getSingle(event).floatValue());
-        if (randomFreqExpr != null) tailInstance.setRandomFrequency(randomFreqExpr.getSingle(event).floatValue());
-
         return new TailNode[]{ node };
     }
 
@@ -133,19 +95,7 @@ public class TailPartCreate extends SimpleExpression<TailNode> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(TailPartCreate.class, TailNode.class)
-                .addPattern("[a] [new] tail[ ]part from %displaygroup% with offset %vector% " +
-                           "[[,] [connected] to parent %-tailpart%] " +
-                           "[[,] [with] rigidity %-number%] " +
-                           "[[,] [with] damping %-number%] " +
-                           "[[,] [with] velocity smoothing %-number%] " +
-                           "[[,] [with] velocity influence %-number%] " +
-                           "[[,] [with] max deflection %-number%] " +
-                           "[[,] [with] depth deflection %-number%] " +
-                           "[[,] [with] undulation amp[litude] %-number%] " +
-                           "[[,] [with] undulation freq[uency] %-number%] " +
-                           "[[,] [with] undulation prop[agation] %-number%] " +
-                           "[[,] [with] random amp[litude] %-number%] " +
-                           "[[,] [with] random freq[uency] %-number%]")
+                .addPattern("[a] [new] tail[ ]part from %displaygroup% with offset %vector% [[,] [connected] to parent %-tailpart%]")
                 .build()
         );
     }

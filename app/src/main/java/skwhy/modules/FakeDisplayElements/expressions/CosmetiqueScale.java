@@ -60,14 +60,16 @@ public class CosmetiqueScale extends SimpleExpression<Number> {
 
     @Override
     public Class<? extends Number> getReturnType() { return Number.class; }
-
+    
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        CosmetiqueData c = cosmetiqueExpr.getSingle(event);
-        if (c == null) return null;
-        return Float.toString(c.getScale());
+        // On renvoie juste le texte représentant la syntaxe, pas sa valeur d'exécution.
+        if (cosmetiqueExpr != null) {
+            return "cosmetic scale of " + cosmetiqueExpr.toString(event, debug);
+        }
+        return "cosmetic scale";
     }
-
+    
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,

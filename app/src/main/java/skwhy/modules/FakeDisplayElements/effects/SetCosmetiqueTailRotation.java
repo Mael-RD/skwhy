@@ -10,6 +10,7 @@ import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.CosmetiqueData;
+import org.joml.Quaternionf;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,14 +28,14 @@ import java.util.List;
 public class SetCosmetiqueTailRotation extends Effect {
 
     private Expression<CosmetiqueData> cosmetiqueExpr;
-    private Expression<Number> numbersExpr;
+    private Expression<Quaternionf> quaternionsExpr;
 
     @Override
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
         this.cosmetiqueExpr = (Expression<CosmetiqueData>) exprs[0];
-        this.numbersExpr = (Expression<Number>) exprs[1];
+        this.quaternionsExpr = (Expression<Quaternionf>) exprs[1];
         return true;
     }
 
@@ -43,14 +44,14 @@ public class SetCosmetiqueTailRotation extends Effect {
         CosmetiqueData cosmetique = cosmetiqueExpr.getSingle(event);
         if (cosmetique == null) return;
 
-        // Récupérer tous les nombres de la liste
-        Number[] numbers = numbersExpr.getAll(event);
-        if (numbers == null || numbers.length == 0) return;
+        // Récupérer tous les quaternions de la liste
+        Quaternionf[] quaternions = quaternionsExpr.getAll(event);
+        if (quaternions == null || quaternions.length == 0) return;
 
-        // Convertir le tableau de Number en List<Float>
-        List<Float> rotations = new ArrayList<>();
-        for (Number n : numbers) {
-            rotations.add(n.floatValue());
+        // Convertir le tableau de Quaternionf en List<Quaternionf>
+        List<Quaternionf> rotations = new ArrayList<>();
+        for (Quaternionf q : quaternions) {
+            rotations.add(q);
         }
 
         // Appliquer les rotations à la queue
@@ -60,14 +61,14 @@ public class SetCosmetiqueTailRotation extends Effect {
     @Override
     public String toString(@Nullable Event event, boolean debug) {
         return "set tail rotation of " + cosmetiqueExpr.toString(event, debug)
-            + " to " + numbersExpr.toString(event, debug);
+            + " to " + quaternionsExpr.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EFFECT,
             SyntaxInfo.builder(SetCosmetiqueTailRotation.class)
-                .addPattern("set tail rotation of %cosmetique% to %numbers%")
+                .addPattern("set tail rotation of %cosmetique% to %quaternions%")
                 .build()
         );
     }

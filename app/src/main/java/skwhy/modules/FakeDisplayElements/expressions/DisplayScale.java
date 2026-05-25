@@ -84,8 +84,8 @@ public class DisplayScale extends SimpleExpression<Vector> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayScale.class, Vector.class)
-                .addPattern("[the] scale of %displaydata%")           // 0
-                .addPattern("[the] translation of %displaydata%")     // 1
+                .addPattern("[the] group scale of %displaydata%")           // 0
+                .addPattern("[the] group translation of %displaydata%")     // 1
                 .build()
         );
     }

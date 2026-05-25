@@ -17,6 +17,7 @@ public class ItemDisplayData extends DisplayData {
     
     private String itemStack; // Format: "MATERIAL" ou "MATERIAL{nbt_data}"
     private int displayMode; // 0=none, 1=thirdperson_lefthand, 2=thirdperson_righthand, 3=firstperson_lefthand, 4=firstperson_righthand, 5=head, 6=gui, 7=ground, 8=fixed
+    private String head = null;
 
     public ItemDisplayData() {
         this(
@@ -82,6 +83,24 @@ public class ItemDisplayData extends DisplayData {
                 new org.bukkit.inventory.ItemStack(
                     org.bukkit.Material.valueOf(itemStack.toUpperCase())
                 );
+            
+            // Si c'est une player head et qu'on a une valeur de head, ajouter la texture
+            if (itemStack.equalsIgnoreCase("PLAYER_HEAD") && head != null) {
+                org.bukkit.inventory.meta.SkullMeta meta = 
+                    (org.bukkit.inventory.meta.SkullMeta) bukkitItem.getItemMeta();
+                
+                if (meta != null) {
+                    com.destroystokyo.paper.profile.PlayerProfile profile;
+                    profile = org.bukkit.Bukkit.createProfile(
+                    java.util.UUID.nameUUIDFromBytes(head.getBytes()), "CustomHead");
+                    profile.getProperties().add(
+                    new com.destroystokyo.paper.profile.ProfileProperty("textures", head));
+                    
+                    meta.setPlayerProfile(profile);
+                    bukkitItem.setItemMeta(meta);
+                }
+            }
+            
             data.add(new EntityData<>(23, EntityDataTypes.ITEMSTACK,
                 io.github.retrooper.packetevents.util.SpigotConversionUtil
                     .fromBukkitItemStack(bukkitItem)));
@@ -102,9 +121,14 @@ public class ItemDisplayData extends DisplayData {
     /**
      * Définit l'itemstack.
      * Exemple: "DIAMOND_SWORD" ou "DIAMOND_SWORD{Enchantments:[{id:sharpness,lvl:5}]}"
+     * Si le type n'est pas PLAYER_HEAD, head est mis à null.
      */
     public void setItemStack(String itemStack) {
         this.itemStack = itemStack;
+        // Si ce n'est pas une player head, réinitialiser head
+        if (itemStack == null || !itemStack.equalsIgnoreCase("PLAYER_HEAD")) {
+            this.head = null;
+        }
     }
     
     /**
@@ -130,6 +154,20 @@ public class ItemDisplayData extends DisplayData {
         return displayMode;
     }
     
+    /**
+     * Définit la tête du joueur.
+     */
+    public void setHead(String head) {
+        this.head = head;
+    }
+    
+    /**
+     * Récupère la tête du joueur.
+     */
+    public String getHead() {
+        return head;
+    }
+    
     public String getDisplayModeName() {
         return switch(displayMode) {
             case 1 -> "thirdperson_lefthand";
@@ -151,18 +189,20 @@ public class ItemDisplayData extends DisplayData {
     
     @Override
     public String serialize() {
+        String headInfo = head != null && !head.isEmpty() ? ",head=" + head : "";
         return String.format(
             "ItemDisplay{" +
             "scale=(%.2f,%.2f,%.2f),translation=(%.2f,%.2f,%.2f),leftRotation=%s,rightRotation=%s," +
-            "itemStack=%s,displayMode=%d(%s),glowColor=%d,shadowRadius=%.2f,shadowStrength=%.2f,viewRange=%.2f,billboardMode=%d}",
+            "itemStack=%s,displayMode=%d(%s),glowColor=%d,shadowRadius=%.2f,shadowStrength=%.2f,viewRange=%.2f,billboardMode=%d%s}",
             scale.x, scale.y, scale.z, translation.x, translation.y, translation.z,
             leftRotation, rightRotation,
             itemStack, displayMode, getDisplayModeName(),
-            glowColor, shadowRadius, shadowStrength, viewRange, billboardMode
+            glowColor, shadowRadius, shadowStrength, viewRange, billboardMode, headInfo
         );
     }
     @Override
     public String toString() {
+        String headInfo = head != null && !head.isEmpty() ? ", head=" + head : "";
         return "item display [" +
             "item="        + itemStack + ", " +
             "mode="        + getDisplayModeName() + ", " +
@@ -172,7 +212,7 @@ public class ItemDisplayData extends DisplayData {
             "rightRotation=" + rightRotation + ", " +
             "billboard="   + billboardMode + ", " +
             "shadow="      + shadowRadius + ", " +
-            "range="       + viewRange +
+            "range="       + viewRange + headInfo +
         "]";
     }
 
@@ -181,6 +221,7 @@ public class ItemDisplayData extends DisplayData {
         ItemDisplayData clone = new ItemDisplayData();
         clone.itemStack = this.itemStack;
         clone.displayMode = this.displayMode;
+        clone.head = this.head;
         return clone;
     }
 }

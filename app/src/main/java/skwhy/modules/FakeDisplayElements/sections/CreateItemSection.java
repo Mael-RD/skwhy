@@ -84,6 +84,8 @@ public class CreateItemSection extends Section {
                     org.bukkit.Material.class, 
                     String.class
                 );
+            case "head" ->
+                parser.parseExpression(String.class);
             case "mode", "displaymode" ->
                 parser.parseExpression(String.class, Number.class);
             default ->
@@ -94,6 +96,15 @@ public class CreateItemSection extends Section {
     @Override
     protected @Nullable TriggerItem walk(Event event) {
         ItemDisplayData display = new ItemDisplayData();
+        
+        // Vérifier que head et item ne coexistent pas
+        boolean hasHead = fields.containsKey("head");
+        boolean hasItem = fields.containsKey("item") || fields.containsKey("itemstack") || fields.containsKey("material");
+        
+        if (hasHead && hasItem) {
+            Skript.error("Les champs 'head' et 'item' sont mutuellement exclusifs.");
+            return getNext();
+        }
 
         fields.forEach((key, expr) -> {
             Object value = expr.getSingle(event);
@@ -145,6 +156,14 @@ public class CreateItemSection extends Section {
                         display.setItemStack(m.name());
                     } else {
                         display.setItemStack(value.toString().toUpperCase().replace(" ", "_"));
+                    }
+                }
+                case "head" -> {
+                    // Si head est présent, forcer item à player_head
+                    display.setItemStack("PLAYER_HEAD");
+                    // Utiliser setHead pour définir la valeur de head
+                    if (value instanceof String s) {
+                        display.setHead(s);
                     }
                 }
                 case "mode", "displaymode" -> {

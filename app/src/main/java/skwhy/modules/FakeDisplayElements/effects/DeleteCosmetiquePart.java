@@ -63,7 +63,7 @@ public class DeleteCosmetiquePart extends Effect {
             SyntaxRegistry.EFFECT,
             SyntaxInfo.builder(DeleteCosmetiquePart.class)
                 // Pattern 0 (index 0) : Chapeau avec slot optionnel (assigné au bit 1 du pr.mark)
-                .addPattern("(delete|remove) [the] hat of %cosmetique% [(1:in [slot] %string%)]")
+                .addPattern("(delete|remove) [the] hat of %cosmetique% [(1:in [slot] %-string%)]")
                 // Pattern 1 (index 1) : Dos
                 .addPattern("(delete|remove) [the] back of %cosmetique%")
                 // Pattern 2 (index 2) : Queue

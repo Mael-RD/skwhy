@@ -4,6 +4,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.util.Vector;
@@ -105,5 +106,15 @@ public class BodyTracker implements Listener {
     // Équivalent de: mod((angle + 180), 360) - 180
     private float normalize(float angle) {
         return mod(angle + 180, 360) - 180;
+    }
+
+    // Détecte le swing du bras et définit le yaw du corps au yaw du joueur
+    @EventHandler
+    public void onPlayerArmSwing(PlayerAnimationEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+        
+        // Définit le yaw du corps au yaw du joueur lors du swing du bras
+        bodyYaws.put(uuid, player.getLocation().getYaw());
     }
 }
