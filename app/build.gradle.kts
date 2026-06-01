@@ -1,5 +1,3 @@
-version = "1.0.0" 
-
 plugins {
     java
     application
@@ -45,6 +43,12 @@ tasks.build {
 tasks.jar {
     archiveBaseName.set("skwhy")
     archiveVersion.set(project.version.toString())
+}
+
+val pluginVersion = project.version.toString()
+
+tasks.processResources {
+    expand("version" to pluginVersion)
 }
 
 tasks {

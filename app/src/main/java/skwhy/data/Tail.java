@@ -568,7 +568,6 @@ public class Tail {
     private void setRestRotationDFS(TailNode node, List<Quaternionf> rots, int[] idx) {
         if (idx[0] < rots.size()) {
             node.restRotation.set(rots.get(idx[0]++));
-            node.currentRot.mul(node.restRotation);
         }
         for (TailNode child : node.children) setRestRotationDFS(child, rots, idx);
     }

@@ -9,6 +9,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.skriptlang.skript.addon.SkriptAddon;
 
 import skwhy.modules.FakeDisplayModule;
+import skwhy.modules.FakePathFindingModule;
 import skwhy.modules.RandomStuffModule;
 
 
@@ -45,6 +46,7 @@ public class SkWhy extends JavaPlugin {
         );
         // Chargement des modules
         skriptAddon.loadModules(new FakeDisplayModule());
+        skriptAddon.loadModules(new FakePathFindingModule());
         skriptAddon.loadModules(new RandomStuffModule());
         getServer().getPluginManager().registerEvents(new EntityRemove(), this);
         getServer().getPluginManager().registerEvents(new BodyTracker(), this);
