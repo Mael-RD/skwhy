@@ -8,7 +8,7 @@ repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://repo.skriptlang.org/releases")
     maven("https://repo.codemc.io/repository/maven-public/")
-    // maven("https://maven.pvphub.me/tofaa")
+    maven("https://maven.maxhenkel.de/repository/public")
 }
 
 dependencies {
@@ -17,8 +17,12 @@ dependencies {
     compileOnly("com.github.SkriptLang:Skript:2.15.2")
 
     compileOnly("com.github.retrooper:packetevents-spigot:2.11.2")
-
-    // implementation("io.github.tofaa2:spigot:3.0.3-SNAPSHOT")
+    
+    compileOnly("de.maxhenkel.voicechat:voicechat-api:2.5.0")
+    
+    // API Vosk (Reconnaissance vocale)
+    implementation("com.alphacephei:vosk:0.3.45")
+    implementation("net.java.dev.jna:jna:5.14.0")
 }
 
 tasks.register<Copy>("copyJarToPlugins") {

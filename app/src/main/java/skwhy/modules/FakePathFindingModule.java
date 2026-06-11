@@ -5,12 +5,13 @@ import org.skriptlang.skript.addon.SkriptAddon;
 
 import com.github.retrooper.packetevents.PacketEvents;
 
-import skwhy.modules.FakePathFindingElements.FakePathFindingCreate;
-import skwhy.modules.FakePathFindingElements.FakePathFindingLocation;
-import skwhy.modules.FakePathFindingElements.FakePathFindingNumber;
-import skwhy.modules.FakePathFindingElements.FakePathFindingPlayers;
-import skwhy.modules.FakePathFindingElements.FakePathFindingType;
-import skwhy.modules.FakePathFindingElements.FakePathFindingVector;
+import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingCreate;
+import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingLocation;
+import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingNumber;
+import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingPlayers;
+import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingType;
+import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingVector;
+import skwhy.modules.FakePathFindingElements.types.FakePathFindingClass;
 
 public class FakePathFindingModule implements AddonModule {
 
@@ -29,7 +30,7 @@ public class FakePathFindingModule implements AddonModule {
 
     @Override
     public void init(SkriptAddon addon) {
-        // Aucun type spécifique à enregistrer pour le moment.
+        FakePathFindingClass.register();
     }
 
     @Override

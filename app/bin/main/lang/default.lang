@@ -15,3 +15,7 @@ types:
   # Cosmétiques
   cosmetique: cosmetique@cosmetiques
   tailpart: tail part@tail parts
+
+
+  #others
+  fakepathfinding: fake pathfinding@fakes pathfindings

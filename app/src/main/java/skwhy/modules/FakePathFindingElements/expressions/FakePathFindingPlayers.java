@@ -1,4 +1,4 @@
-package skwhy.modules.FakePathFindingElements;
+package skwhy.modules.FakePathFindingElements.expressions;
 
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;

@@ -1,9 +1,6 @@
 package skwhy;
 
 import ch.njol.skript.Skript;
-// import me.tofaa.entitylib.APIConfig;
-// import me.tofaa.entitylib.EntityLib;
-// import me.tofaa.entitylib.spigot.SpigotEntityLibPlatform;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.skriptlang.skript.addon.SkriptAddon;
@@ -11,6 +8,7 @@ import org.skriptlang.skript.addon.SkriptAddon;
 import skwhy.modules.FakeDisplayModule;
 import skwhy.modules.FakePathFindingModule;
 import skwhy.modules.RandomStuffModule;
+import skwhy.modules.VoiceModule;
 
 
 // import com.github.retrooper.packetevents.PacketEvents;
@@ -38,6 +36,15 @@ public class SkWhy extends JavaPlugin {
         //     EntityLib.init(platform, config);
         // }
 
+
+        
+        instance = this;
+        saveDefaultConfig();
+
+
+        getLogger().info("[VoiceSkript] Addon chargé avec succès !");
+
+
         skriptAddon = Skript.instance().registerAddon(SkWhy.class, "SkWhy");
         
         skriptAddon.localizer().setSourceDirectories(
@@ -48,6 +55,7 @@ public class SkWhy extends JavaPlugin {
         skriptAddon.loadModules(new FakeDisplayModule());
         skriptAddon.loadModules(new FakePathFindingModule());
         skriptAddon.loadModules(new RandomStuffModule());
+        skriptAddon.loadModules(new VoiceModule());
         getServer().getPluginManager().registerEvents(new EntityRemove(), this);
         getServer().getPluginManager().registerEvents(new BodyTracker(), this);
         getServer().getPluginManager().registerEvents(new FutureRotationTracker(), this);
