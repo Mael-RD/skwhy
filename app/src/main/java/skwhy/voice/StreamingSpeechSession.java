@@ -4,6 +4,7 @@ import org.vosk.Model;
 import org.vosk.Recognizer;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import skwhy.SkWhy;
 
 import java.io.IOException;
 import java.util.*;
@@ -287,6 +288,12 @@ public class StreamingSpeechSession {
     // ── Gestion des transcriptions ────────────────────────────────────────────
 
     private void onTranscribed(String text, boolean isPartial) throws IOException {
+        // Debug: log Vosk detections for the player session
+        try {
+            SkWhy.getInstance().getLogger().fine("[VoiceSkript DEBUG] Vosk détecté pour " + playerId + " : '" + text + "' (partial=" + isPartial + ") phase=" + phase);
+        } catch (Exception ignored) {
+        }
+
         double threshold = isPartial ? PARTIAL_THRESHOLD : MATCH_THRESHOLD;
 
         if (phase == Phase.TRIGGER_LISTEN) {

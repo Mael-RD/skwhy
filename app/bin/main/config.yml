@@ -1,0 +1,6 @@
+# Configuration minimale pour VoiceSkript
+voice:
+  # Nom du dossier du modèle Vosk (présent dans plugins/SkWhy/model/)
+  model: model
+  # Timeout par défaut pour la fenêtre de payload (ms)
+  default_timeout_ms: 3000

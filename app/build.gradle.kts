@@ -1,6 +1,5 @@
 plugins {
     java
-    application
 }
 
 repositories {
@@ -26,8 +25,10 @@ dependencies {
 }
 
 tasks.register<Copy>("copyJarToPlugins") {
-    from(tasks.jar)
-    into("C:/Users/orimi/Desktop/proxti/plugins") 
+    val jarTask = tasks.named<Jar>("jar")
+    dependsOn(jarTask)
+    from(jarTask.flatMap { it.archiveFile })
+    into("C:/Users/orimi/Desktop/proxti/plugins")
 }
 
 java {
@@ -36,17 +37,17 @@ java {
     }
 }
 
-application {
-    mainClass.set("skwhy.SkWhy")
-}
 
-tasks.build {
-    finalizedBy("copyJarToPlugins")
-}
 
 tasks.jar {
     archiveBaseName.set("skwhy")
     archiveVersion.set(project.version.toString())
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from({
+        configurations.runtimeClasspath.get().filter { it.name.endsWith(".jar") }.map { zipTree(it) }
+    })
+    exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "META-INF/LICENSE", "META-INF/LICENSE.txt", "META-INF/NOTICE", "META-INF/NOTICE.txt")
 }
 
 val pluginVersion = project.version.toString()
@@ -56,14 +57,11 @@ tasks.processResources {
 }
 
 tasks {
-    startScripts { enabled = false }
-    distZip { enabled = false }
-    distTar { enabled = false }
-
     build {
         finalizedBy("copyJarToPlugins")
     }
 }
+
 
 tasks.javadoc {
     options.encoding = "UTF-8"

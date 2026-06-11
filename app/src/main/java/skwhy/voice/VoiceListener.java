@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.io.IOException;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 
 /**
  * Pont entre SimpleVoiceChat et les sessions de reconnaissance de chaque joueur.
@@ -36,15 +38,16 @@ public class VoiceListener implements VoicechatPlugin {
 
     // ── Enregistrement VoiceChat ──────────────────────────────────────────────
 
-    public void register() {
+    public boolean register() {
         BukkitVoicechatService service = plugin.getServer()
                 .getServicesManager().load(BukkitVoicechatService.class);
         if (service == null) {
             plugin.getLogger().severe("[VoiceSkript] SimpleVoiceChat introuvable !");
-            return;
+            return false;
         }
         service.registerPlugin(this);
         plugin.getLogger().info("[VoiceSkript] VoiceListener enregistré.");
+        return true;
     }
 
     @Override public String getPluginId() { return PLUGIN_ID; }
@@ -65,7 +68,13 @@ public class VoiceListener implements VoicechatPlugin {
 
         byte[] pcm16k = resample48kTo16k(event.getPacket().getOpusEncodedData());
         StreamingSpeechSession s = sessions.get(id);
-        if (s != null && s.isOpen()) s.feedAudio(pcm16k);
+        if (s != null && s.isOpen()) {
+            // Debug : log when audio is forwarded to Vosk for a listening player
+            Player bp = Bukkit.getPlayer(id);
+            String name = bp != null ? bp.getName() : id.toString();
+            plugin.getLogger().fine("[VoiceSkript DEBUG] Envoi audio à Vosk pour " + name + " (" + id + ") — bytes=" + pcm16k.length);
+            s.feedAudio(pcm16k);
+        }
     }
 
     // ── API Skript ────────────────────────────────────────────────────────────

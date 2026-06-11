@@ -8,6 +8,14 @@ import org.vosk.Model;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.Enumeration;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,20 +40,108 @@ public class SpeechRecognizer {
     // ── Init / shutdown ───────────────────────────────────────────────────────
 
     public boolean initialize() {
-        File modelDir = new File(plugin.getDataFolder(), "model");
-        if (!modelDir.exists() || !modelDir.isDirectory()) {
-            plugin.getLogger().severe("[VoiceSkript] Modèle Vosk absent dans plugins/VoiceSkript/model/");
-            plugin.getLogger().severe("[VoiceSkript] → vosk-model-small-fr-0.22 sur alphacephei.com/vosk/models");
-            return false;
-        }
         try {
+            // model folder name is configurable in config.yml under 'voice.model'
+            String modelFolderName = "model";
+            try {
+                if (plugin.getConfig() != null) {
+                    modelFolderName = plugin.getConfig().getString("voice.model", modelFolderName);
+                }
+            } catch (Exception ignored) {
+            }
+
+            File modelDir = new File(plugin.getDataFolder(), modelFolderName);
+            // If model directory is missing, try extracting an embedded model from the plugin JAR
+            if (!modelDir.exists() || !modelDir.isDirectory()) {
+                plugin.getLogger().info("[VoiceSkript] " + modelFolderName + "/ absent, tentative d'extraction depuis le JAR...");
+                try {
+                    boolean ok = extractModelFromJar(modelFolderName, plugin.getDataFolder());
+                    if (!ok) {
+                        plugin.getLogger().info("[VoiceSkript] Aucun modèle '" + modelFolderName + "' trouvé dans le JAR/classpath.");
+                    }
+                } catch (Exception e) {
+                    plugin.getLogger().warning("[VoiceSkript] Extraction du modèle depuis le JAR a échoué: " + e.getMessage());
+                }
+            }
+
+            if (!modelDir.exists() || !modelDir.isDirectory()) {
+                plugin.getLogger().severe("[VoiceSkript] Modèle Vosk absent dans " + modelDir.getAbsolutePath());
+                plugin.getLogger().severe("[VoiceSkript] → vosk-model-small-fr-0.22 sur alphacephei.com/vosk/models");
+                return false;
+            }
             LibVosk.setLogLevel(LogLevel.WARNINGS);
             voskModel = new Model(modelDir.getAbsolutePath());
             plugin.getLogger().info("[VoiceSkript] Modèle Vosk chargé.");
             return true;
-        } catch (Exception e) {
-            plugin.getLogger().severe("[VoiceSkript] Erreur Vosk : " + e.getMessage());
+        } catch (NoClassDefFoundError e) {
+            plugin.getLogger().severe("[VoiceSkript] Vosk/JNA absent du classpath. Le module voice est désactivé.");
+            plugin.getLogger().severe("[VoiceSkript] Ajoutez les dépendances Vosk et JNA, ou déployez un jar contenant ces bibliothèques.");
+            plugin.getLogger().severe("[VoiceSkript] Exception: " + e.getClass().getSimpleName() + " - " + e.getMessage());
             return false;
+        } catch (UnsatisfiedLinkError e) {
+            plugin.getLogger().severe("[VoiceSkript] La bibliothèque native Vosk n'a pas pu être chargée : " + e.getMessage());
+            plugin.getLogger().severe("[VoiceSkript] Vérifiez que vos dépendances natives JNA/Vosk sont disponibles.");
+            return false;
+        } catch (Throwable e) {
+            plugin.getLogger().severe("[VoiceSkript] Erreur Vosk : " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Extracts entries under resourcePath from the plugin JAR into destinationDir.
+     * resourcePath should be a directory prefix like "model" (no leading slash).
+     */
+    private boolean extractModelFromJar(String resourcePath, File destinationDir) throws IOException, URISyntaxException {
+        // Ensure destination exists
+        if (!destinationDir.exists()) destinationDir.mkdirs();
+
+        URL jarUrl = plugin.getClass().getProtectionDomain().getCodeSource().getLocation();
+        File jarFile = new File(jarUrl.toURI());
+        if (!jarFile.exists()) return false;
+
+        // If running from an exploded classes/resources directory (dev), copy directly
+        if (jarFile.isDirectory()) {
+            // try to find resourcePath inside classes/resources
+            URL res = plugin.getClass().getClassLoader().getResource(resourcePath);
+            if (res != null && "file".equals(res.getProtocol())) {
+                File src = new File(res.toURI());
+                if (src.exists() && src.isDirectory()) {
+                    copyDirectory(src, new File(destinationDir, resourcePath));
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        boolean extracted = false;
+        try (JarFile jf = new JarFile(jarFile)) {
+            Enumeration<JarEntry> entries = jf.entries();
+            while (entries.hasMoreElements()) {
+                JarEntry je = entries.nextElement();
+                String name = je.getName();
+                if (!name.startsWith(resourcePath + "/")) continue;
+                if (je.isDirectory()) continue;
+                File out = new File(destinationDir, name);
+                File parent = out.getParentFile();
+                if (!parent.exists()) parent.mkdirs();
+                try (InputStream in = jf.getInputStream(je)) {
+                    Files.copy(in, out.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                }
+                extracted = true;
+            }
+        }
+        return extracted;
+    }
+
+    private void copyDirectory(File src, File dest) throws IOException {
+        if (!dest.exists()) dest.mkdirs();
+        File[] files = src.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            File out = new File(dest, f.getName());
+            if (f.isDirectory()) copyDirectory(f, out);
+            else Files.copy(f.toPath(), out.toPath(), StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
