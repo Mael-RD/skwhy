@@ -122,6 +122,7 @@ These features are in progress or planned for the future. No ETA.
 
 | Module | Required dependency |
 |---|---|
+| All | Skript 2.15+ |
 | Fake Display Entities | [PacketEvents](https://github.com/retrooper/packetevents) |
 | Voice Recognition | [SimpleVoiceChat](https://modrinth.com/plugin/simple-voice-chat) + Vosk model |
 
