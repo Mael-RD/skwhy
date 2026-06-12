@@ -139,3 +139,5 @@ Full syntax reference is available in the [releases](../../releases) — each ve
 Built for one server. Shared for whoever needs it.
 
 </div>
+
+ps, documentation and coding is partially IA made, I've checked it, it must be fine, I think, at least it's working fine.
