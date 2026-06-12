@@ -153,7 +153,7 @@ public class SpeechRecognizer {
 
     // ── Ouverture de session ──────────────────────────────────────────────────
 
-    public StreamingSpeechSession openSession(UUID playerId, List<TriggerRule> rules) throws IOException {
+    public StreamingSpeechSession openSession(UUID playerId, List<String> rules) throws IOException {
         try {
             return new StreamingSpeechSession(
                     playerId, rules, voskModel, VOSK_SAMPLE_RATE,

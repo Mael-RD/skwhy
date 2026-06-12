@@ -52,10 +52,26 @@ public class SkWhy extends JavaPlugin {
             null
         );
         // Chargement des modules
-        skriptAddon.loadModules(new FakeDisplayModule());
-        skriptAddon.loadModules(new FakePathFindingModule());
-        skriptAddon.loadModules(new RandomStuffModule());
-        skriptAddon.loadModules(new VoiceModule());
+        if (isModuleEnabled("modules.fake_display")) {
+            skriptAddon.loadModules(new FakeDisplayModule());
+        } else {
+            getLogger().info("[VoiceSkript] Module FakeDisplay désactivé dans la config.");
+        }
+        if (isModuleEnabled("modules.fake_pathfinding")) {
+            skriptAddon.loadModules(new FakePathFindingModule());
+        } else {
+            getLogger().info("[VoiceSkript] Module FakePathFinding désactivé dans la config.");
+        }
+        if (isModuleEnabled("modules.random_stuff")) {
+            skriptAddon.loadModules(new RandomStuffModule());
+        } else {
+            getLogger().info("[VoiceSkript] Module RandomStuff désactivé dans la config.");
+        }
+        if (isModuleEnabled("modules.voice")) {
+            skriptAddon.loadModules(new VoiceModule());
+        } else {
+            getLogger().info("[VoiceSkript] Module Voice désactivé dans la config.");
+        }
         getServer().getPluginManager().registerEvents(new EntityRemove(), this);
         getServer().getPluginManager().registerEvents(new BodyTracker(), this);
         getServer().getPluginManager().registerEvents(new FutureRotationTracker(), this);
@@ -73,4 +89,8 @@ public class SkWhy extends JavaPlugin {
 
     public static SkWhy getInstance() { return instance; }
     public static SkriptAddon getSkriptAddon() { return skriptAddon; }
+
+    private boolean isModuleEnabled(String path) {
+        return getConfig().getBoolean(path, true);
+    }
 }

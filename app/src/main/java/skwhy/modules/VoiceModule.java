@@ -53,7 +53,6 @@ public class VoiceModule implements AddonModule {
         
         // Expressions
         VoiceRules.register(addon);
-        VoiceTimeout.register(addon);
 
         // --- 1. ENREGISTREMENT DE LA SYNTAXE ---
         SyntaxRegistry syntaxRegistry = this.moduleRegistry(addon);
@@ -135,9 +134,6 @@ public class VoiceModule implements AddonModule {
 
         VoicePhraseDetected event = new VoicePhraseDetected(player, matchedPhrase);
         Bukkit.getPluginManager().callEvent(event);
-
-        SkWhy.getInstance().getLogger().fine(String.format("[VoiceSkript] Phrase reconnue pour %s : \"%s\" (%.0f%%)",
-                player.getName(), matchedPhrase, confidence * 100));
     }
 
     

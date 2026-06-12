@@ -41,12 +41,12 @@ public class GrammarSet {
      * Grammaire contenant uniquement les triggers des règles actives.
      * Utilisée en phase TRIGGER_LISTEN.
      */
-    public static GrammarSet fromTriggers(List<TriggerRule> rules) {
+    public static GrammarSet fromTriggers(List<String> rules) {
         Set<String> words = new LinkedHashSet<>();
-        for (TriggerRule r : rules) {
+        for (String r : rules) {
             // Pour un trigger multi-mots ("ouvre la porte"), Vosk reconnaît la séquence
             // comme un seul token si on l'ajoute tel quel.
-            words.add(r.trigger);
+            words.add(r);
         }
         return new GrammarSet(words);
     }
@@ -55,10 +55,10 @@ public class GrammarSet {
      * Grammaire contenant uniquement les payloads des règles armées.
      * Utilisée en phase PAYLOAD_LISTEN.
      */
-    public static GrammarSet fromPayloads(List<TriggerRule> rules) {
+    public static GrammarSet fromPayloads(List<String> rules) {
         Set<String> words = new LinkedHashSet<>();
-        for (TriggerRule r : rules) {
-            if (r.payload != null) words.add(r.payload);
+        for (String r : rules) {
+            if (r != null) words.add(r);
         }
         return new GrammarSet(words);
     }

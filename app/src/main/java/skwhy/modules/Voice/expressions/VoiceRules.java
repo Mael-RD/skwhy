@@ -12,7 +12,6 @@ import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 
-import skwhy.voice.TriggerRule;
 import skwhy.voice.VoiceListener;
 import skwhy.voice.StreamingSpeechSession;
 import skwhy.voice.TextNormalizer;
@@ -114,7 +113,8 @@ public class VoiceRules extends SimpleExpression<String> {
             case ADD    -> new Class[]{ String[].class };  // add "x" to ...
             case REMOVE -> new Class[]{ String[].class };  // remove "x" from ...
             case DELETE,
-                 RESET  -> new Class[0];                   // clear / delete (pas de delta)
+                 RESET,
+                 REMOVE_ALL  -> new Class[0];                   // clear / delete (pas de delta)
             default     -> null;
         };
     }
@@ -130,9 +130,9 @@ public class VoiceRules extends SimpleExpression<String> {
 
             case SET -> {
                 // Remplacer toute la liste et recharger la session
-                List<TriggerRule> rules = toSimpleRules(delta);
+                List<String> rules = toSimpleRules(delta);
                 try {
-                    listener.startListeningWithRules(player, rules);
+                    listener.startListening(player, rules);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -153,9 +153,9 @@ public class VoiceRules extends SimpleExpression<String> {
                     }
                 }
 
-                List<TriggerRule> rules = phraseListToRules(existing);
+                List<String> rules = phraseListToRules(existing);
                 try {
-                    listener.startListeningWithRules(player, rules);
+                    listener.startListening(player, rules);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -177,7 +177,7 @@ public class VoiceRules extends SimpleExpression<String> {
                     listener.stopListening(player);
                 } else {
                     try {
-                        listener.startListeningWithRules(player, phraseListToRules(existing));
+                        listener.startListening(player, phraseListToRules(existing));
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -194,22 +194,20 @@ public class VoiceRules extends SimpleExpression<String> {
     // ── Utilitaires ───────────────────────────────────────────────────────────
 
     /** Convertit un tableau Object[] de delta Skript en TriggerRules SIMPLE */
-    private List<TriggerRule> toSimpleRules(Object[] delta) {
-        List<TriggerRule> rules = new ArrayList<>();
+    private List<String> toSimpleRules(Object[] delta) {
+        List<String> rules = new ArrayList<>();
         if (delta == null) return rules;
         for (Object o : delta) {
             if (o instanceof String s && !s.isBlank()) {
-                rules.add(new TriggerRule(s)); // normalisation faite dans TriggerRule
+                rules.add(TextNormalizer.normalize(s));
             }
         }
         return rules;
     }
 
     /** Convertit une liste de phrases normalisées en TriggerRules SIMPLE */
-    private List<TriggerRule> phraseListToRules(List<String> phrases) {
-        List<TriggerRule> rules = new ArrayList<>();
-        for (String p : phrases) rules.add(new TriggerRule(p));
-        return rules;
+    private List<String> phraseListToRules(List<String> phrases) {
+        return new ArrayList<>(phrases);
     }
 
     @Override

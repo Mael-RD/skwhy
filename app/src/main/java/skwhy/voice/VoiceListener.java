@@ -1,10 +1,13 @@
 package skwhy.voice;
 
 import de.maxhenkel.voicechat.api.BukkitVoicechatService;
+import de.maxhenkel.voicechat.api.VoicechatApi;
 import de.maxhenkel.voicechat.api.VoicechatConnection;
 import de.maxhenkel.voicechat.api.VoicechatPlugin;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
+import de.maxhenkel.voicechat.api.opus.OpusDecoder;
+
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -14,8 +17,6 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.io.IOException;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 
 /**
  * Pont entre SimpleVoiceChat et les sessions de reconnaissance de chaque joueur.
@@ -23,13 +24,19 @@ import org.bukkit.entity.Player;
  */
 public class VoiceListener implements VoicechatPlugin {
 
-    private static final String PLUGIN_ID = "voiceskript-addon";
+    private static final String PLUGIN_ID = "SkWhy";
 
     private final JavaPlugin plugin;
     private final SpeechRecognizer recognizer;
 
-    private final Map<UUID, StreamingSpeechSession> sessions       = new ConcurrentHashMap<>();
-    private final Map<UUID, List<TriggerRule>>      listenedRules  = new ConcurrentHashMap<>();
+    private final Map<UUID, StreamingSpeechSession> sessions  = new ConcurrentHashMap<>();
+    private final Map<UUID, List<String>>      listenedRules  = new ConcurrentHashMap<>();
+    
+    private VoicechatApi voicechatApi;
+    @Override
+    public void initialize(VoicechatApi api) {
+        this.voicechatApi = api;
+    }
 
     public VoiceListener(JavaPlugin plugin, SpeechRecognizer recognizer) {
         this.plugin     = plugin;
@@ -63,47 +70,42 @@ public class VoiceListener implements VoicechatPlugin {
         if (event.getSenderConnection() == null) return;
         VoicechatConnection senderConnection = event.getSenderConnection();
         if (senderConnection == null) return;
+        
         UUID id = senderConnection.getPlayer().getUuid();
         if (!listenedRules.containsKey(id)) return;
 
-        byte[] pcm16k = resample48kTo16k(event.getPacket().getOpusEncodedData());
         StreamingSpeechSession s = sessions.get(id);
-        if (s != null && s.isOpen()) {
-            // Debug : log when audio is forwarded to Vosk for a listening player
-            Player bp = Bukkit.getPlayer(id);
-            String name = bp != null ? bp.getName() : id.toString();
-            plugin.getLogger().fine("[VoiceSkript DEBUG] Envoi audio à Vosk pour " + name + " (" + id + ") — bytes=" + pcm16k.length);
-            s.feedAudio(pcm16k);
-        }
-    }
+        if (s == null) return;
 
+        // 1. On crée un décodeur via l'API de SimpleVoiceChat
+        OpusDecoder decoder = voicechatApi.createDecoder();
+        
+        // 2. On décode les données Opus en PCM 48kHz (tableau de shorts)
+        short[] decodedPcm48k = decoder.decode(event.getPacket().getOpusEncodedData());
+        decoder.close(); // Important pour éviter les fuites de mémoire
+        
+        // 3. On doit convertir ces shorts en octets 16kHz pour Vosk
+        byte[] pcm16k = resampleAndConvert48kTo16k(decodedPcm48k);
+
+        s.feedAudio(pcm16k);
+    }
     // ── API Skript ────────────────────────────────────────────────────────────
 
     /**
-     * Écoute SIMPLE (rétrocompatibilité) : liste de phrases sans trigger.
-     * Chaque phrase est une TriggerRule en mode SIMPLE.
+     * Écoute SIMPLE : liste de phrases.
      */
-    public void startListening(Player player, List<String> phrases) throws IOException {
-        List<TriggerRule> rules = new ArrayList<>();
-        for (String p : phrases) rules.add(new TriggerRule(p));
-        startListeningWithRules(player, rules);
-    }
-
-    /**
-     * Écoute avec règles (mode trigger→payload inclus).
-     */
-    public void startListeningWithRules(Player player, List<TriggerRule> rules) throws IOException {
+    public void startListening(Player player, List<String> rules) throws IOException {
         UUID id = player.getUniqueId();
 
         StreamingSpeechSession old = sessions.remove(id);
-        if (old != null) old.close();
+        if (old != null) {
+            old.close();
+        }
 
-        listenedRules.put(id, rules);
-        StreamingSpeechSession session = recognizer.openSession(id, rules);
+        List<String> copyRules = new ArrayList<>(rules);
+        listenedRules.put(id, copyRules);
+        StreamingSpeechSession session = recognizer.openSession(id, copyRules);
         sessions.put(id, session);
-
-        plugin.getLogger().info("[VoiceSkript] Écoute démarrée pour "
-                + player.getName() + " — " + rules.size() + " règle(s)");
     }
 
     public void stopListening(Player player) {
@@ -119,38 +121,21 @@ public class VoiceListener implements VoicechatPlugin {
 
     // ── Rééchantillonnage 48kHz → 16kHz ──────────────────────────────────────
 
-    private byte[] resample48kTo16k(byte[] pcm48k) {
-        int out = (pcm48k.length / 2) / 3;
-        byte[] result = new byte[out * 2];
-        for (int i = 0; i < out; i++) {
-            int src = i * 6;
-            if (src + 1 < pcm48k.length) {
-                result[i*2]   = pcm48k[src];
-                result[i*2+1] = pcm48k[src+1];
-            }
+    private byte[] resampleAndConvert48kTo16k(short[] pcm48k) {
+        // On divise par 3 pour passer de 48kHz à 16kHz
+        int outLength = pcm48k.length / 3;
+        // 2 octets par short
+        byte[] result = new byte[outLength * 2]; 
+        
+        for (int i = 0; i < outLength; i++) {
+            // On prend 1 échantillon sur 3
+            short sample = pcm48k[i * 3]; 
+            
+            // On convertit le short (16 bits) en 2 bytes (Little Endian, requis par la plupart des systèmes Vosk)
+            result[i * 2] = (byte) (sample & 0xff);
+            result[(i * 2) + 1] = (byte) ((sample >> 8) & 0xff);
         }
         return result;
-    }
-
-    /**
-     * Ajoute une règle à un joueur déjà sur écoute sans réinitialiser sa session.
-     * Si le joueur n'est pas encore sur écoute, ouvre une session avec cette unique règle.
-     */
-    public void addRule(Player player, TriggerRule rule) {
-        UUID id = player.getUniqueId();
-        List<TriggerRule> existing = listenedRules.computeIfAbsent(id, k -> new ArrayList<>());
-        existing.add(rule);
-
-        // Recréer la session avec la liste mise à jour
-        StreamingSpeechSession old = sessions.remove(id);
-        if (old != null) old.close();
-
-        try {
-            StreamingSpeechSession session = recognizer.openSession(id, existing);
-            sessions.put(id, session);
-        } catch (IOException e) {
-            plugin.getLogger().severe("[VoiceSkript] Erreur lors de l'ajout de la règle : " + e.getMessage());
-        }
     }
 
     /**

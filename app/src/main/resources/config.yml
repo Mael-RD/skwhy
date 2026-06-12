@@ -1,4 +1,10 @@
 # Configuration minimale pour VoiceSkript
+modules:
+  fake_display: true
+  fake_pathfinding: false
+  random_stuff: true
+  voice: true
+
 voice:
   # Nom du dossier du modèle Vosk (présent dans plugins/SkWhy/model/)
   model: model
