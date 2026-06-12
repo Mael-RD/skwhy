@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -13,19 +19,27 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 
-import ch.njol.skript.doc.Name;
-import ch.njol.skript.doc.Description;
-import ch.njol.skript.doc.Examples;
-import ch.njol.skript.doc.Since;
-
-
-@Name("Display Scale/Translation")
-@Description("Récupère ou modifie l'échelle ou la translation d'un display.")
+@Name("Display Scale / Translation")
+@Description("Gets or sets the scale vector or translation offset of a fake display entity. Scale controls the size on each axis; translation offsets the display relative to its anchor point.")
 @Examples({
-    "set scale of {_d} to vector(2, 2, 2)",
-    "broadcast \"Scale: %scale of {_d}%\""
+    "set {_group} to a new fake display group at player",
+    "set {_display} to [a new fake item display]:",
+    "    set item of display to dirt",
+    "",
+    "# Read the current scale",
+    "set {_scale} to group scale of {_display}",
+    "",
+    "# Set the scale to double on all axes",
+    "set group scale of {_display} to vector(2, 2, 2)",
+    "",
+    "# Read the current translation offset",
+    "set {_offset} to group translation of {_display}",
+    "",
+    "# Shift the display upward by 1 block",
+    "set group translation of {_display} to vector(0, 1, 0)"
 })
 @Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class DisplayScale extends SimpleExpression<Vector> {
 
     private int matchedPattern;

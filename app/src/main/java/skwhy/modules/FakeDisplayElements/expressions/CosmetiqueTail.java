@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -37,6 +43,33 @@ import skwhy.data.CosmetiqueData;
  * 17 random [amplitude]             → amplitude du mouvement aléatoire
  * 18 random frequency               → fréquence du mouvement aléatoire
  */
+@Name("Cosmetic Tail Physics")
+@Description("Gets or sets any numeric physics or motion parameter of a cosmetic tail. All 19 parameters are individually accessible: rigidity, damping, velocity smoothing, velocity influences (forward/lateral/vertical/yaw), max deflection angle, depth deflection factor, impulse influences (forward/lateral/vertical), undulation amplitudes (x/y/z), undulation frequency and propagation, and random motion amplitude and frequency.")
+@Examples({
+    "set {_cosmetique} to a new cosmetique for player with hats false back false and tail true",
+    "",
+    "set tail rigidity of {_cosmetique} to 0.8",
+    "set tail damping of {_cosmetique} to 0.3",
+    "set tail velocity smoothing of {_cosmetique} to 0.5",
+    "set tail velocity forward of {_cosmetique} to 1.0",
+    "set tail velocity lateral of {_cosmetique} to 0.6",
+    "set tail velocity vertical of {_cosmetique} to 0.4",
+    "set tail velocity yaw of {_cosmetique} to 0.9",
+    "set tail max deflection angle of {_cosmetique} to 45",
+    "set tail depth deflection factor of {_cosmetique} to 1.2",
+    "set tail impulse forward of {_cosmetique} to 0.7",
+    "set tail impulse lateral of {_cosmetique} to 0.5",
+    "set tail impulse vertical of {_cosmetique} to 0.3",
+    "set tail undulation x of {_cosmetique} to 0.1",
+    "set tail undulation y of {_cosmetique} to 0.2",
+    "set tail undulation z of {_cosmetique} to 0.0",
+    "set tail undulation frequency of {_cosmetique} to 2.0",
+    "set tail undulation propagation of {_cosmetique} to 0.5",
+    "set tail random of {_cosmetique} to 0.05",
+    "set tail random frequency of {_cosmetique} to 1.5"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class CosmetiqueTail extends SimpleExpression<Number> {
 
     private int matchedPattern;

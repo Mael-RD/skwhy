@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.util.Kleenean;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 
@@ -37,6 +43,29 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+@Name("Create Display Group")
+@Description("Creates a new fake display group anchored at a location or attached to an entity. Optionally takes a list of display datas to populate the group with, and a list of players who will see it. Both are optional and can be combined freely.")
+@Examples({
+    "set {_display} to [a new fake item display]:",
+    "    set item of display to dirt",
+    "",
+    "# Pattern: group at a location with no displays and no viewers",
+    "set {_group} to a new fake display group at location of player",
+    "",
+    "# Pattern: group attached to an entity",
+    "set {_group} to a new fake display group at player",
+    "",
+    "# Pattern: group at a location, pre-populated with displays",
+    "set {_group} to a new fake display group at location of player from {_display}",
+    "",
+    "# Pattern: group at a location with specific viewers",
+    "set {_group} to a new fake display group at location of player with all players",
+    "",
+    "# Pattern: group with both displays and specific viewers",
+    "set {_group} to a new fake display group at location of player from {_display} with player"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class GroupCreate extends SimpleExpression<DisplayGroupData> {
 
     private Expression<DisplayData> displaysExpr;

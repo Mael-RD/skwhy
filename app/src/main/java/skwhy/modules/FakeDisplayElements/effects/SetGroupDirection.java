@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.effects;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -11,6 +17,19 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 
+@Name("Set Group Direction")
+@Description("Orients a display group toward a specific direction by setting its yaw and pitch values directly.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "",
+    "# Set direction using explicit yaw and pitch angles",
+    "set direction of {_group} to 90 and 45",
+    "",
+    "# Using the 'yaw and pitch' alias",
+    "set yaw and pitch of {_group} to 180 and 0"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class SetGroupDirection extends Effect {
 
     private Expression<DisplayGroupData> groupExpr;

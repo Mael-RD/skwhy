@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -14,6 +20,25 @@ import skwhy.data.DisplayData;
 import skwhy.data.ItemDisplayData;
 import skwhy.data.TextDisplayData;
 
+@Name("Display Numeric Properties")
+@Description("Gets or sets any numeric property of a display entity: glow color, shadow radius, shadow strength, view range, billboard mode (all types), display mode (item display only), background color, text alignment, and line width (text display only).")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "set {_display} to [a new fake item display]:",
+    "    set item of display to dirt",
+    "",
+    "set glow of {_display} to 16711680",
+    "set shadow radius of {_display} to 0.5",
+    "set shadow strength of {_display} to 1.0",
+    "set view range of {_display} to 64",
+    "set billboard of {_display} to 0",
+    "set display mode of {_display} to 5",
+    "set background color of {_display} to 0",
+    "set text alignment of {_display} to 0",
+    "set line width of {_display} to 200"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class DisplayNumber extends SimpleExpression<Number> {
 
     // ── Indices des patterns ───────────────────────────────────────────────

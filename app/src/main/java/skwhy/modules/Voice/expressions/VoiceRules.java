@@ -1,5 +1,11 @@
 package skwhy.modules.Voice.expressions;
 
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.RequiredPlugins;
+import ch.njol.skript.doc.Since;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -56,6 +62,15 @@ import java.util.List;
  *  Add et remove rechargent donc la session complète avec la nouvelle liste.
  *  C'est documenté dans les commentaires ci-dessous et acceptable selon les specs.
  */
+@Name("Voice Rules")
+@Description("Gets, sets, adds or removes voice recognition rules (phrases) for a specific player.")
+@Examples({
+    "set voice rules of player to \"hello\", \"help\" and \"stop\"",
+    "add \"jump\" to voice rules of player",
+    "clear voice rules of player"
+})
+@Since("1.1.0")
+@RequiredPlugins({"SimpleVoiceChat"})
 public class VoiceRules extends SimpleExpression<String> {
 
     public static void register(SkriptAddon addon) {

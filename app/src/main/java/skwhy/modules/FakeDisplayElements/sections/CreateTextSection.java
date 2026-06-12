@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.sections;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.Skript;
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.config.Node;
@@ -25,6 +31,38 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@Name("Create Fake Text Display")
+@Description("Creates a new fake text display entity using a configuration section. Accepted keys: " +
+    "text (String), " +
+    "seethrough/see_through/through (Boolean), " +
+    "alignment/align/textalignment (center/left/right or 0/1/2), " +
+    "background/backgroundcolor/bgcolor (Color, int RGB, or hex string), " +
+    "linewidth/width/line_width (Number), " +
+    "scale/translation (Vector or Number), " +
+    "rotation/leftrotation/rightrotation (Quaternionf), " +
+    "glow (int RGB), shadow/shadowradius/radius, strength/shadowstrength, range/viewrange, " +
+    "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay (Number).")
+@Examples({
+    "set {_display} to [a new fake text display]:",
+    "    text: \"&aHello world!\"",
+    "    seethrough: true",
+    "    alignment: center",
+    "    background: 0",
+    "    linewidth: 200",
+    "    scale: vector(1, 1, 1)",
+    "    translation: vector(0, 0.5, 0)",
+    "    billboard: 3",
+    "    glow: 0",
+    "    shadow: 0.5",
+    "    strength: 1",
+    "    range: 64",
+    "    interpolation: 5",
+    "    interpolationstart: 0",
+    "    rotation: {_quaternion}",
+    "    rightrotation: {_quaternion}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class CreateTextSection extends Section {
 
     private Expression<?> resultVar;

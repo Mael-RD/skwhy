@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.effects;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -13,6 +19,16 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 import skwhy.data.Quat4;
 
+@Name("Set Group Rotation")
+@Description("Sets the full 3D rotation of a display group using Euler angles (X, Y, Z in degrees). Internally converts to a quaternion using JOML's rotationXYZ method.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "",
+    "# Set rotation with pitch, yaw and roll in degrees",
+    "set group rotation of {_group} to 90, 45, 0"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class SetGroupRotation extends Effect {
 
     private Expression<DisplayGroupData> groupExpr;

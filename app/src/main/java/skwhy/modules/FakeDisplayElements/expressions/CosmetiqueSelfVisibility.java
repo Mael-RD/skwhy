@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -13,6 +19,22 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 
 import skwhy.data.CosmetiqueData;
 
+@Name("Cosmetic Self Visibility")
+@Description("Gets or sets whether the player wearing the cosmetic can see their own hat, back, or tail parts. Useful for hiding first-person overlapping cosmetics like masks or helmets.")
+@Examples({
+    "set {_cosmetique} to a new cosmetique for player with hats true back true and tail true",
+    "",
+    "# Hide the hat from the wearer's own view",
+    "set hats visibility of {_cosmetique} to false",
+    "",
+    "# Show the back part to the wearer",
+    "set back visibility in {_cosmetique} to true",
+    "",
+    "# Read the current tail visibility",
+    "set {_visible} to the tail visibility of {_cosmetique}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class CosmetiqueSelfVisibility extends SimpleExpression<Boolean> {
 
     private Expression<CosmetiqueData> cosmetiqueExpr;

@@ -22,13 +22,20 @@ public class DisplayGroup {
     public static void register() {
         Classes.registerClass(new ClassInfo<>(DisplayGroupData.class, "displaygroup")
             .name("Display Group")
-            .description("Un groupe de displays pouvant être contrôlées ensemble avec une position et une monture communes.")
-            .usage("créé via 'new display group'")
+            .description("A group of fake display entities (item, block, or text displays) that share a common location or attached entity, " +
+                "and are sent to specific players via packets. Supports transformation, rotation, mirroring, mounting, and viewer management. " +
+                "Can be serialized and restored across reloads when attached to a location.")
+            .usage("Created via 'a new fake display group at %location/entity%', optionally with displays and players.")
             .user("display ?groups?")
             .examples(
-                "set {_group} to new display group",
-                "add {_display} to {_group}",
-                "update {_group} with x = 100, y = 64"
+                "set {_display} to [a new fake item display]:",
+                "    item: dirt",
+                "set {_group} to a new fake display group at player from {_display} with all players",
+                "set group scale of {_group} to 2",
+                "set group location of {_group} to location of player",
+                "add player to viewers of {_group}",
+                "mirror {_group} on axes xyz",
+                "destroy display group {_group}"
             )
             .since("1.0.0")
             

@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -11,6 +17,21 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 
+@Name("Display Entity ID / UUID")
+@Description("Returns the numeric entity ID or the UUID string of a fake display entity. The entity ID is used for packet operations; the UUID is used for persistent identification.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "set {_display} to [a new fake item display]:",
+    "    set item of display to dirt",
+    "",
+    "# Get the numeric entity ID",
+    "set {_id} to entity id of {_display}",
+    "",
+    "# Get the UUID string",
+    "set {_uuid} to entity uuid of {_display}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class DisplayId extends SimpleExpression<Object> {
 
     // 0 → entity id  (Number)

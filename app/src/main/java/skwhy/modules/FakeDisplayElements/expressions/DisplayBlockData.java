@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -15,6 +21,21 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.BlockDisplayData;
 import skwhy.data.DisplayData;
 
+@Name("Display Block Data")
+@Description("Gets or sets the block data string of a block display entity. Only works on DisplayData instances that are of the BlockDisplay type.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "set {_display} to [a new fake item display]:",
+    "    set item of display to dirt",
+    "",
+    "# Read the block data",
+    "set {_data} to block data of {_display}",
+    "",
+    "# Change the displayed block",
+    "set blockdata of {_display} to stone"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class DisplayBlockData extends SimpleExpression<BlockData> {
 
     private Expression<DisplayData> displayExpr;

@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.effects;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -13,6 +19,24 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 import skwhy.data.DisplayGroupData;
 
+@Name("Mirror Transformation")
+@Description("Applies a mirror (axis flip) transformation to one or more display entities or display groups. Axes can be combined freely: X, Y, Z, XY, XZ, YZ, or XYZ.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "set {_display} to [a new fake item display]:",
+    "    set item of display to dirt",
+    "",
+    "# Mirror a group on a single axis",
+    "mirror {_group} on axis x",
+    "",
+    "# Mirror a display entity on two axes",
+    "mirror {_display} on axes xz",
+    "",
+    "# Mirror multiple targets on all axes",
+    "mirror {_group} on axes xyz"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class Mirror extends Effect {
 
     private Expression<?> targetExpr;

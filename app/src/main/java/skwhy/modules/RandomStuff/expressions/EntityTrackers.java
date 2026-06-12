@@ -1,5 +1,10 @@
 package skwhy.modules.RandomStuff.expressions;
 
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Since;
+
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -18,6 +23,13 @@ import java.util.Collection;
  * Expression pour obtenir tous les joueurs qui "trackent" une entité.
  * Note : Nécessite Paper (ou une version de Bukkit récente supportant getTrackers).
  */
+@Name("Entity Trackers")
+@Description("Gets a list of all players who are currently tracking (seeing) a specific entity.")
+@Examples({
+    "set {_trackers::*} to trackers of target entity",
+    "broadcast \"This entity is seen by %size of {_trackers::*}% players.\""
+})
+@Since("1.0.0")
 public class EntityTrackers extends SimpleExpression<Player> {
 
     private Expression<Entity> entityExpr;

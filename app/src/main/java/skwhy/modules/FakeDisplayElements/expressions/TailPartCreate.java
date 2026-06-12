@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -18,6 +24,22 @@ import skwhy.data.Vec3;
 
 import org.bukkit.util.Vector;
 
+@Name("Create Tail Part")
+@Description("Creates a new tail node linked to a display group with a positional offset. Optionally connects it to a parent tail node to build a chain. If no parent is provided, the node becomes the root of a new tail structure.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "",
+    "# Create a root tail node (no parent)",
+    "set {_root} to a new tailpart from {_group} with offset vector(0, 1, 0)",
+    "",
+    "# Create a child node connected to the root",
+    "set {_child} to a new tailpart from {_group} with offset vector(0, 0.5, 0) connected to parent {_root}",
+    "",
+    "# Create a grandchild node",
+    "set {_grandchild} to new tail part from {_group} with offset vector(0, 0.3, 0), connected to parent {_child}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class TailPartCreate extends SimpleExpression<TailNode> {
 
     // Éléments requis de base

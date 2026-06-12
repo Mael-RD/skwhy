@@ -1,5 +1,10 @@
 package skwhy.modules.RandomStuff.expressions;
 
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Since;
+
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -21,6 +26,13 @@ import java.util.List;
  * Pattern : [all] [the] [entities] tracked by %player%
  * Retourne toutes les entités trackées (visibles) par ce joueur.
  */
+@Name("Tracked Entities")
+@Description("Gets a list of all entities currently being tracked (seen) by a specific player.")
+@Examples({
+    "set {_entities::*} to tracked entities of player",
+    "kill all tracked entities of target"
+})
+@Since("1.0.0")
 public class TrackedEntities extends SimpleExpression<Entity> {
 
     private Expression<Player> playerExpr;

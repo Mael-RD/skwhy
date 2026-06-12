@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -16,6 +22,33 @@ import skwhy.data.DisplayGroupData;
 import java.util.ArrayList;
 import java.util.List;
 
+@Name("Clone Displays")
+@Description("Clones one or more display datas or display groups, optionally applying a mirror transformation on one or more axes during cloning. Without an axis, produces an exact copy.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "set {_display} to [a new fake item display]:",
+    "    set item of display to dirt",
+    "",
+    "# Clone a display without mirroring",
+    "set {_clone} to fake display clone of {_display}",
+    "",
+    "# Clone a group without mirroring",
+    "set {_groupClone} to display clone of {_group}",
+    "",
+    "# Clone and mirror on X axis",
+    "set {_mirrorX} to fake display clone x of {_display}",
+    "",
+    "# Clone and mirror on Y axis",
+    "set {_mirrorY} to display clone y of {_group}",
+    "",
+    "# Clone and mirror on XY axes",
+    "set {_mirrorXY} to fake display clone xy of {_display}",
+    "",
+    "# Clone and mirror on all axes",
+    "set {_mirrorXYZ} to display clone xyz of {_group}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class CloneDisplays extends SimpleExpression<Object> {
 
     private Expression<?> targets;

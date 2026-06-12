@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -28,6 +34,17 @@ import skwhy.data.TextDisplayData;
 import skwhy.data.Vec3;
 import skwhy.data.Quat4;
 
+@Name("Display From Real Entity")
+@Description("Converts a real Bukkit display entity (BlockDisplay, ItemDisplay, or TextDisplay) into a fake DisplayData object that can be used in display groups and cosmetics.")
+@Examples({
+    "# Convert a real display entity into fake display data",
+    "set {_display} to a fake display from target entity",
+    "",
+    "# Use the resulting display data in a group",
+    "set {_group} to a new fake display group at player from {_display}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class DisplayFromReal extends SimpleExpression<DisplayData> {
 
     private Expression<Entity> entityExpr;

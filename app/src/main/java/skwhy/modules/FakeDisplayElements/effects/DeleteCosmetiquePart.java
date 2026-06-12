@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.effects;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -12,6 +18,25 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 
 import skwhy.data.CosmetiqueData;
 
+@Name("Delete Cosmetic Part")
+@Description("Removes a specific part (hat, back, or tail) from a cosmetic. The hat pattern supports an optional slot identifier to remove only a specific hat layer.")
+@Examples({
+    "set {_cosmetique} to a new cosmetique for player",
+    "",
+    "# Remove a specific hat in a given slot",
+    "delete the hat of {_cosmetique} in slot \"wings\"",
+    "",
+    "# Remove all hats at once",
+    "remove the hat of {_cosmetique}",
+    "",
+    "# Remove the back part",
+    "delete the back of {_cosmetique}",
+    "",
+    "# Remove the tail part",
+    "remove the tail of {_cosmetique}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class DeleteCosmetiquePart extends Effect {
 
     private int patternIndex;

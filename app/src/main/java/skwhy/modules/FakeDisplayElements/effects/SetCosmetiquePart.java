@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.effects;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -14,6 +20,24 @@ import skwhy.data.CosmetiqueData;
 import skwhy.data.DisplayGroupData;
 import skwhy.data.Tail.TailNode;
 
+@Name("Set Cosmetic Part")
+@Description("Sets or replaces a specific part of a cosmetic: a hat (linked to a display group, a slot name, and rotation flags), a back (linked to a display group and a type string), or a tail (linked to a tail node).")
+@Examples({
+    "set {_cosmetique} to a new cosmetique for player",
+    "set {_group} to a new fake display group at player",
+    "set {_tailpart} to a new tailpart from {_group} with offset vector(0, 1, 0)",
+    "",
+    "# Pattern 0: set a hat with slot and rotation options",
+    "set hat of {_cosmetique} to {_group} in slot \"halo\" with vertical rotation true, and horizontal rotation false",
+    "",
+    "# Pattern 1: set the back part with a type identifier",
+    "set back of {_cosmetique} to {_group} with type \"wings\"",
+    "",
+    "# Pattern 2: set the tail part using a tail node",
+    "set tail of {_cosmetique} to {_tailpart}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class SetCosmetiquePart extends Effect {
 
     private int patternIndex;

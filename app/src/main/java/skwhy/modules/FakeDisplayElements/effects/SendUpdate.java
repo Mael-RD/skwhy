@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.effects;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -13,6 +19,20 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 import skwhy.data.CosmetiqueData; // N'oublie pas l'import
 
+@Name("Send Metadata Update")
+@Description("Forces a metadata packet update for a display group or a cosmetic, pushing the latest state to all relevant players.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "set {_cosmetique} to a new cosmetique for player",
+    "",
+    "# Send a metadata update for a display group",
+    "send update {_group}",
+    "",
+    "# Send a metadata update for a cosmetic",
+    "send update {_cosmetique}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class SendUpdate extends Effect {
 
     // On utilise Object pour accepter les deux types

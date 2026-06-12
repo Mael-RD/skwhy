@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -16,6 +22,29 @@ import skwhy.data.DisplayGroupData;
 import skwhy.data.Vec3;
 import skwhy.data.Quat4;
 
+@Name("Group Transformation")
+@Description("Gets or sets the center, translation, rotation, or scale of a display group. Center and translation return a Vector; rotation returns a Quaternionf; scale returns a Number.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "",
+    "# Get and set the group center (pivot point)",
+    "set {_center} to group center of {_group}",
+    "set group center of {_group} to vector(0, 1, 0)",
+    "",
+    "# Get and set the translation offset",
+    "set {_translation} to group translation of {_group}",
+    "set group translation of {_group} to vector(0, 0.5, 0)",
+    "",
+    "# Get and set the rotation quaternion",
+    "set {_rotation} to group rotation of {_group}",
+    "set group rotation of {_group} to {_quaternion}",
+    "",
+    "# Get and set the uniform scale factor",
+    "set {_scale} to group scale of {_group}",
+    "set group scale of {_group} to 2"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class GroupTransformation extends SimpleExpression<Object> {
 
     // 0 = center      → Vector

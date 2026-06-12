@@ -1,5 +1,11 @@
 package skwhy.modules.Voice.conditions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.RequiredPlugins;
+import ch.njol.skript.doc.Since;
+
 import ch.njol.skript.lang.Condition;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -10,18 +16,30 @@ import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
+import org.skriptlang.skript.docs.Origin;
 
 import skwhy.modules.VoiceModule;
 import skwhy.voice.VoiceListener;
 
+@Name("Has Voice")
+@Description("Checks if one or more players are currently connected and using the voice module.")
+@Examples({
+    "if player has voice:",
+    "\tsend \"You are using voice chat!\"",
+    "if all players have voice:",
+    "\tsend \"Everyone is on voice chat.\""
+})
+@Since("1.1.0")
+@RequiredPlugins({"SimpleVoiceChat"})
 public class HasVoice extends Condition {
 
-    // ── Enregistrement de la condition (Nouvelle API Skript 2.14+) ────────────
+    // ── Enregistrement de la condition ─────────────────────────────────────────
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.CONDITION,
             SyntaxInfo.builder(HasVoice.class)
+                .origin(Origin.of(addon))
                 .addPattern("%players% (has|have) voice")
                 .addPattern("%players% (hasn't|haven't|do[es] not have|do[es]n't have) voice")
                 .build()
@@ -38,11 +56,7 @@ public class HasVoice extends Condition {
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed, ParseResult parseResult) {
         this.playersExpr = (Expression<Player>) exprs[0];
-        
-        // matchedPattern == 0 correspond au pattern positif ("has voice")
-        // matchedPattern == 1 correspond au pattern négatif ("hasn't voice")
         setNegated(matchedPattern == 1);
-        
         return true;
     }
 
@@ -58,13 +72,11 @@ public class HasVoice extends Condition {
 
         for (Player player : players) {
             boolean isListening = listener.isListening(player);
-            
-            // Si la condition attendue n'est pas remplie pour un seul joueur, on retourne false
+            // Logique correcte : si isListening != isNegated, la condition est validée pour ce joueur
             if (isListening == isNegated()) {
                 return false;
             }
         }
-        
         return true;
     }
 

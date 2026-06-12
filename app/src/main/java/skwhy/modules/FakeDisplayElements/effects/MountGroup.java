@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.effects;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -18,6 +24,30 @@ import skwhy.data.CosmetiqueData;
 import java.util.Arrays;
 import java.util.List;
 
+@Name("Mount Group")
+@Description("Mounts or dismounts fake display groups or cosmetics onto entities or virtual entity IDs. Supports four patterns: simple self-mount, mount on a real entity, mount on a virtual ID at a location, and packet-based mount/dismount for specific players.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "set {_cosmetique} to a new cosmetique for player",
+    "",
+    "# Pattern 0: make a cosmetic or group self-mount",
+    "make fake {_cosmetique} mount",
+    "make fake {_group} mount",
+    "",
+    "# Pattern 1: mount a group onto a real entity",
+    "make fake {_group} mount on player",
+    "",
+    "# Pattern 2: mount a group onto a virtual entity ID at a location",
+    "make fake {_group} mount on 12345 at location of player",
+    "",
+    "# Pattern 3: packet-based mount for specific players",
+    "make fake {_group} mount on player for all players",
+    "",
+    "# Pattern 3: packet-based dismount for specific players",
+    "make fake {_group} dismount on player for player"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class MountGroup extends Effect {
 
     private Expression<Object> targetsExpr;

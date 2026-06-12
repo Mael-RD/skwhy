@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.effects;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -11,6 +17,19 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 
+@Name("Destroy Display Group")
+@Description("Destroys one or more fake display entity groups, removing them from all targeted players via packets.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "",
+    "# Destroy a single group",
+    "destroy display group {_group}",
+    "",
+    "# Destroy multiple groups at once",
+    "destroy group {_groups::*}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class DestroyGroup extends Effect {
 
     private Expression<DisplayGroupData> groupExpr;

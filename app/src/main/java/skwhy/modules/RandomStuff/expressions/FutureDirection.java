@@ -1,5 +1,10 @@
 package skwhy.modules.RandomStuff.expressions;
 
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Since;
+
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -12,6 +17,13 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.FutureRotationTracker;
 
+@Name("Future Direction")
+@Description("Calculates the future direction or position of an entity based on its current velocity.")
+@Examples({
+    "set {_futurePos} to the future direction of target",
+    "teleport player to future direction of event-entity"
+})
+@Since("1.0.0")
 public class FutureDirection extends SimpleExpression<Float> {
 
     private Expression<Player> playerExpr;

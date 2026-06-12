@@ -77,12 +77,18 @@ public class Display {
     private static void registerDisplayDataClass() {
         Classes.registerClass(new ClassInfo<>(DisplayData.class, "displaydata")
             .name("Display Data")
-            .description("Représente les données d'une display entity Minecraft.")
-            .usage("obtenu via les expressions de skwhy")
+            .description("Base type representing a fake display entity. " +
+                "Can be a block, item, or text display. " +
+                "Cannot be parsed from text — instances are created via the dedicated section syntax for each subtype.")
+            .usage("Created via 'set %objects% to a new fake block/item/text display'.")
             .user("display ?datas?")
             .examples(
-                "set {_data} to new block display",
-                "update {_data} with x = 100, y = 64"
+                "set {_display} to [a new fake item display]:",
+                "    item: dirt",
+                "set {_id} to entity id of {_display}",
+                "set {_uuid} to entity uuid of {_display}",
+                "set group scale of {_display} to vector(2, 2, 2)",
+                "set group translation of {_display} to vector(0, 1, 0)"
             )
             .since("1.0.0")
             
@@ -153,12 +159,19 @@ public class Display {
     private static void registerBlockDisplayData() {
         Classes.registerClass(new ClassInfo<>(BlockDisplayData.class, "blockdisplay")
             .name("Block Display")
-            .description("Une display entity qui affiche un bloc.")
-            .usage("créée via 'new block display'")
+            .description("A fake display entity that renders a block. " +
+                "Supports all common display properties (scale, translation, rotations, glow, shadow, view range, billboard) " +
+                "plus a block data string that defines which block is shown. " +
+                "Fully serializable for persistent storage in Skript variables.")
+            .usage("Created via 'set %objects% to a new fake block display'.")
             .user("display ?block ?datas?")
             .examples(
-                "set {_display} to new block display",
-                "set block data of {_display} to \"OAK_LOG[axis=y]\""
+                "set {_display} to [a new fake block display]:",
+                "    block: stone",
+                "    scale: vector(1, 1, 1)",
+                "    shadow: 0.5",
+                "set block data of {_display} to oak_log",
+                "set group scale of {_display} to vector(2, 2, 2)"
             )
             .since("1.0.0")
             
@@ -240,12 +253,20 @@ public class Display {
     private static void registerItemDisplayData() {
         Classes.registerClass(new ClassInfo<>(ItemDisplayData.class, "itemdisplay")
             .name("Item Display")
-            .description("Une display entity qui affiche un item.")
-            .usage("créée via 'new item display'")
+            .description("A fake display entity that renders an item or block item model. " +
+                "Supports all common display properties (scale, translation, rotations, glow, shadow, view range, billboard) " +
+                "plus an item stack identifier and a display mode (none/thirdperson/firstperson/head/gui/ground/fixed). " +
+                "Also supports player head skin values via the 'head' key. " +
+                "Fully serializable for persistent storage in Skript variables.")
+            .usage("Created via 'set %objects% to a new fake item display'.")
             .user("display ?item ?datas?")
             .examples(
-                "set {_display} to new item display",
-                "set item stack of {_display} to \"DIAMOND_SWORD\""
+                "set {_display} to [a new fake item display]:",
+                "    item: dirt",
+                "    scale: vector(1, 1, 1)",
+                "    mode: head",
+                "set item of {_display} to diamond sword",
+                "set display mode of {_display} to 5"
             )
             .since("1.0.0")
             
@@ -329,12 +350,22 @@ public class Display {
     private static void registerTextDisplayData() {
         Classes.registerClass(new ClassInfo<>(TextDisplayData.class, "textdisplay")
             .name("Text Display")
-            .description("Une display entity qui affiche du texte.")
-            .usage("créée via 'new text display'")
+            .description("A fake display entity that renders formatted text. " +
+                "Supports all common display properties (scale, translation, rotations, glow, shadow, view range, billboard) " +
+                "plus text content, background color, text alignment (center/left/right), line width, and see-through mode. " +
+                "Fully serializable for persistent storage in Skript variables.")
+            .usage("Created via 'set %objects% to a new fake text display'.")
             .user("display ?text ?datas?")
             .examples(
-                "set {_display} to new text display",
-                "set text of {_display} to \"Hello World\""
+                "set {_display} to [a new fake text display]:",
+                "    text: \"&aHello world!\"",
+                "    seethrough: true",
+                "    alignment: center",
+                "    background: 0",
+                "    linewidth: 200",
+                "set text of {_display} to \"&cUpdated!\"",
+                "set see through of {_display} to false",
+                "set background color of {_display} to 255"
             )
             .since("1.0.0")
             

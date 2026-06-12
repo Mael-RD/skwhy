@@ -16,13 +16,16 @@ public class Cosmetique {
     public static void register() {
         Classes.registerClass(new ClassInfo<>(CosmetiqueData.class, "cosmetique")
             .name("Cosmetique")
-            .description("Un cosmetique pouvant être contrôlé avec une position et une monture communes.")
-            .usage("créé via 'new cosmetique'")
+            .description("A cosmetic object that groups hat, back, and tail parts for a specific entity or player. " +
+                "All parts share a common mount and scale. Cannot be parsed from text.")
+            .usage("Created via 'a new cosmetique for %entity%' or 'a new cosmetique for %player% with hats %boolean% back %boolean% and tail %boolean%'.")
             .user("cosmetiques?")
             .examples(
-                "set {_group} to new display group",
-                "add {_display} to {_group}",
-                "update {_group} with x = 100, y = 64"
+                "set {_cosmetique} to a new cosmetique for player",
+                "set {_cosmetique} to a new cosmetique for player with hats true back true and tail true",
+                "set cosmetique scale of {_cosmetique} to 1.5",
+                "add player to viewers of {_cosmetique}",
+                "destroy cosmetique {_cosmetique}"
             )
             .since("1.0.0")
             

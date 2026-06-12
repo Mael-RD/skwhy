@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -14,6 +20,20 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 
 import skwhy.data.CosmetiqueData;
 
+@Name("Create Cosmetic")
+@Description("Creates a new cosmetic data object attached to an entity or player. When targeting a player, three booleans enable or disable the hat, back, and tail slots respectively. Non-player entities always have all three slots disabled.")
+@Examples({
+    "# Pattern 0: create a cosmetic for a non-player entity",
+    "set {_cosmetique} to a new cosmetique for target entity",
+    "",
+    "# Pattern 1: create a cosmetic for a player with all slots enabled",
+    "set {_cosmetique} to a new cosmetique for player with hats true, back true, and tail true",
+    "",
+    "# Pattern 1: create a cosmetic with only the hat slot enabled",
+    "set {_cosmetique} to a new cosmetique for player with hats true back false, and tail false"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class CosmetiqueCreate extends SimpleExpression<CosmetiqueData> {
 
     private int patternIndex;

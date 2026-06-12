@@ -1,5 +1,10 @@
 package skwhy.modules.RandomStuff.expressions;
 
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Since;
+
 import ch.njol.skript.Skript;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -17,6 +22,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+@Name("Split with Regex")
+@Description("Splits a text into multiple parts using a regular expression (Regex).")
+@Examples({
+    "set {_parts::*} to \"apple,banana;orange\" split at regex \"[,;]\"",
+    "broadcast \"%{_parts::1}%\""
+})
+@Since("1.0.0")
 public class SplitRegex extends SimpleExpression<String> {
 
     private Expression<String> inputExpr;

@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -13,6 +19,19 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 
+@Name("Group Location")
+@Description("Gets or sets the current location of a fake display group. Setting the location will teleport the group to the new position.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "",
+    "# Read the group's current location",
+    "set {_loc} to group location of {_group}",
+    "",
+    "# Teleport the group to a new location",
+    "set group location of {_group} to location of player"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class GroupLocation extends SimpleExpression<Location> {
 
     private Expression<DisplayGroupData> groupExpr;

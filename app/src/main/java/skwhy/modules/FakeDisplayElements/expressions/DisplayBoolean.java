@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -13,6 +19,21 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 import skwhy.data.TextDisplayData;
 
+@Name("Display See Through")
+@Description("Gets or sets the see-through property of a text display entity. When true, the text is visible through blocks. Only works on DisplayData instances of the TextDisplay type.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "set {_display} to [a new fake item display]:",
+    "    set item of display to dirt",
+    "",
+    "# Read the see-through state",
+    "set {_visible} to see through of {_display}",
+    "",
+    "# Make the text visible through walls",
+    "set seethrough of {_display} to true"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class DisplayBoolean extends SimpleExpression<Boolean> {
 
     // 0  outline            → TextDisplayData seulement

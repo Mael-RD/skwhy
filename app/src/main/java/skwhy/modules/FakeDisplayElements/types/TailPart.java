@@ -17,12 +17,17 @@ public class TailPart {
     public static void register() {
         Classes.registerClass(new ClassInfo<>(TailNode.class, "tailpart")
             .name("Tail Part")
-            .description("Représente un segment (nœud) individuel d'une queue animée (Tail).")
-            .usage("Obtenu via des expressions spécifiques de gestion des queues.")
+            .description("Represents a single segment (node) in an animated tail structure. " +
+                "Nodes are chained together from a root node outward; each node references a display group and a positional offset. " +
+                "Cannot be parsed from text and is not persistently serializable.")
+            .usage("Created via 'a new tailpart from %displaygroup% with offset %vector%', optionally connected to a parent tail part.")
             .user("tail ?parts?")
             .examples(
-                "set {_root} to root part of {_tail}",
-                "set {_parent} to parent of tailpart {_part}"
+                "set {_group} to a new fake display group at player",
+                "set {_root} to a new tailpart from {_group} with offset vector(0, 1, 0)",
+                "set {_child} to a new tailpart from {_group} with offset vector(0, 0.5, 0) connected to parent {_root}",
+                "set tail of {_cosmetique} to {_root}",
+                "set tail rotation of {_cosmetique} to {_quaternions::*}"
             )
             .since("1.0.0")
 

@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -20,6 +26,22 @@ import skwhy.data.CosmetiqueData;
  *
  * Applique le scale à tous les éléments du cosmétique (chapeaux, dos, queue).
  */
+@Name("Cosmetic Scale")
+@Description("Gets or sets the uniform scale factor of a cosmetic. The scale is applied to all parts of the cosmetic (hats, back, tail).")
+@Examples({
+    "set {_cosmetique} to a new cosmetique for player",
+    "",
+    "# Read the current scale",
+    "set {_scale} to cosmetic scale of {_cosmetique}",
+    "",
+    "# Set the cosmetic to half size",
+    "set cosmetique scale of {_cosmetique} to 0.5",
+    "",
+    "# Double the size",
+    "set the cosmetic scale of {_cosmetique} to 2"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class CosmetiqueScale extends SimpleExpression<Number> {
 
     private Expression<CosmetiqueData> cosmetiqueExpr;

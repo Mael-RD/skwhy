@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import org.bukkit.entity.Player;
 import ch.njol.skript.lang.Expression;
@@ -18,6 +24,26 @@ import skwhy.data.CosmetiqueData;
 import java.util.List;
 import java.util.ArrayList;
 
+@Name("Group Viewers")
+@Description("Gets, sets, adds, or removes the players who can see a display group or a cosmetic. Supports SET, ADD, REMOVE, and REMOVE_ALL change modes.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "set {_cosmetique} to a new cosmetique for player",
+    "",
+    "# Add a viewer to a group",
+    "add player to viewers of {_group}",
+    "",
+    "# Remove a viewer from a cosmetic",
+    "remove player from viewers of {_cosmetique}",
+    "",
+    "# Replace all viewers of a group with a single player",
+    "set viewers of {_group} to player",
+    "",
+    "# Clear all viewers",
+    "remove all from viewers of {_cosmetique}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class GroupPlayers extends SimpleExpression<Player> {
 
     private Expression<Object> targetExpr;

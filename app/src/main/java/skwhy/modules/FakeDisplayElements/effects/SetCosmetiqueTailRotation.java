@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.effects;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -25,6 +31,16 @@ import java.util.List;
  * <p>Usage : set tail rotation of %cosmetique% to %numbers%
  * Exemple : set tail rotation of my_cosmetique to {0.1, 0.2, 0.3, 0.9, 0.0, 0.0, 0.5, 0.87}
  */
+@Name("Set Cosmetic Tail Rotation")
+@Description("Sets the rest rotations for all segments of a cosmetic's tail by providing a list of Quaternionf values. Each quaternion corresponds to one tail segment, iterated in depth-first order (DFS).")
+@Examples({
+    "set {_cosmetique} to a new cosmetique for player",
+    "",
+    "# Apply a list of quaternion rotations to the tail segments",
+    "set tail rotation of {_cosmetique} to {_quaternions::*}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class SetCosmetiqueTailRotation extends Effect {
 
     private Expression<CosmetiqueData> cosmetiqueExpr;

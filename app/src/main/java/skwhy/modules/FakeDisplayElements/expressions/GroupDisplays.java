@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -13,6 +19,27 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 import skwhy.data.DisplayGroupData;
 
+@Name("Group Displays")
+@Description("Gets, adds, or removes the display entities contained in a display group. Supports ADD, REMOVE, and REMOVE_ALL change modes.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "set {_display} to [a new fake item display]:",
+    "    set item of display to dirt",
+    "",
+    "# Add a display to the group",
+    "add {_display} to displays of {_group}",
+    "",
+    "# Remove a specific display from the group",
+    "remove {_display} from displays of {_group}",
+    "",
+    "# Clear all displays from the group",
+    "remove all from displays of {_group}",
+    "",
+    "# Read the current displays",
+    "set {_displays::*} to displays of {_group}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class GroupDisplays extends SimpleExpression<DisplayData> {
 
     private Expression<DisplayGroupData> groupExpr;

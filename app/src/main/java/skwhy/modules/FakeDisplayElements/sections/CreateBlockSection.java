@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.sections;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.Skript;
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.config.Node;
@@ -25,6 +31,30 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@Name("Create Fake Block Display")
+@Description("Creates a new fake block display entity using a configuration section. Accepted keys: " +
+    "block (ItemType, ItemStack, BlockData, Material, or String block data), " +
+    "scale/translation (Vector or Number), " +
+    "rotation/leftrotation/rightrotation (Quaternionf), " +
+    "glow (int RGB), shadow/shadowradius/radius, strength/shadowstrength, range/viewrange, " +
+    "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay (Number).")
+@Examples({
+    "set {_display} to [a new fake block display]:",
+    "    block: stone",
+    "    scale: vector(1, 1, 1)",
+    "    translation: vector(0, 0, 0)",
+    "    billboard: 0",
+    "    glow: 0",
+    "    shadow: 0.5",
+    "    strength: 1",
+    "    range: 64",
+    "    interpolation: 5",
+    "    interpolationstart: 0",
+    "    rotation: {_quaternion}",
+    "    rightrotation: {_quaternion}"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class CreateBlockSection extends Section {
 
     private Expression<?> resultVar;

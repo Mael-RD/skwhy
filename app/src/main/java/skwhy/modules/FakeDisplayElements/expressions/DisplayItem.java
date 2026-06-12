@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.aliases.ItemType;
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
@@ -18,6 +24,24 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 import skwhy.data.ItemDisplayData;
 
+@Name("Display Item")
+@Description("Gets or sets the item displayed by an item display entity. Only works on DisplayData instances of the ItemDisplay type. Accepts ItemType or ItemStack on set.")
+@Examples({
+    "set {_group} to a new fake display group at player",
+    "set {_display} to [a new fake item display]:",
+    "    set item of display to dirt",
+    "",
+    "# Read the current item",
+    "set {_item} to item of {_display}",
+    "",
+    "# Change the displayed item",
+    "set item of {_display} to diamond sword",
+    "",
+    "# Change using item stack expression",
+    "set itemstack of {_display} to stone"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class DisplayItem extends SimpleExpression<ItemType> {
 
     private Expression<DisplayData> displayExpr;

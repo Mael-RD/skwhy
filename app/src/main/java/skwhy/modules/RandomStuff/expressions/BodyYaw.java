@@ -1,5 +1,11 @@
 package skwhy.modules.RandomStuff.expressions;
 
+
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Since;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -14,6 +20,13 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 
 import skwhy.BodyTracker;
 
+@Name("Body Yaw")
+@Description("Gets or sets the body yaw rotation of an entity.")
+@Examples({
+    "set the body yaw of target to 90",
+    "broadcast \"Your body yaw is %body yaw of player%\""
+})
+@Since("1.0.0")
 public class BodyYaw extends SimpleExpression<Float> {
 
     private Expression<Player> playerExpr;

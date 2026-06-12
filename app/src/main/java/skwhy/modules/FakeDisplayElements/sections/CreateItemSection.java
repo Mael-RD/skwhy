@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.sections;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.Skript;
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.config.Node;
@@ -25,6 +31,38 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@Name("Create Fake Item Display")
+@Description("Creates a new fake item display entity using a configuration section. Accepted keys: " +
+    "item/itemstack/material (ItemType, ItemStack, or Material), " +
+    "head (String — sets item to PLAYER_HEAD and applies the skin value; mutually exclusive with item), " +
+    "mode/displaymode (none/thirdperson_lefthand/thirdperson_righthand/firstperson_lefthand/firstperson_righthand/head/gui/ground/fixed, or 0–8), " +
+    "scale/translation (Vector or Number), " +
+    "rotation/leftrotation/rightrotation (Quaternionf), " +
+    "glow (int RGB), shadow/shadowradius/radius, strength/shadowstrength, range/viewrange, " +
+    "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay (Number).")
+@Examples({
+    "# Create a basic item display showing dirt",
+    "set {_display} to [a new fake item display]:",
+    "    item: dirt",
+    "    scale: vector(1, 1, 1)",
+    "    translation: vector(0, 0.5, 0)",
+    "    billboard: 0",
+    "    glow: 0",
+    "    shadow: 0.5",
+    "    strength: 1",
+    "    range: 64",
+    "    interpolation: 5",
+    "    interpolationstart: 0",
+    "    mode: head",
+    "",
+    "# Create a player head display using a skin value",
+    "set {_display} to [a new fake item display]:",
+    "    head: eyJ0ZXh0dXJlcy...",
+    "    scale: vector(1, 1, 1)",
+    "    mode: gui"
+})
+@Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class CreateItemSection extends Section {
 
     private Expression<?> resultVar;

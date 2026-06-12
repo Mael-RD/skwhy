@@ -1,5 +1,11 @@
 package skwhy.modules.FakeDisplayElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -15,18 +21,27 @@ import org.joml.Quaternionf;
 import skwhy.data.DisplayData;
 import skwhy.data.Quat4;
 
-import ch.njol.skript.doc.Name;
-import ch.njol.skript.doc.Description;
-import ch.njol.skript.doc.Examples;
-import ch.njol.skript.doc.Since;
-
 @Name("Display Rotation")
-@Description("Récupère ou modifie la rotation gauche ou droite d'une display entity.")
+@Description("Gets or sets the left or right rotation quaternion of a fake display entity. Both rotations are represented as Quat4 objects and affect how the display is oriented in the world.")
 @Examples({
-    "set left rotation of {_d} to new quat(0, 0, 0, 1)",
-    "set {_r} to right rotation of {_d}"
+    "set {_group} to a new fake display group at player",
+    "set {_display} to [a new fake item display]:",
+    "    set item of display to dirt",
+    "",
+    "# Read the left rotation",
+    "set {_leftRot} to left rotation of {_display}",
+    "",
+    "# Read the right rotation",
+    "set {_rightRot} to right rotation of {_display}",
+    "",
+    "# Set a new left rotation",
+    "set left rotation of {_display} to {_quaternion}",
+    "",
+    "# Set a new right rotation",
+    "set right rotation of {_display} to {_quaternion}"
 })
 @Since("1.0.0")
+@RequiredPlugins("PacketEvents")
 public class DisplayRotation extends SimpleExpression<Quat4> {
 
     private int matchedPattern;

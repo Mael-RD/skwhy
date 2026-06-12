@@ -14,6 +14,7 @@ import ch.njol.skript.lang.util.SimpleEvent;
 
 import skwhy.modules.Voice.expressions.*;
 import skwhy.modules.Voice.events.*;
+import skwhy.modules.Voice.conditions.*;
 
 import skwhy.voice.SpeechRecognizer;
 import skwhy.voice.VoiceListener;
@@ -54,15 +55,24 @@ public class VoiceModule implements AddonModule {
         // Expressions
         VoiceRules.register(addon);
 
+        // Conditions
+        HasVoice.register(addon);
+
         // --- 1. ENREGISTREMENT DE LA SYNTAXE ---
         SyntaxRegistry syntaxRegistry = this.moduleRegistry(addon);
         
         syntaxRegistry.register(
             BukkitSyntaxInfos.Event.KEY,
             BukkitSyntaxInfos.Event.builder(SimpleEvent.class, "Voice Phrase Detected")
-                .addEvent(VoicePhraseDetected.class) // <--- LA VRAIE MÉTHODE
-                .addPattern("voice phrase [detected]") // (Méthode héritée de SyntaxInfo.Builder)
-                .addDescription("Se déclenche quand une phrase vocale est reconnue par Vosk.") // <--- CORRIGÉ ICI AUSSI
+                .addEvent(VoicePhraseDetected.class)
+                .addPattern("voice phrase [detected]")
+                .addDescription("Fires when a voice phrase is recognized by Vosk for a player.")
+                .addExamples(
+                    "on voice phrase detected:",
+                    "\tbroadcast \"%player% said: %event-string%\""
+                )
+                .addSince("1.1.0")
+                .addRequiredPlugins("SimpleVoiceChat")
                 .build()
         );
 
