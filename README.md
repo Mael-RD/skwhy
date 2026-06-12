@@ -15,7 +15,6 @@
 
 ![Skript](https://img.shields.io/badge/Skript-addon-4B8BBE?style=flat-square&logo=java&logoColor=white)
 ![Minecraft](https://img.shields.io/badge/Minecraft-Java-62B542?style=flat-square)
-![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 ![Status](https://img.shields.io/badge/status-active%20development-orange?style=flat-square)
 
 </div>
