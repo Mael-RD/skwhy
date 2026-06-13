@@ -6,9 +6,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.skriptlang.skript.addon.SkriptAddon;
 
-import skwhy.data.FakePathFinding;
+import skwhy.pathfinder.Navigation;
 import skwhy.modules.FakeDisplayModule;
-import skwhy.modules.FakePathFindingModule;
+import skwhy.modules.NavigationModule;
 import skwhy.modules.RandomStuffModule;
 import skwhy.modules.VoiceModule;
 
@@ -60,8 +60,8 @@ public class SkWhy extends JavaPlugin {
             getLogger().info("[VoiceSkript] Module FakeDisplay désactivé dans la config.");
         }
         if (isModuleEnabled("modules.fake_pathfinding")) {
-            skriptAddon.loadModules(new FakePathFindingModule());
-            Bukkit.getScheduler().runTaskTimer(this, FakePathFinding::tickAll, 0L, 1L);
+            skriptAddon.loadModules(new NavigationModule());
+            Bukkit.getScheduler().runTaskTimer(this, Navigation::tickAll, 0L, 1L);
         } else {
             getLogger().info("[VoiceSkript] Module FakePathFinding désactivé dans la config.");
         }
