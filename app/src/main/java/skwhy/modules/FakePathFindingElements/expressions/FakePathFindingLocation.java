@@ -1,5 +1,10 @@
 package skwhy.modules.FakePathFindingElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -13,6 +18,24 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.FakePathFinding;
 
+@Name("Fake Pathfinding Location / Destination")
+@Description("Gets or sets the current location or the movement destination of a fake pathfinding object.")
+@Examples({
+    "set {_fake} to a new fake pathfinding with id 12345 hitbox vector(0.6, 1.8, 0.6) location location of player type \"WALK\"",
+    "",
+    "# Read the current location",
+    "set {_loc} to location of {_fake}",
+    "",
+    "# Teleport the fake entity to a new position",
+    "set location of {_fake} to location of player",
+    "",
+    "# Read the current destination",
+    "set {_dest} to destination of {_fake}",
+    "",
+    "# Update the movement target",
+    "set destination of {_fake} to location(100, 64, 200, world \"world\")"
+})
+@Since("1.2.0")
 public class FakePathFindingLocation extends SimpleExpression<Location> {
 
     private int matchedPattern;
@@ -64,8 +87,8 @@ public class FakePathFindingLocation extends SimpleExpression<Location> {
     @Override
     public String toString(@Nullable Event event, boolean debug) {
         return switch (matchedPattern) {
-            case 0 -> "location of " + fakeExpr.toString(event, debug);
-            default -> "destination of " + fakeExpr.toString(event, debug);
+            case 0 -> "path location of " + fakeExpr.toString(event, debug);
+            default -> "path destination of " + fakeExpr.toString(event, debug);
         };
     }
 
@@ -73,8 +96,8 @@ public class FakePathFindingLocation extends SimpleExpression<Location> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(FakePathFindingLocation.class, Location.class)
-                .addPattern("location of %fakepathfinding%")
-                .addPattern("destination of %fakepathfinding%")
+                .addPattern("path location of %fakepathfinding%")
+                .addPattern("path destination of %fakepathfinding%")
                 .build()
         );
     }

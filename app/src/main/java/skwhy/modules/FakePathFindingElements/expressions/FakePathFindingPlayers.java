@@ -1,5 +1,11 @@
 package skwhy.modules.FakePathFindingElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+import ch.njol.skript.doc.RequiredPlugins;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -17,6 +23,26 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Name("Fake Pathfinding Viewers")
+@Description("Gets, adds, removes, or replaces the list of players who can see a fake pathfinding entity. " +
+    "Supports SET, ADD, and REMOVE change modes via dedicated syntax patterns.")
+@Examples({
+    "set {_fake} to a new fake pathfinding with id 12345 hitbox vector(0.6, 1.8, 0.6) location location of player type \"WALK\"",
+    "",
+    "# Read the current viewer list",
+    "set {_players::*} to players of {_fake}",
+    "",
+    "# Add a player to the viewer list",
+    "add player player to players of {_fake}",
+    "",
+    "# Remove a player from the viewer list",
+    "remove player player from players of {_fake}",
+    "",
+    "# Replace the entire viewer list",
+    "set players of {_fake} to all players"
+})
+@Since("1.2.0")
+@RequiredPlugins("PacketEvents")
 public class FakePathFindingPlayers extends SimpleExpression<Player> {
 
     private int matchedPattern;
@@ -107,10 +133,7 @@ public class FakePathFindingPlayers extends SimpleExpression<Player> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(FakePathFindingPlayers.class, Player.class)
-                .addPattern("players of %fakepathfinding%")
-                .addPattern("add player %player% to players of %fakepathfinding%")
-                .addPattern("remove player %player% from players of %fakepathfinding%")
-                .addPattern("set players of %fakepathfinding% to %players%")
+                .addPattern("path viewers of %fakepathfinding%")
                 .build()
         );
     }

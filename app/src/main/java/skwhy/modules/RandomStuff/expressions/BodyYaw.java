@@ -21,7 +21,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.BodyTracker;
 
 @Name("Body Yaw")
-@Description("Gets or sets the body yaw rotation of an entity.")
+@Description("Gets the body yaw rotation of an entity.")
 @Examples({
     "set the body yaw of target to 90",
     "broadcast \"Your body yaw is %body yaw of player%\""
@@ -51,14 +51,11 @@ public class BodyYaw extends SimpleExpression<Float> {
 
     @Override
     public @Nullable Class<?>[] acceptChange(ChangeMode mode) {
-        // Optionnel : si l'API Paper permet de modifier le bodyYaw, tu pourrais l'ajouter ici.
-        // Sinon, on retourne null pour dire que c'est une valeur en lecture seule.
         return null;
     }
 
     @Override
     public void change(Event event, Object @Nullable [] delta, ChangeMode mode) {
-        // Laisser vide si on ne gère pas le 'set'
     }
 
     @Override

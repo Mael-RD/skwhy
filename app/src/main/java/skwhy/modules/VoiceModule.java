@@ -11,15 +11,13 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import org.skriptlang.skript.bukkit.registration.BukkitSyntaxInfos;
 import org.skriptlang.skript.bukkit.lang.eventvalue.EventValue;
 import ch.njol.skript.lang.util.SimpleEvent;
-
-import skwhy.modules.Voice.expressions.*;
-import skwhy.modules.Voice.events.*;
-import skwhy.modules.Voice.conditions.*;
-
 import skwhy.voice.SpeechRecognizer;
 import skwhy.voice.VoiceListener;
 
 import skwhy.SkWhy;
+import skwhy.modules.VoiceElements.conditions.*;
+import skwhy.modules.VoiceElements.events.*;
+import skwhy.modules.VoiceElements.expressions.*;
 
 import java.io.File;
 import java.util.UUID;

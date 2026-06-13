@@ -1,5 +1,10 @@
 package skwhy.modules.FakePathFindingElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -12,6 +17,23 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.FakePathFinding;
 
+@Name("Fake Pathfinding Numeric Properties")
+@Description("Gets or sets numeric properties of a fake pathfinding object: movement speed, pause duration in ticks, or the numeric entity ID (read-only).")
+@Examples({
+    "set {_fake} to a new fake pathfinding with id 12345 hitbox vector(0.6, 1.8, 0.6) location location of player type \"WALK\"",
+    "",
+    "# Read and update movement speed",
+    "set {_speed} to speed of {_fake}",
+    "set speed of {_fake} to 0.3",
+    "",
+    "# Read and update the pause duration",
+    "set {_pause} to pause ticks of {_fake}",
+    "set pause ticks of {_fake} to 20",
+    "",
+    "# Read the numeric entity ID (read-only)",
+    "set {_id} to entity id of {_fake}"
+})
+@Since("1.2.0")
 public class FakePathFindingNumber extends SimpleExpression<Number> {
 
     private int matchedPattern;

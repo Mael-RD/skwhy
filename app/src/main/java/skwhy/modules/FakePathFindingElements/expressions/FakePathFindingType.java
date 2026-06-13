@@ -1,5 +1,10 @@
 package skwhy.modules.FakePathFindingElements.expressions;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
+
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
@@ -12,6 +17,22 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.FakePathFinding;
 
+@Name("Fake Pathfinding Type")
+@Description("Gets or sets the movement type of a fake pathfinding object as a string. " +
+    "Valid values are WALK, FLY, and SWIM. Invalid values are silently ignored and the type remains unchanged.")
+@Examples({
+    "set {_fake} to a new fake pathfinding with id 12345 hitbox vector(0.6, 1.8, 0.6) location location of player type \"WALK\"",
+    "",
+    "# Read the current pathfinding type",
+    "set {_type} to pathfinding type of {_fake}",
+    "",
+    "# Change to flying movement",
+    "set pathfinding type of {_fake} to \"FLY\"",
+    "",
+    "# Change to swimming movement",
+    "set pathfinding type of {_fake} to \"SWIM\""
+})
+@Since("1.2.0")
 public class FakePathFindingType extends SimpleExpression<String> {
 
     private Expression<FakePathFinding> fakeExpr;

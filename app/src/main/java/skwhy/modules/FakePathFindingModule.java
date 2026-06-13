@@ -5,13 +5,12 @@ import org.skriptlang.skript.addon.SkriptAddon;
 
 import com.github.retrooper.packetevents.PacketEvents;
 
-import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingCreate;
-import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingLocation;
-import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingNumber;
-import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingPlayers;
-import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingType;
-import skwhy.modules.FakePathFindingElements.expressions.FakePathFindingVector;
-import skwhy.modules.FakePathFindingElements.types.FakePathFindingClass;
+import org.bukkit.Bukkit;
+
+import skwhy.modules.FakePathFindingElements.effects.*;
+import skwhy.modules.FakePathFindingElements.expressions.*;
+import skwhy.modules.FakePathFindingElements.conditions.*;
+import skwhy.modules.FakePathFindingElements.types.*;
 
 public class FakePathFindingModule implements AddonModule {
 
@@ -35,11 +34,23 @@ public class FakePathFindingModule implements AddonModule {
 
     @Override
     public void load(SkriptAddon addon) {
+        RealEntity.register(addon);
+
+        DestroyPathFinding.register(addon);
+        UpdateHitbox.register(addon);
+
         FakePathFindingCreate.register(addon);
-        FakePathFindingNumber.register(addon);
+        FakePathFindingEntity.register(addon);
         FakePathFindingLocation.register(addon);
-        FakePathFindingVector.register(addon);
+        FakePathFindingNumber.register(addon);
         FakePathFindingType.register(addon);
-        FakePathFindingPlayers.register(addon);
+        FakePathFindingVector.register(addon);
+
+        try {
+            Class.forName("com.github.retrooper.packetevents.PacketEvents");
+            FakePathFindingPlayers.register(addon);
+        } catch (ClassNotFoundException e) {
+            Bukkit.getLogger().info("[SkWhy] PacketEvents absent — FakePathFindingPlayers non chargé.");
+        }
     }
 }

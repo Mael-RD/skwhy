@@ -32,6 +32,7 @@ public class RandomStuffModule implements AddonModule {
     @Override
     public void load(SkriptAddon addon) {
         BodyYaw.register(addon);
+        EntityId.register(addon);
         EntityTrackers.register(addon);
         FutureDirection.register(addon);
         GenerateId.register(addon);
