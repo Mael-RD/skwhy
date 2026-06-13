@@ -1,9 +1,6 @@
 package skwhy.pathfinder;
 
 import org.bukkit.World;
-import org.bukkit.block.Block;
-import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.Waterlogged;
 import org.bukkit.entity.Mob;
 import org.jspecify.annotations.Nullable;
 
@@ -42,8 +39,8 @@ public class AmphibiousNodeEvaluator extends WalkNodeEvaluator {
     }
 
     @Override
-    public void prepare(final World world, final Mob entity) {
-        super.prepare(world, entity);
+    public void prepare(final World world, final Navigation navigation) {
+        super.prepare(world, navigation);
         // Override malus costs for this session using NodeEvaluator's per-entity map
         this.setPathfindingMalus(PathType.WATER, 0.0F);
         this.oldWalkableCost = this.getPathfindingMalus(PathType.WALKABLE);
@@ -61,15 +58,14 @@ public class AmphibiousNodeEvaluator extends WalkNodeEvaluator {
 
     @Override
     public Node getStart() {
-        if (!isEntityInWater(this.mob)) {
+        if (!this.navigation.isInWater()) {
             return super.getStart();
         }
-        // In water: anchor to the vertical midpoint of the bounding box
-        org.bukkit.util.BoundingBox bb = this.mob.getBoundingBox();
+        
         return this.getStartNode(
-                (int) Math.floor(bb.getMinX()),
-                (int) Math.floor(bb.getMinY() + 0.5),
-                (int) Math.floor(bb.getMinZ())
+                (int) Math.floor(navigation.getMinX()),
+                (int) Math.floor((navigation.getMinY() + navigation.getMaxY()) / 2.0),
+                (int) Math.floor(navigation.getMinZ())
         );
     }
 
@@ -118,7 +114,7 @@ public class AmphibiousNodeEvaluator extends WalkNodeEvaluator {
 
         // Shallow-swimming penalty: discourage nodes deep below the sea level
         if (this.prefersShallowSwimming) {
-            int seaLevel = this.mob.getWorld().getSeaLevel();
+            int seaLevel = this.navigation.getLocation().getWorld().getSeaLevel();
             for (int i = 0; i < numValidNeighbors; i++) {
                 Node neighbor = neighbors[i];
                 if (neighbor.type == PathType.WATER && neighbor.y < seaLevel - 10) {
@@ -163,18 +159,6 @@ public class AmphibiousNodeEvaluator extends WalkNodeEvaluator {
     // Helpers
     // ------------------------------------------------------------------
 
-    /**
-     * Returns true if the entity is currently in water (source, flowing, or waterlogged block).
-     * Mirrors NMS {@code Mob#isInWater()}.
-     */
-    private static boolean isEntityInWater(final Mob mob) {
-        Block block = mob.getLocation().getBlock();
-        if (block.getType() == org.bukkit.Material.WATER) {
-            return true;
-        }
-        BlockData data = block.getBlockData();
-        return data instanceof Waterlogged wl && wl.isWaterlogged();
-    }
 
     /**
      * Step height for this entity.

@@ -12,7 +12,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.entity.Mob;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -60,14 +59,14 @@ public class PathFinder {
      */
     public @Nullable Path findPath(
             final World world,
-            final Mob entity,
+            final Navigation navigation,
             final Set<Location> targets,
             final float maxPathLength,
             final int reachRange,
             final float maxVisitedNodesMultiplier
     ) {
         this.openSet.clear();
-        this.nodeEvaluator.prepare(world, entity);
+        this.nodeEvaluator.prepare(world, navigation);
         Node from = this.nodeEvaluator.getStart();
         if (from == null) {
             return null;

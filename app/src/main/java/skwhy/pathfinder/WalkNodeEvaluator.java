@@ -90,14 +90,14 @@ public class WalkNodeEvaluator extends NodeEvaluator {
     // ------------------------------------------------------------------
 
     @Override
-    public void prepare(final World world, final Mob entity) {
-        super.prepare(world, entity);
-        // NMS calls entity.onPathfindingStart() here – not available in Bukkit
+    public void prepare(final World world, final Navigation navigation) {
+        super.prepare(world, navigation);
+        // NMS calls navigation.onPathfindingStart() here – not available in Bukkit
     }
 
     @Override
     public void done() {
-        // NMS calls mob.onPathfindingDone() here – not available in Bukkit
+        // NMS calls navigation.onPathfindingDone() here – not available in Bukkit
         this.pathTypesByPosCacheByMob.clear();
         this.collisionCache.clear();
         super.done();
@@ -109,9 +109,9 @@ public class WalkNodeEvaluator extends NodeEvaluator {
 
     @Override
     public Node getStart() {
-        int startY = this.mob.getLocation().getBlockY();
-        double mobX = this.mob.getLocation().getX();
-        double mobZ = this.mob.getLocation().getZ();
+        int startY = this.navigation.getLocation().getBlockY();
+        double mobX = this.navigation.getLocation().getX();
+        double mobZ = this.navigation.getLocation().getZ();
         World world = this.currentContext.world();
 
         Block startBlock = world.getBlockAt((int) Math.floor(mobX), startY, (int) Math.floor(mobZ));
@@ -121,7 +121,7 @@ public class WalkNodeEvaluator extends NodeEvaluator {
         boolean standingOnFluid = isSurfaceFluid(startBlock);
 
         if (!standingOnFluid) {
-            if (this.canFloat() && isInWater(this.mob)) {
+            if (this.canFloat() && navigation.isInWater()) {
                 // Float up to find the water surface
                 while (true) {
                     Block b = world.getBlockAt((int) Math.floor(mobX), startY, (int) Math.floor(mobZ));
@@ -137,11 +137,11 @@ public class WalkNodeEvaluator extends NodeEvaluator {
                     }
                     startY++;
                 }
-            } else if (this.mob.isOnGround()) {
-                startY = (int) Math.floor(this.mob.getLocation().getY() + 0.5);
+            } else if (this.navigation.isOnGround()) {
+                startY = (int) Math.floor(this.navigation.getLocation().getY() + 0.5);
             } else {
                 // Scan downward to find a solid landing point
-                int scanY = (int) Math.floor(this.mob.getLocation().getY() + 1.0);
+                int scanY = (int) Math.floor(this.navigation.getLocation().getY() + 1.0);
                 int minY = world.getMinHeight();
                 while (scanY > minY) {
                     startY = scanY;
@@ -164,13 +164,12 @@ public class WalkNodeEvaluator extends NodeEvaluator {
         int startZ = (int) Math.floor(mobZ);
 
         if (!this.canStartAt(startX, startY, startZ)) {
-            BoundingBox mobBB = this.mob.getBoundingBox();
-            if (this.canStartAt((int) Math.floor(mobBB.getMinX()), startY, (int) Math.floor(mobBB.getMinZ()))
-                    || this.canStartAt((int) Math.floor(mobBB.getMinX()), startY, (int) Math.floor(mobBB.getMaxZ()))
-                    || this.canStartAt((int) Math.floor(mobBB.getMaxX()), startY, (int) Math.floor(mobBB.getMinZ()))
-                    || this.canStartAt((int) Math.floor(mobBB.getMaxX()), startY, (int) Math.floor(mobBB.getMaxZ()))) {
+            if (this.canStartAt((int) Math.floor(navigation.getMinX()), startY, (int) Math.floor(navigation.getMinZ()))
+                    || this.canStartAt((int) Math.floor(navigation.getMinX()), startY, (int) Math.floor(navigation.getMaxZ()))
+                    || this.canStartAt((int) Math.floor(navigation.getMaxX()), startY, (int) Math.floor(navigation.getMinZ()))
+                    || this.canStartAt((int) Math.floor(navigation.getMaxX()), startY, (int) Math.floor(navigation.getMaxZ()))) {
                 return this.getStartNode(
-                        (int) Math.floor(mobBB.getMinX()), startY, (int) Math.floor(mobBB.getMinZ()));
+                        (int) Math.floor(navigation.getMinX()), startY, (int) Math.floor(navigation.getMinZ()));
             }
         }
 
@@ -258,7 +257,7 @@ public class WalkNodeEvaluator extends NodeEvaluator {
         if (ew.type == PathType.WALKABLE_DOOR || ns.type == PathType.WALKABLE_DOOR) {
             return false;
         }
-        double bbWidth = this.mob.getBoundingBox().getWidthX();
+        double bbWidth = this.navigation.getHitbox().getX();
         if (bbWidth > 1.0 && (ew.costMalus > 0.0F || ns.costMalus > 0.0F)) {
             return false;
         }
@@ -415,7 +414,7 @@ public class WalkNodeEvaluator extends NodeEvaluator {
                 dirDx, dirDy, dirDz, blockPathTypeCurrent);
         if (nodeAbove == null) return null;
 
-        double bbWidth = this.mob.getBoundingBox().getWidthX();
+        double bbWidth = this.navigation.getHitbox().getX();
         if (bbWidth >= 1.0F) return nodeAbove;
         if (nodeAbove.type != PathType.OPEN && nodeAbove.type != PathType.WALKABLE) return nodeAbove;
 
@@ -426,7 +425,7 @@ public class WalkNodeEvaluator extends NodeEvaluator {
         double floorAtTarget = this.getFloorLevel(nodeAbove.x, nodeAbove.y, nodeAbove.z);
         BoundingBox grow = BoundingBox.of(
                 new Vector(centerX - halfWidth, floorAtStep   + 0.001, centerZ - halfWidth),
-                new Vector(centerX + halfWidth, this.mob.getBoundingBox().getHeight() + floorAtTarget - 0.002, centerZ + halfWidth)
+                new Vector(centerX + halfWidth, this.navigation.getHitbox().getY() + floorAtTarget - 0.002, centerZ + halfWidth)
         );
         return this.hasCollisions(grow) ? null : nodeAbove;
     }
@@ -513,14 +512,14 @@ public class WalkNodeEvaluator extends NodeEvaluator {
     }
 
     private boolean canReachWithoutCollision(final Node posTo) {
-        BoundingBox bb = this.mob.getBoundingBox();
-        Location mobLoc = this.mob.getLocation();
+        Vector hitbox = this.navigation.getHitbox();
+        Location mobLoc = this.navigation.getLocation();
 
-        double dx = posTo.x - mobLoc.getX() + bb.getWidthX() / 2.0;
-        double dy = posTo.y - mobLoc.getY() + bb.getHeight()  / 2.0;
-        double dz = posTo.z - mobLoc.getZ() + bb.getWidthZ()  / 2.0;
+        double dx = posTo.x - mobLoc.getX() + hitbox.getX() / 2.0;
+        double dy = posTo.y - mobLoc.getY() + hitbox.getY()  / 2.0;
+        double dz = posTo.z - mobLoc.getZ() + hitbox.getZ()  / 2.0;
         double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        double size = bb.getWidthX(); // approximate "size" as width
+        double size = hitbox.getX(); // approximate "size" as width
 
         int steps = (int) Math.ceil(len / size);
         if (steps == 0) return true;
@@ -529,12 +528,12 @@ public class WalkNodeEvaluator extends NodeEvaluator {
         double stepY = dy / steps;
         double stepZ = dz / steps;
 
-        double cx = bb.getCenterX();
-        double cy = bb.getCenterY();
-        double cz = bb.getCenterZ();
-        double hx = bb.getWidthX() / 2.0;
-        double hy = bb.getHeight()  / 2.0;
-        double hz = bb.getWidthZ()  / 2.0;
+        double hx = hitbox.getX()  / 2.0;
+        double hy = hitbox.getY()  / 2.0;
+        double hz = hitbox.getZ()  / 2.0;
+        double cx = navigation.getLocation().getX();
+        double cy = navigation.getLocation().getY() + hy;
+        double cz = navigation.getLocation().getZ();
 
         for (int i = 1; i <= steps; i++) {
             BoundingBox stepped = BoundingBox.of(
@@ -553,7 +552,7 @@ public class WalkNodeEvaluator extends NodeEvaluator {
     protected PathType getCachedPathType(final int x, final int y, final int z) {
         return pathTypesByPosCacheByMob.computeIfAbsent(
                 PathTypeCache.asLong(x, y, z),
-                k -> this.getPathTypeOfMob(this.currentContext, x, y, z, this.mob));
+                k -> this.getPathTypeOfMob(this.currentContext, x, y, z, this.navigation));
     }
 
     // ------------------------------------------------------------------
@@ -562,7 +561,7 @@ public class WalkNodeEvaluator extends NodeEvaluator {
 
     @Override
     public PathType getPathTypeOfMob(final PathfindingContext context, final int x, final int y, final int z,
-                                      final Mob mob) {
+                                      final Navigation navigation) {
         Set<PathType> blockTypes = this.getPathTypeWithinMobBB(context, x, y, z);
 
         if (blockTypes.size() == 1) {
@@ -604,7 +603,7 @@ public class WalkNodeEvaluator extends NodeEvaluator {
     public Set<PathType> getPathTypeWithinMobBB(final PathfindingContext context,
                                                   final int x, final int y, final int z) {
         EnumSet<PathType> blockTypes = EnumSet.noneOf(PathType.class);
-        Location mobLoc = this.mob.getLocation();
+        Location mobLoc = this.navigation.getLocation();
         int mobX = mobLoc.getBlockX();
         int mobY = mobLoc.getBlockY();
         int mobZ = mobLoc.getBlockZ();

@@ -3,7 +3,6 @@ package skwhy.pathfinder;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.entity.Mob;
 
 /**
  * Holds the world reference and per-pathfinding-session cache used by node evaluators.
@@ -23,10 +22,10 @@ public class PathfindingContext {
     private final int mobY;
     private final int mobZ;
 
-    public PathfindingContext(final World world, final Mob mob) {
+    public PathfindingContext(final World world, final Navigation navigation) {
         this.world = world;
         this.cache = new PathTypeCache();
-        Location pos = mob.getLocation();
+        Location pos = navigation.getLocation();
         this.mobX = pos.getBlockX();
         this.mobY = pos.getBlockY();
         this.mobZ = pos.getBlockZ();

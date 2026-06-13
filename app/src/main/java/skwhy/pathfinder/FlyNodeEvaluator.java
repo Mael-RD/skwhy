@@ -4,10 +4,8 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.block.Block;
-import org.bukkit.entity.Mob;
-import org.bukkit.util.BoundingBox;
 import org.jspecify.annotations.Nullable;
+import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,8 +35,8 @@ public class FlyNodeEvaluator extends WalkNodeEvaluator {
     private static final int MAX_START_NODE_CANDIDATES = 10;
 
     @Override
-    public void prepare(final World world, final Mob entity) {
-        super.prepare(world, entity);
+    public void prepare(final World world, final Navigation navigation) {
+        super.prepare(world, navigation);
         this.pathTypeByPosCache.clear();
         // Note: NMS calls entity.onPathfindingStart() here.
         // Bukkit does not expose this hook; add it to your custom mob class if needed.
@@ -55,22 +53,22 @@ public class FlyNodeEvaluator extends WalkNodeEvaluator {
     @Override
     public Node getStart() {
         int startY;
-        if (this.canFloat() && this.mob.isInWater()) {
-            startY = this.mob.getLocation().getBlockY();
+        if (this.canFloat() && this.navigation.isInWater()) {
+            startY = this.navigation.getLocation().getBlockY();
             // Rise until we leave the water surface
             while (this.currentContext.world().getBlockAt(
-                    (int) Math.floor(this.mob.getLocation().getX()),
+                    (int) Math.floor(this.navigation.getLocation().getX()),
                     startY,
-                    (int) Math.floor(this.mob.getLocation().getZ())
+                    (int) Math.floor(this.navigation.getLocation().getZ())
             ).getType() == Material.WATER) {
                 startY++;
             }
         } else {
-            startY = (int) Math.floor(this.mob.getLocation().getY() + 0.5);
+            startY = (int) Math.floor(this.navigation.getLocation().getY() + 0.5);
         }
 
-        int startX = (int) Math.floor(this.mob.getLocation().getX());
-        int startZ = (int) Math.floor(this.mob.getLocation().getZ());
+        int startX = (int) Math.floor(this.navigation.getLocation().getX());
+        int startZ = (int) Math.floor(this.navigation.getLocation().getZ());
 
         if (!this.canStartAt(startX, startY, startZ)) {
             for (int[] candidate : iterateStartCandidates()) {
@@ -231,8 +229,8 @@ public class FlyNodeEvaluator extends WalkNodeEvaluator {
     @Override
     protected PathType getCachedPathType(final int x, final int y, final int z) {
         return pathTypeByPosCache.computeIfAbsent(
-                PathTypeCache.asLong(x, y, z),
-                key -> this.getPathTypeOfMob(this.currentContext, x, y, z, this.mob)
+            PathTypeCache.asLong(x, y, z),
+            key -> this.getPathTypeOfMob(this.currentContext, x, y, z, this.navigation)
         );
     }
 
@@ -283,27 +281,27 @@ public class FlyNodeEvaluator extends WalkNodeEvaluator {
      * positions within a slightly inflated bounding box for small mobs.
      */
     private List<int[]> iterateStartCandidates() {
-        BoundingBox bb = this.mob.getBoundingBox();
-        boolean isSmall = bb.getVolume() < SMALL_MOB_SIZE;
+        Vector hitbox = this.navigation.getHitbox();
+        boolean isSmall = hitbox.getX()*hitbox.getY()*hitbox.getZ() < SMALL_MOB_SIZE;
         List<int[]> candidates = new ArrayList<>();
 
         if (!isSmall) {
-            int y = this.mob.getLocation().getBlockY();
-            candidates.add(new int[]{(int) Math.floor(bb.getMinX()), y, (int) Math.floor(bb.getMinZ())});
-            candidates.add(new int[]{(int) Math.floor(bb.getMinX()), y, (int) Math.floor(bb.getMaxZ())});
-            candidates.add(new int[]{(int) Math.floor(bb.getMaxX()), y, (int) Math.floor(bb.getMinZ())});
-            candidates.add(new int[]{(int) Math.floor(bb.getMaxX()), y, (int) Math.floor(bb.getMaxZ())});
+            int y = this.navigation.getLocation().getBlockY();
+            candidates.add(new int[]{(int) Math.floor(this.navigation.getMinX()), y, (int) Math.floor(this.navigation.getMinZ())});
+            candidates.add(new int[]{(int) Math.floor(this.navigation.getMinX()), y, (int) Math.floor(this.navigation.getMaxZ())});
+            candidates.add(new int[]{(int) Math.floor(this.navigation.getMaxX()), y, (int) Math.floor(this.navigation.getMinZ())});
+            candidates.add(new int[]{(int) Math.floor(this.navigation.getMaxX()), y, (int) Math.floor(this.navigation.getMaxZ())});
         } else {
-            double xPad = Math.max(0.0, SMALL_MOB_INFLATED_START_NODE_BOUNDING_BOX - bb.getWidthX());
-            double yPad = Math.max(0.0, SMALL_MOB_INFLATED_START_NODE_BOUNDING_BOX - bb.getHeight());
-            double zPad = Math.max(0.0, SMALL_MOB_INFLATED_START_NODE_BOUNDING_BOX - bb.getWidthZ());
+            double xPad = Math.max(0.0, SMALL_MOB_INFLATED_START_NODE_BOUNDING_BOX - hitbox.getX());
+            double yPad = Math.max(0.0, SMALL_MOB_INFLATED_START_NODE_BOUNDING_BOX - hitbox.getY());
+            double zPad = Math.max(0.0, SMALL_MOB_INFLATED_START_NODE_BOUNDING_BOX - hitbox.getZ());
 
-            int minX = (int) Math.floor(bb.getMinX() - xPad);
-            int minY = (int) Math.floor(bb.getMinY() - yPad);
-            int minZ = (int) Math.floor(bb.getMinZ() - zPad);
-            int maxX = (int) Math.floor(bb.getMaxX() + xPad);
-            int maxY = (int) Math.floor(bb.getMaxY() + yPad);
-            int maxZ = (int) Math.floor(bb.getMaxZ() + zPad);
+            int minX = (int) Math.floor(this.navigation.getMinX() - xPad);
+            int minY = (int) Math.floor(this.navigation.getMinY() - yPad);
+            int minZ = (int) Math.floor(this.navigation.getMinZ() - zPad);
+            int maxX = (int) Math.floor(this.navigation.getMaxX() + xPad);
+            int maxY = (int) Math.floor(this.navigation.getMaxY() + yPad);
+            int maxZ = (int) Math.floor(this.navigation.getMaxZ() + zPad);
 
             ThreadLocalRandom rng = ThreadLocalRandom.current();
             for (int i = 0; i < MAX_START_NODE_CANDIDATES; i++) {

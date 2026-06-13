@@ -3,16 +3,11 @@ package skwhy.pathfinder;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import org.bukkit.Material;
-import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Waterlogged;
-import org.bukkit.entity.Mob;
 import org.jspecify.annotations.Nullable;
-
-import java.util.EnumMap;
-import java.util.Map;
 
 /**
  * Node evaluator for swimming entities.
@@ -35,8 +30,6 @@ public class SwimNodeEvaluator extends NodeEvaluator {
         { 0,  1,  0}, { 0, -1,  0},
         { 0,  0,  1}, { 0,  0, -1}
     };
-    // Horizontal only: N/S/E/W pairs for diagonal checks (indices into DIRECTIONS)
-    private static final int[] HORIZONTAL_DIRS = {0, 1, 4, 5}; // +X, -X, +Z, -Z
 
     private final boolean allowBreaching;
     private final Long2ObjectMap<PathType> pathTypesByPosCache = new Long2ObjectOpenHashMap<>();
@@ -46,8 +39,8 @@ public class SwimNodeEvaluator extends NodeEvaluator {
     }
 
     @Override
-    public void prepare(final World world, final Mob entity) {
-        super.prepare(world, entity);
+    public void prepare(final World world, final Navigation navigation) {
+        super.prepare(world, navigation);
         this.pathTypesByPosCache.clear();
     }
 
@@ -59,11 +52,10 @@ public class SwimNodeEvaluator extends NodeEvaluator {
 
     @Override
     public Node getStart() {
-        org.bukkit.util.BoundingBox bb = this.mob.getBoundingBox();
         return this.getNode(
-                (int) Math.floor(bb.getMinX()),
-                (int) Math.floor(bb.getMinY() + 0.5),
-                (int) Math.floor(bb.getMinZ())
+                (int) Math.floor(this.navigation.getMinX()),
+                (int) Math.floor(this.navigation.getMinY() + 0.5),
+                (int) Math.floor(this.navigation.getMinZ())
         );
     }
 
@@ -141,11 +133,11 @@ public class SwimNodeEvaluator extends NodeEvaluator {
 
     @Override
     public PathType getPathType(final PathfindingContext context, final int x, final int y, final int z) {
-        return this.getPathTypeOfMob(context, x, y, z, this.mob);
+        return this.getPathTypeOfMob(context, x, y, z, this.navigation);
     }
 
     @Override
-    public PathType getPathTypeOfMob(final PathfindingContext context, final int x, final int y, final int z, final Mob mob) {
+    public PathType getPathTypeOfMob(final PathfindingContext context, final int x, final int y, final int z, final Navigation navigation) {
         World world = context.world();
 
         for (int xx = x; xx < x + this.entityWidth; xx++) {

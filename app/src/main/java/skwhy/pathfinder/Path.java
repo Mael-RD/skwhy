@@ -2,8 +2,6 @@ package skwhy.pathfinder;
 
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.entity.Entity;
-import org.bukkit.util.BoundingBox;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
@@ -92,10 +90,9 @@ public final class Path {
      * @param entity the entity following the path
      * @param index  node index
      */
-    public Location getEntityPosAtNode(final World world, final Entity entity, final int index) {
+    public Location getEntityPosAtNode(final World world, final Navigation navigation, final int index) {
         Node node = this.nodes.get(index);
-        BoundingBox bb = entity.getBoundingBox();
-        double halfWidth = (int) (bb.getWidthX() + 1.0) * 0.5;
+        double halfWidth = (int) (navigation.getHitbox().getX() + 1.0) * 0.5;
         double x = node.x + halfWidth;
         double y = node.y;
         double z = node.z + halfWidth;
@@ -107,8 +104,8 @@ public final class Path {
         return new Location(world, n.x, n.y, n.z);
     }
 
-    public Location getNextEntityPos(final World world, final Entity entity) {
-        return getEntityPosAtNode(world, entity, this.nextNodeIndex);
+    public Location getNextEntityPos(final World world, final Navigation navigation) {
+        return getEntityPosAtNode(world, navigation, this.nextNodeIndex);
     }
 
     public Location getNextNodePos(final World world) {

@@ -9,7 +9,7 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.data.Lightable;
-import org.bukkit.entity.Mob;
+import org.bukkit.util.Vector;
 
 /**
  * Abstract base class for node evaluators.
@@ -30,7 +30,7 @@ import org.bukkit.entity.Mob;
  */
 public abstract class NodeEvaluator {
     protected PathfindingContext currentContext;
-    protected Mob mob;
+    protected Navigation navigation;
     protected final Int2ObjectMap<Node> nodes = new Int2ObjectOpenHashMap<>();
     protected int entityWidth;
     protected int entityHeight;
@@ -47,19 +47,19 @@ public abstract class NodeEvaluator {
      */
     private final java.util.EnumMap<PathType, Float> pathfindingMalusMap = new java.util.EnumMap<>(PathType.class);
 
-    public void prepare(final World world, final Mob entity) {
-        this.currentContext = new PathfindingContext(world, entity);
-        this.mob = entity;
+    public void prepare(final World world, final Navigation navigation) {
+        this.currentContext = new PathfindingContext(world, navigation);
+        this.navigation = navigation;
         this.nodes.clear();
-        org.bukkit.util.BoundingBox bb = entity.getBoundingBox();
-        this.entityWidth  = (int) Math.floor(bb.getWidthX() + 1.0);
-        this.entityHeight = (int) Math.floor(bb.getHeight() + 1.0);
-        this.entityDepth  = (int) Math.floor(bb.getWidthZ() + 1.0);
+        Vector hitbox = navigation.getHitbox();
+        this.entityWidth  = (int) Math.floor(hitbox.getX() + 1.0);
+        this.entityHeight = (int) Math.floor(hitbox.getY() + 1.0);
+        this.entityDepth  = (int) Math.floor(hitbox.getZ() + 1.0);
     }
 
     public void done() {
         this.currentContext = null;
-        this.mob = null;
+        this.navigation = null;
     }
 
     // ------------------------------------------------------------------
@@ -104,12 +104,12 @@ public abstract class NodeEvaluator {
 
     public abstract int getNeighbors(Node[] neighbors, Node pos);
 
-    public abstract PathType getPathTypeOfMob(PathfindingContext context, int x, int y, int z, Mob mob);
+    public abstract PathType getPathTypeOfMob(PathfindingContext context, int x, int y, int z, Navigation navigation);
 
     public abstract PathType getPathType(PathfindingContext context, int x, int y, int z);
 
-    public PathType getPathType(final Mob mob, final Location pos) {
-        return getPathType(new PathfindingContext(pos.getWorld(), mob), pos.getBlockX(), pos.getBlockY(), pos.getBlockZ());
+    public PathType getPathType(final Navigation navigation, final Location pos) {
+        return getPathType(new PathfindingContext(pos.getWorld(), navigation), pos.getBlockX(), pos.getBlockY(), pos.getBlockZ());
     }
 
     // ------------------------------------------------------------------
@@ -153,4 +153,5 @@ public abstract class NodeEvaluator {
         }
         return false;
     }
+
 }

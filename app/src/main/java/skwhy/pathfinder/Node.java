@@ -9,24 +9,25 @@ import org.jspecify.annotations.Nullable;
  * Represents a single node in the pathfinding graph.
  *
  * <p>Adapted from net.minecraft.world.level.pathfinder.Node:
- * - BlockPos replaced by int coordinates (kept as-is, no wrapper needed)
+ * - BlockPos replaced by int coordinates
  * - Vec3 replaced by org.bukkit.util.Vector
- * - FriendlyByteBuf serialization removed (not available in Bukkit API;
- *   use your own serialization if needed)
+ * - Custom Octile 3D heuristic reintegrated from PathNode
  */
 public class Node {
     public final int x;
     public final int y;
     public final int z;
     private final int hash;
+    
     public int heapIdx = -1;
     public float g;
     public float h;
     public float f;
     public @Nullable Node cameFrom;
     public boolean closed;
+    
     public float walkedDistance;
-    public float costMalus;
+    public float costMalus; // Remplace l'ancien "malus" de PathNode
     public PathType type = PathType.BLOCKED;
 
     public Node(final int x, final int y, final int z) {
@@ -35,6 +36,28 @@ public class Node {
         this.z = z;
         this.hash = createHash(x, y, z);
     }
+
+    // =========================================================================
+    // L'HEURISTIQUE (Réintégrée de PathNode)
+    // =========================================================================
+
+    /**
+     * Heuristique Octile 3D (identique à Minecraft Vanilla).
+     * Essentielle pour l'algorithme A* avec des déplacements diagonaux.
+     */
+    public float heuristic(final Node target) {
+        float dx = Math.abs(this.x - target.x);
+        float dy = Math.abs(this.y - target.y);
+        float dz = Math.abs(this.z - target.z);
+        float max = Math.max(dx, Math.max(dy, dz));
+        float min = Math.min(dx, Math.min(dy, dz));
+        float mid = dx + dy + dz - max - min;
+        return max + (float)(Math.sqrt(3) - 2) * min + (float)(Math.sqrt(2) - 1) * mid;
+    }
+
+    // =========================================================================
+    // UTILITAIRES DE NOEUDS
+    // =========================================================================
 
     public Node cloneAndMove(final int x, final int y, final int z) {
         Node node = new Node(x, y, z);
@@ -53,6 +76,10 @@ public class Node {
     public static int createHash(final int x, final int y, final int z) {
         return y & 0xFF | (x & 32767) << 8 | (z & 32767) << 24 | (x < 0 ? Integer.MIN_VALUE : 0) | (z < 0 ? 32768 : 0);
     }
+
+    // =========================================================================
+    // DISTANCES
+    // =========================================================================
 
     public float distanceTo(final Node to) {
         float xd = to.x - this.x;
@@ -103,6 +130,10 @@ public class Node {
         return xd + yd + zd;
     }
 
+    // =========================================================================
+    // CONVERSIONS BUKKIT
+    // =========================================================================
+
     /**
      * Returns this node as a Bukkit Location in the given world.
      * The world parameter is required because Bukkit Locations carry world references.
@@ -116,9 +147,14 @@ public class Node {
         return new Vector(this.x, this.y, this.z);
     }
 
+    // =========================================================================
+    // OVERRIDES HASH & EQUALS
+    // =========================================================================
+
     @Override
     public boolean equals(final Object o) {
         if (!(o instanceof Node no)) return false;
+        // La comparaison rapide par hash permet d'économiser beaucoup de CPU
         return this.hash == no.hash && this.x == no.x && this.y == no.y && this.z == no.z;
     }
 
@@ -126,6 +162,10 @@ public class Node {
     public int hashCode() {
         return this.hash;
     }
+
+    // =========================================================================
+    // HELPERS D'ÉTAT
+    // =========================================================================
 
     public boolean inOpenSet() {
         return this.heapIdx >= 0;
