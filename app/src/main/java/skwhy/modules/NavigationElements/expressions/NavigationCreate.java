@@ -103,10 +103,10 @@ public class NavigationCreate extends SimpleExpression<Navigation> {
         if (rawType == null) return null;
 
         // Vitesse : valeur optionnelle, 0.1 par défaut
-        double speed = 0.1;
+        float speed = 0.1F;
         if (speedExpr != null) {
             Number speedValue = speedExpr.getSingle(event);
-            if (speedValue != null) speed = speedValue.doubleValue();
+            if (speedValue != null) speed = speedValue.floatValue();
         }
 
         // Type de pathfinding
@@ -131,11 +131,11 @@ public class NavigationCreate extends SimpleExpression<Navigation> {
             Vector   hitbox   = hitboxExpr.getSingle(event);
             Location location = locationExpr.getSingle(event);
             if (hitbox == null || location == null) return null;
-            return new Navigation[]{ new Navigation(id.intValue(), hitbox, location, speed, viewers, pathfindingType) };
+            return new Navigation[]{ new Navigation(id.intValue(), hitbox, location, pathfindingType, speed, viewers) };
         } else {
             Entity entity = entityExpr.getSingle(event);
             if (entity == null) return null;
-            return new Navigation[]{ new Navigation(entity, speed, viewers, pathfindingType) };
+            return new Navigation[]{ new Navigation(entity, speed, pathfindingType) };
         }
     }
 

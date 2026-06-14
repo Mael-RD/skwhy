@@ -76,7 +76,7 @@ public class NavigationNumber extends SimpleExpression<Number> {
         if (navigation == null) return;
 
         switch (matchedPattern) {
-            case 0 -> navigation.setSpeed(n.doubleValue());
+            case 0 -> navigation.setSpeed(n.floatValue());
             case 1 -> navigation.setPauseTicks(n.intValue());
             default -> {
             }
