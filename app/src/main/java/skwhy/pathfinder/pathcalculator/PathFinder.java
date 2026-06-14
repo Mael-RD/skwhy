@@ -5,7 +5,7 @@ import com.google.common.collect.Lists;
 import skwhy.pathfinder.Mob;
 import skwhy.pathfinder.Navigation.PathfindingType;
 
-import org.bukkit.util.Vector;
+import org.bukkit.Location;
 import java.util.List;
 
 import org.jspecify.annotations.Nullable;
@@ -42,7 +42,7 @@ public class PathFinder {
         return this.path;
     }
 
-    public @Nullable Path findPath(Mob mob, Vector target, float maxPathLength) {
+    public @Nullable Path findPath(Mob mob, Location target, float maxPathLength) {
         this.nodeEvaluator.prepare(mob);
         Node from = this.nodeEvaluator.getStart();
         if (from == null) {
@@ -58,7 +58,7 @@ public class PathFinder {
     private @Nullable Path findPath(
             final Node from,
             final Target target,
-            final Vector targetLocation,
+            final Location targetLocation,
             final float maxPathLength
     ) {
         from.g = 0.0F;
@@ -122,7 +122,7 @@ public class PathFinder {
         return from.distanceTo(to);
     }
 
-    private Path reconstructPath(final Node closest, final Vector target, final boolean reached) {
+    private Path reconstructPath(final Node closest, final Location target, final boolean reached) {
         List<Node> nodes = Lists.newArrayList();
         Node node = closest;
         nodes.add(0, closest);

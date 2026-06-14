@@ -154,11 +154,6 @@ public final class Path {
         return this.debugData;
     }
 
-    @Override
-    public String toString() {
-        return "Path(length=" + this.nodes.size() + ")";
-    }
-
     public Vector getTarget() { return new Vector(targetX, targetY, targetZ); }
     public int getTargetX() { return this.targetX; }
     public int getTargetY() { return this.targetY; }
@@ -176,4 +171,53 @@ public final class Path {
     }
 
     public record DebugData(Node[] openSet, Node[] closedSet, Set<Target> targetNodes) {}
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ░░ DEBUG / AFFICHAGE ░░
+    // ════════════════════════════════════════════════════════════════════════
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("┌────────────────────────────────────────────\n");
+        sb.append("│ PATH INFO (Chemin A*)\n");
+        sb.append("├────────────────────────────────────────────\n");
+        
+        // --- Cible & Statut ---
+        sb.append("│ [Objectif]\n");
+        sb.append(String.format("│ Cible exacte    : X:%d | Y:%d | Z:%d\n", targetX, targetY, targetZ));
+        sb.append("│ Est atteignable : ").append(reached ? "Oui (Chemin complet)" : "Non (Chemin partiel)").append("\n");
+        if (distToTarget == Float.MAX_VALUE) {
+            sb.append("│ Distance finale : Inconnue (Pas de noeuds)\n");
+        } else {
+            sb.append(String.format("│ Distance finale : %.2f blocs\n", distToTarget));
+        }
+
+        // --- Progression ---
+        sb.append("│\n│ [Progression]\n");
+        sb.append("│ Longueur totale : ").append(nodes.size()).append(" noeuds\n");
+        sb.append("│ Index actuel    : ").append(nextNodeIndex).append(" / ").append(nodes.size());
+        
+        if (nodes.isEmpty()) {
+            sb.append(" (Chemin Vide)\n");
+        } else if (isDone()) {
+            sb.append(" (Terminé)\n");
+        } else {
+            sb.append(" (En cours)\n");
+            Node next = getNextNode();
+            sb.append(String.format("│ Prochain noeud  : X:%d | Y:%d | Z:%d\n", next.x, next.y, next.z));
+        }
+
+        // --- Données de Debug (Si activées) ---
+        if (debugData != null) {
+            sb.append("│\n│ [Debug Data]\n");
+            sb.append("│ OpenSet évalués : ").append(debugData.openSet().length).append("\n");
+            sb.append("│ ClosedSet total : ").append(debugData.closedSet().length).append("\n");
+        }
+        
+        sb.append("└────────────────────────────────────────────");
+        
+        return sb.toString();
+    }
 }

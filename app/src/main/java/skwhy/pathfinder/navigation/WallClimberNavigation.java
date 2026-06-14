@@ -1,7 +1,7 @@
 package skwhy.pathfinder.navigation;
 
 import org.jspecify.annotations.Nullable;
-import org.bukkit.util.Vector;
+import org.bukkit.Location;
 import org.bukkit.block.Block;
 
 import skwhy.pathfinder.Mob;
@@ -16,8 +16,8 @@ public class WallClimberNavigation extends GroundPathNavigation {
    }
 
    @Override
-   public Path createPath(final Vector pos, float reachRange) {
-      this.block = world.getBlockAt((int) pos.getX(), (int) pos.getY(), (int) pos.getZ());
+   public Path createPath(final Location pos, float reachRange) {
+      this.block = mob.getWorld().getBlockAt((int) pos.getX(), (int) pos.getY(), (int) pos.getZ());
       return super.createPath(pos, reachRange);
    }
 
@@ -29,7 +29,7 @@ public class WallClimberNavigation extends GroundPathNavigation {
             if (!Mth.closerToCenterThan(block, this.mob.getLocation(), this.mob.getHitbox().getX())
                && (
                   !(this.mob.getY() > this.block.getY())
-                     || Mth.closerToCenterThan(world.getBlockAt(this.block.getX(), (int) this.mob.getY(), this.block.getZ()), this.mob.getLocation(), this.mob.getHitbox().getX())
+                     || Mth.closerToCenterThan(mob.getWorld().getBlockAt(this.block.getX(), (int) this.mob.getY(), this.block.getZ()), this.mob.getLocation(), this.mob.getHitbox().getX())
                )) {
                this.mob
                   .getMoveControl()

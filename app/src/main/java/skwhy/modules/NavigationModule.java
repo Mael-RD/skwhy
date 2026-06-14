@@ -29,7 +29,7 @@ public class NavigationModule implements AddonModule {
 
     @Override
     public void init(SkriptAddon addon) {
-        FakePathFindingClass.register();
+        NavigationSkriptType.register();
     }
 
     @Override

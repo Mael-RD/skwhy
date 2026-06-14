@@ -94,6 +94,7 @@ public class BinaryHeap {
         node.heapIdx = idx;
     }
 
+    @SuppressWarnings("null")
     private void downHeap(int idx) {
         Node node = this.heap[idx];
         float cost = node.f;

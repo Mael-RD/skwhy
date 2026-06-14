@@ -3,11 +3,12 @@ package skwhy.pathfinder;
 // ── Guava ────────────────────────────────────────────────────────────────────
 import com.google.common.collect.Maps;
 
+
 // ── Java std ─────────────────────────────────────────────────────────────────
-import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.Optional;
 
+import org.bukkit.Bukkit;
 // ── Bukkit ───────────────────────────────────────────────────────────────────
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -24,28 +25,14 @@ import skwhy.pathfinder.control.BodyRotationControl;
 import skwhy.pathfinder.control.JumpControl;
 import skwhy.pathfinder.control.LookControl;
 import skwhy.pathfinder.control.MoveControl;
+import skwhy.pathfinder.navigation.AmphibiousPathNavigation;
+import skwhy.pathfinder.navigation.FlyingPathNavigation;
 import skwhy.pathfinder.navigation.GroundPathNavigation;
 import skwhy.pathfinder.navigation.PathNavigation;
+import skwhy.pathfinder.navigation.WallClimberNavigation;
+import skwhy.pathfinder.navigation.WaterBoundPathNavigation;
 import skwhy.pathfinder.pathcalculator.PathType;
 
-/**
- * Fusion de Entity + LivingEntity + Mob (originaux NMS) en une seule classe
- * utilisant exclusivement l'API org.bukkit.
- *
- * Stratégie de remplacement NMS → Bukkit :
- * - Vec3 / Vector NMS → org.bukkit.util.Vector
- * - AABB → org.bukkit.util.BoundingBox
- * - BlockPos → org.bukkit.block.Block / Location
- * - Level / World NMS → org.bukkit.World
- * - Attributes.* → org.bukkit.attribute.Attribute.*
- * - BlockTags / FluidTags → Material checks ou méthodes Bukkit
- * - Mth.* → java.lang.Math + helpers internes
- * - MoverType (enum NMS) → MoverType (enum interne)
- * - EntityType NMS → org.bukkit.entity.EntityType
- * - BlockState NMS → org.bukkit.block.Block + BlockData
- * - VoxelShape / Shapes → supprimés (pas d'équivalent Bukkit direct)
- * - FluidState → isInWater() / isInLava() sur l'entité
- */
 public class Mob {
 
     // ════════════════════════════════════════════════════════════════════════
@@ -54,14 +41,18 @@ public class Mob {
 
     // ── Identité ─────────────────────────────────────────────────────
     private final Entity entity;
-
     private final Integer id;
+    private final Navigation navigation;
+
     private Vector hitbox;
     private Vector position;
+    private float yaw;
+    private float pitch;
     private World world;
 
     private PathfindingType pathfindingType;
     private float speed;
+    private float maxUpStep = 0.6F;
 
     // ── Position ─────────────────────────────────────────────────────────────
 
@@ -71,7 +62,6 @@ public class Mob {
 
     // ── Vitesse (delta movement) ─────────────────────────────────────────────
     private Vector deltaMovement = new Vector(0, 0, 0);
-    private Vector velocity = new Vector(0,0,0);
 
     // ── Rotation ─────────────────────────────────────────────────────────────
     private float yRot;
@@ -82,9 +72,6 @@ public class Mob {
     // ── Flags de collision / mouvement ───────────────────────────────────────
     private boolean onGround;
     public boolean horizontalCollision;
-    public boolean verticalCollision;
-    public boolean verticalCollisionBelow;
-    public boolean minorHorizontalCollision;
     protected Vector stuckSpeedMultiplier = new Vector(0, 0, 0);
 
     // ── Chute ────────────────────────────────────────────────────────────────
@@ -100,20 +87,6 @@ public class Mob {
     protected boolean wasEyeInWater;
     public boolean isInPowderSnow;
     public boolean wasInPowderSnow;
-
-    // ── Bloc porteur ─────────────────────────────────────────────────────────
-    public Optional<Location> mainSupportingBlockPos = Optional.empty();
-    // private boolean onGroundNoBlocks = false;
-
-    // ── Historique de vitesse ─────────────────────────────────────────────────
-    private Vector lastKnownSpeed = new Vector(0, 0, 0);
-    private Vector lastKnownPosition = null;
-
-    // ── Enregistrement de mouvement ──────────────────────────────────────────
-    public static final int MAX_MOVEMENTS_HANDLED_PER_TICK = 100;
-    private final ArrayDeque<Movement> movementThisTick = new ArrayDeque<>(100);
-    // private final List<Movement> finalMovementsThisTick = new ObjectArrayList<>();
-    // private final LongSet visitedBlocks = new LongOpenHashSet();
 
     // ── Flags partagés (bitmask) ─────────────────────────────────────────────
     private byte sharedFlags = 0;
@@ -153,7 +126,7 @@ public class Mob {
     protected MoveControl moveControl;
     protected JumpControl jumpControl;
     private BodyRotationControl bodyRotationControl;
-    protected PathNavigation navigation;
+    protected PathNavigation pathnavigation;
 
     private final Map<PathType, Float> pathfindingMalus = Maps.newEnumMap(PathType.class);
 
@@ -164,11 +137,10 @@ public class Mob {
     // ░░ CONSTRUCTEUR ░░
     // ════════════════════════════════════════════════════════════════════════
 
-    
-    public Mob(Entity entity, PathfindingType pathfindingType, float speed) {
-        this.setPos(0, 0, 0);
+    public Mob(Navigation navigation, Entity entity, PathfindingType pathfindingType, float speed) {
         this.id = null;
         this.entity = entity;
+        this.navigation = navigation;
 
         this.pathfindingType = pathfindingType;
         this.speed = speed;
@@ -178,13 +150,14 @@ public class Mob {
         this.moveControl = new MoveControl(this);
         this.jumpControl = new JumpControl(this);
         this.bodyRotationControl = this.createBodyControl();
-        this.navigation = this.createNavigation();
+        this.pathnavigation = this.createNavigation();
     }
 
-    public Mob(int id, Vector hitbox, Location location, PathfindingType pathfindingType, float speed) {
-        this.setPos(0, 0, 0);
+    public Mob(Navigation navigation, int id, Vector hitbox, Location location, PathfindingType pathfindingType,
+            float speed) {
         this.id = id;
         this.entity = null;
+        this.navigation = navigation;
         this.hitbox = hitbox;
         this.position = new Vector(location.getX(), location.getY(), location.getZ());
         this.world = location.getWorld();
@@ -197,7 +170,7 @@ public class Mob {
         this.moveControl = new MoveControl(this);
         this.jumpControl = new JumpControl(this);
         this.bodyRotationControl = this.createBodyControl();
-        this.navigation = this.createNavigation();
+        this.pathnavigation = this.createNavigation();
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -209,14 +182,19 @@ public class Mob {
     }
 
     public final void setPos(final double x, final double y, final double z) {
-        if (this.position.getX() != x || this.position.getY() != y || this.position.getZ() != z) {
+        if (isRealEntity())
+            entity.teleport(new Location(entity.getWorld(), x, y, z));
+        else {
             this.position = new Vector(x, y, z);
+            navigation.sendTeleportPacket(new Location(world, x, y, z));
         }
     }
 
-    protected void reapplyPosition() {
-        this.lastKnownPosition = null;
-        this.setPos(this.position.getX(), this.position.getY(), this.position.getZ());
+    private void moveTo(final Vector movement) {
+        if (isRealEntity())
+            entity.teleport(entity.getLocation().add(movement));
+        else
+            navigation.sendMovePacket(movement);
     }
 
     public Vector position() {
@@ -242,10 +220,21 @@ public class Mob {
 
     /** Retourne un {@link Location} Bukkit cohérent avec la position interne. */
     public void setLocation(Location location) {
-        if (isRealEntity()) entity.teleport(location);
+        if (isRealEntity())
+            entity.teleport(location);
         else {
             this.position = new Vector(location.getX(), location.getY(), location.getZ());
             this.world = location.getWorld();
+        }
+    }
+
+    public void setYaw(float yaw) {
+        Location location = getLocation();
+        if (isRealEntity())
+            entity.teleport(location);
+        else {
+            this.yaw = yaw;
+            // SEND ROTATION PACKET !
         }
     }
 
@@ -254,7 +243,7 @@ public class Mob {
      * Remplace {@code blockPosition()} NMS.
      */
     public Block blockPosition() {
-        return world.getBlockAt(
+        return getWorld().getBlockAt(
                 (int) Math.floor(getX()),
                 (int) Math.floor(getY()),
                 (int) Math.floor(getZ()));
@@ -301,8 +290,6 @@ public class Mob {
         this.setPos(x, y, z);
         this.setYRot(yRot);
         this.setXRot(xRot);
-        this.setOldPosAndRot();
-        this.reapplyPosition();
     }
 
     public final void setOldPosAndRot() {
@@ -349,11 +336,13 @@ public class Mob {
     }
 
     public Vector getHitbox() {
-        return (isRealEntity()) ? new Vector(entity.getWidth(), entity.getHeight(), entity.getWidth()) : this.hitbox.clone(); 
+        return (isRealEntity()) ? new Vector(entity.getWidth(), entity.getHeight(), entity.getWidth())
+                : this.hitbox.clone();
     }
 
     public void setHitbox(Vector hitbox) {
-        if (isRealEntity()) return;
+        if (isRealEntity())
+            return;
         this.hitbox = hitbox.clone();
     }
 
@@ -393,14 +382,14 @@ public class Mob {
 
     /** Interpolation linéaire d'un angle en degrés (rotLerp). */
     // private float rotlerpDeg(final float a, final float b, final float max) {
-    //     float diff = (float) wrapDegrees(b - a);
-    //     diff = Math.max(-max, Math.min(max, diff));
-    //     float result = a + diff;
-    //     if (result < 0f)
-    //         result += 360f;
-    //     if (result > 360f)
-    //         result -= 360f;
-    //     return result;
+    // float diff = (float) wrapDegrees(b - a);
+    // diff = Math.max(-max, Math.min(max, diff));
+    // float result = a + diff;
+    // if (result < 0f)
+    // result += 360f;
+    // if (result > 360f)
+    // result -= 360f;
+    // return result;
     // }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -438,14 +427,6 @@ public class Mob {
             this.push(impulse.getX(), impulse.getY(), impulse.getZ());
     }
 
-    public Vector getVelocity() {
-        return velocity.clone();
-    }
-
-    public void setVelocity(Vector velocity) {
-        this.velocity = velocity.clone();
-    }
-
     // ════════════════════════════════════════════════════════════════════════
     // ░░ MOUVEMENT PRINCIPAL ░░
     // ════════════════════════════════════════════════════════════════════════
@@ -455,45 +436,34 @@ public class Mob {
      * La résolution réelle des collisions est déléguée à {@link #collide(Vector)}
      * pour permettre aux sous-classes d'injecter leur propre logique.
      */
-    public void move(final MoverType moverType, Vector delta) {
-        delta = this.maybeBackOffFromEdge(delta, moverType);
+    public void move(Vector delta) {
+        Bukkit.getLogger().info("movement : " + delta);
         Vector movement = this.collide(delta);
+        Bukkit.getLogger().info("y1 : " + movement.getY());
         double movementLength = movement.lengthSquared();
 
-        if (movementLength > 1.0e-7 || delta.lengthSquared() - movementLength < 1.0e-7) {
-            if (this.fallDistance != 0.0 && movementLength >= 1.0)
-                this.resetFallDistance();
-            Vector pos = position();
-            Vector newPos = pos.clone().add(movement);
-            this.addMovementThisTick(new Movement(pos, newPos, delta));
-            this.setPos(newPos);
-        }
+        if (movementLength > 1.0e-7 || delta.lengthSquared() - movementLength < 1.0e-7) this.moveTo(movement);
 
-        boolean xColl = Math.abs(delta.getX() - movement.getX()) > 1.0e-5;
-        boolean zColl = Math.abs(delta.getZ() - movement.getZ()) > 1.0e-5;
-        this.horizontalCollision = xColl || zColl;
-        this.verticalCollision = Math.abs(delta.getY() - movement.getY()) > 1.0e-5;
-        this.verticalCollisionBelow = this.verticalCollision && delta.getY() < 0.0;
-        this.setOnGroundWithMovement(this.verticalCollisionBelow, movement);
-        this.minorHorizontalCollision = this.horizontalCollision && this.isHorizontalCollisionMinor(movement);
+        Bukkit.getLogger().info("y2 : " + movement.getY());
 
-        if (this.horizontalCollision) {
-            Vector v = this.getDeltaMovement();
-            this.setDeltaMovement(xColl ? 0 : v.getX(), v.getY(), zColl ? 0 : v.getZ());
+        if (Math.abs(delta.getY() - movement.getY()) > 1.0e-5) {
+            this.deltaMovement.setY(0);
+            Bukkit.getLogger().info("y3 : " + movement.getY());
+            if (delta.getY() < 0.0) this.setOnGround(true);
         }
+        
+        Bukkit.getLogger().info("on ground: " + onGround());
+
+        if (Math.abs(delta.getX() - movement.getX()) > 1.0e-5) this.deltaMovement.setX(0);
+        if (Math.abs(delta.getZ() - movement.getZ()) > 1.0e-5) this.deltaMovement.setZ(0);
 
         float blockSpeedFactor = this.getBlockSpeedFactor();
         Vector dm = this.getDeltaMovement();
         this.setDeltaMovement(dm.getX() * blockSpeedFactor, dm.getY(), dm.getZ() * blockSpeedFactor);
     }
 
-    /**
-     * Résout les collisions pour {@code delta}.
-     * Retourner {@code delta} inchangé revient à ne pas avoir de collisions.
-     * Les sous-classes doivent surcharger cette méthode pour une physique réelle.
-     */
-    protected Vector collide(final Vector delta) {
-        return delta;
+    private Vector collide(final Vector movement) {
+        return Collide.collide(this, movement);
     }
 
     // ── Entrée relative ──────────────────────────────────────────────────────
@@ -577,7 +547,7 @@ public class Mob {
         float slowDown = this.getWaterSlowDown();
 
         this.moveRelative(speed, input);
-        this.move(MoverType.SELF, this.getDeltaMovement());
+        this.move(this.getDeltaMovement());
         Vector ladderMovement = this.getDeltaMovement();
 
         if (this.horizontalCollision && this.onClimbable()) {
@@ -595,7 +565,7 @@ public class Mob {
     private void travelInLava(final Vector input, final double baseGravity,
             final boolean isFalling, final double oldY) {
         this.moveRelative(0.02F, input);
-        this.move(MoverType.SELF, this.getDeltaMovement());
+        this.move(this.getDeltaMovement());
 
         // Hauteur de fluide simplifiée : si dans la lave, on considère immergé
         this.setDeltaMovement(this.getDeltaMovement().multiply(0.5));
@@ -620,7 +590,7 @@ public class Mob {
         } else {
             Vector lastMovement = this.getDeltaMovement();
             this.setDeltaMovement(this.updateFallFlyingMovement(lastMovement));
-            this.move(MoverType.SELF, this.getDeltaMovement());
+            this.move(this.getDeltaMovement());
         }
     }
 
@@ -666,7 +636,7 @@ public class Mob {
     private Vector handleRelativeFrictionAndCalculateMovement(final Vector input, final float friction) {
         this.moveRelative(this.getFrictionInfluencedSpeed(friction), input);
         this.setDeltaMovement(this.handleOnClimbable(this.getDeltaMovement()));
-        this.move(MoverType.SELF, this.getDeltaMovement());
+        this.move(this.getDeltaMovement());
         Vector movement = this.getDeltaMovement();
 
         if ((this.horizontalCollision || this.jumping)
@@ -679,7 +649,6 @@ public class Mob {
 
     private Vector handleOnClimbable(Vector delta) {
         if (this.onClimbable()) {
-            this.resetFallDistance();
             double xd = Math.max(-0.15F, Math.min(0.15F, delta.getX()));
             double zd = Math.max(-0.15F, Math.min(0.15F, delta.getZ()));
             double yd = Math.max(delta.getY(), -0.15F);
@@ -712,50 +681,45 @@ public class Mob {
 
     public void setOnGround(final boolean onGround) {
         this.onGround = onGround;
-        this.checkSupportingBlock(onGround, null);
-    }
-
-    public void setOnGroundWithMovement(final boolean onGround, final Vector movement) {
-        this.onGround = onGround;
-        this.checkSupportingBlock(onGround, movement);
     }
 
     public void setOnGroundWithMovement(final boolean onGround,
-            final boolean horizontalCollision,
-            final Vector movement) {
+            final boolean horizontalCollision) {
         this.onGround = onGround;
         this.horizontalCollision = horizontalCollision;
-        this.checkSupportingBlock(onGround, movement);
     }
 
     public boolean onGround() {
         return this.onGround;
     }
 
-    protected void checkSupportingBlock(final boolean onGround, final Vector movement) {
-        if (!onGround) {
-            this.mainSupportingBlockPos = Optional.empty();
-            // this.onGroundNoBlocks = false;
-        } else {
-            this.mainSupportingBlockPos = Optional.of(new Location(
-                    this.world,
-                    Math.floor(this.getX()),
-                    Math.floor(this.getY() - 1.0e-5),
-                    Math.floor(this.getZ())));
-            // this.onGroundNoBlocks = false;
-        }
-    }
-
     // ════════════════════════════════════════════════════════════════════════
     // ░░ HITBOX ░░
     // ════════════════════════════════════════════════════════════════════════
-    
-    public double  getMinX()       { return getX() - getHitbox().getX() / 2.0; }
-    public double  getMinY()       { return getY(); }
-    public double  getMinZ()       { return getZ() - getHitbox().getZ() / 2.0; }
-    public double  getMaxX()       { return getX() + getHitbox().getX() / 2.0; }
-    public double  getMaxY()       { return getY() + getHitbox().getY(); }
-    public double  getMaxZ()       { return getZ() + getHitbox().getZ() / 2.0; }
+
+    public double getMinX() {
+        return getX() - getHitbox().getX() / 2.0;
+    }
+
+    public double getMinY() {
+        return getY();
+    }
+
+    public double getMinZ() {
+        return getZ() - getHitbox().getZ() / 2.0;
+    }
+
+    public double getMaxX() {
+        return getX() + getHitbox().getX() / 2.0;
+    }
+
+    public double getMaxY() {
+        return getY() + getHitbox().getY();
+    }
+
+    public double getMaxZ() {
+        return getZ() + getHitbox().getZ() / 2.0;
+    }
 
     // ════════════════════════════════════════════════════════════════════════
     // ░░ GRAVITÉ & CHUTE ░░
@@ -767,42 +731,6 @@ public class Mob {
 
     protected double getEffectiveGravity() {
         return this.getGravity();
-    }
-
-    protected void applyGravity() {
-        double g = this.getGravity();
-        if (g != 0.0)
-            this.setDeltaMovement(this.getDeltaMovement().add(new Vector(0, -g, 0)));
-    }
-
-    protected void checkFallDamage(final double ya, final boolean onGround) {
-        if (!this.isInWater() && ya < 0.0)
-            this.fallDistance -= (float) ya;
-        if (onGround) {
-            if (this.fallDistance > 0.0)
-                this.onFallDamage(this.fallDistance);
-            this.resetFallDistance();
-        }
-    }
-
-    protected void onFallDamage(final double fallDistance) {
-        /* à surcharger */ }
-
-    public void resetFallDistance() {
-        this.fallDistance = 0.0;
-    }
-
-    public void checkFallDistanceAccumulation() {
-        if (this.getDeltaMovement().getY() > -0.5 && this.fallDistance > 1.0)
-            this.fallDistance = 1.0;
-    }
-
-    public int getMaxFallDistance() {
-        return getComfortableFallDistance(0.0F);
-    }
-
-    protected final int getComfortableFallDistance(final float allowedDamage) {
-        return (int) Math.floor(allowedDamage + 3.0F);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -819,7 +747,7 @@ public class Mob {
     }
 
     protected void jumpInLiquid() {
-        if (this.navigation.canFloat()) {
+        if (this.pathnavigation.canFloat()) {
             this.setDeltaMovement(this.getDeltaMovement().add(new Vector(0, 0.04, 0)));
         } else {
             this.setDeltaMovement(this.getDeltaMovement().add(new Vector(0, 0.3, 0)));
@@ -838,6 +766,14 @@ public class Mob {
         this.jumping = jump;
     }
 
+    public float getMaxUpStep() {
+        return maxUpStep;
+    }
+
+    public void setMaxUpStep(float maxUpStep) {
+        this.maxUpStep = maxUpStep;
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // ░░ GRIMPABLE (CLIMBABLE) ░░
     // ════════════════════════════════════════════════════════════════════════
@@ -854,7 +790,7 @@ public class Mob {
         }
         // Trapdoor utilisable comme échelle
         if (block.getBlockData() instanceof TrapDoor td && td.isOpen()) {
-            Block below = world.getBlockAt(block.getX(), block.getY() - 1, block.getZ());
+            Block below = getWorld().getBlockAt(block.getX(), block.getY() - 1, block.getZ());
             if (below.getType() == Material.LADDER
                     && below.getBlockData() instanceof org.bukkit.block.data.type.Ladder ladder
                     && ladder.getFacing() == td.getFacing()) {
@@ -944,10 +880,6 @@ public class Mob {
         return 1.0f;
     }
 
-    protected float getBlockJumpFactor() {
-        return 1.0f;
-    }
-
     private float getFrictionInfluencedSpeed(final float blockFriction) {
         return this.onGround
                 ? this.speed * (0.21600002F / (blockFriction * blockFriction * blockFriction))
@@ -976,7 +908,7 @@ public class Mob {
     }
 
     private Block getBlockBelowFeet() {
-        return world.getBlockAt(
+        return getWorld().getBlockAt(
                 (int) Math.floor(getX()),
                 (int) Math.floor(getY() - 0.5001),
                 (int) Math.floor(getZ()));
@@ -984,7 +916,7 @@ public class Mob {
 
     /** Vérifie si une case est libre (pas de bloc solide). */
     protected boolean isFree(final double dx, final double dy, final double dz) {
-        Block b = world.getBlockAt(
+        Block b = getWorld().getBlockAt(
                 (int) Math.floor(getX() + dx),
                 (int) Math.floor(getY() + dy),
                 (int) Math.floor(getZ() + dz));
@@ -1024,7 +956,7 @@ public class Mob {
     public boolean isNoGravity() {
         return isNoGravity;
     }
-    
+
     public void setNoGravity(boolean isNoGravity) {
         this.isNoGravity = isNoGravity;
     }
@@ -1083,6 +1015,9 @@ public class Mob {
     }
 
     public void tick() {
+        serverAiStep();
+        
+        this.travel(getDeltaMovement());
     }
 
     // ── Bulle (bubble column) ─────────────────────────────────────────────────
@@ -1097,7 +1032,6 @@ public class Mob {
         Vector m = this.getDeltaMovement();
         double yd = dragDown ? Math.max(-0.3, m.getY() - 0.03) : Math.min(0.7, m.getY() + 0.06);
         this.setDeltaMovement(m.getX(), yd, m.getZ());
-        this.resetFallDistance();
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1121,7 +1055,14 @@ public class Mob {
     // ════════════════════════════════════════════════════════════════════════
 
     protected PathNavigation createNavigation() {
-        return new GroundPathNavigation(this);
+        return switch (pathfindingType) {
+            case WALK -> new GroundPathNavigation(this);
+            case WALK_WATER -> new AmphibiousPathNavigation(this);
+            case SWIM -> new WaterBoundPathNavigation(this);
+            case FLY, FLY_GROUND -> new FlyingPathNavigation(this);
+            case CLIMB -> new WallClimberNavigation(this);
+            case NONE -> null;
+        };
     }
 
     public float getPathfindingMalus(final PathType pathType) {
@@ -1131,9 +1072,6 @@ public class Mob {
 
     public void setPathfindingMalus(final PathType pathType, final float cost) {
         this.pathfindingMalus.put(pathType, cost);
-    }
-
-    public void onPathfindingStart() {
     }
 
     public void onPathfindingDone() {
@@ -1156,7 +1094,7 @@ public class Mob {
     }
 
     public PathNavigation getNavigation() {
-        return this.navigation;
+        return this.pathnavigation;
     }
 
     public void stopInPlace() {
@@ -1204,106 +1142,10 @@ public class Mob {
     // ── Tick IA serveur ───────────────────────────────────────────────────────
 
     protected final void serverAiStep() {
-        this.navigation.tick();
+        this.pathnavigation.tick();
         this.moveControl.tick();
         this.lookControl.tick();
         this.jumpControl.tick();
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // ░░ ENREGISTREMENT DES MOUVEMENTS ░░
-    // ════════════════════════════════════════════════════════════════════════
-
-    private void addMovementThisTick(final Movement movement) {
-        if (this.movementThisTick.size() >= 100) {
-            Movement first = this.movementThisTick.removeFirst();
-            Movement second = this.movementThisTick.removeFirst();
-            this.movementThisTick.addFirst(new Movement(first.from(), second.to()));
-        }
-        this.movementThisTick.add(movement);
-    }
-
-    public void removeLatestMovementRecording() {
-        if (!this.movementThisTick.isEmpty())
-            this.movementThisTick.removeLast();
-    }
-
-    protected void clearMovementThisTick() {
-        this.movementThisTick.clear();
-    }
-
-    public boolean hasMovedHorizontallyRecently() {
-        Vector v = this.lastKnownSpeed;
-        return Math.abs(Math.sqrt(v.getX() * v.getX() + v.getZ() * v.getZ())) > 1.0e-5;
-    }
-
-    protected void computeSpeed() {
-        if (this.lastKnownPosition == null)
-            this.lastKnownPosition = position();
-        this.lastKnownSpeed = position().subtract(this.lastKnownPosition);
-        this.lastKnownPosition = position();
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // ░░ ENUMS INTERNES ░░
-    // ════════════════════════════════════════════════════════════════════════
-
-    /** Remplace {@code net.minecraft.world.entity.MoverType}. */
-    public enum MoverType {
-        SELF, PLAYER, NOISY, PISTON, SHULKER, SHULKER_BOX
-    }
-
-    public enum MovementEmission {
-        NONE(false, false), SOUNDS(true, false), EVENTS(false, true), ALL(true, true);
-
-        final boolean sounds, events;
-
-        MovementEmission(boolean s, boolean e) {
-            sounds = s;
-            events = e;
-        }
-
-        public boolean emitsAnything() {
-            return events || sounds;
-        }
-
-        public boolean emitsSounds() {
-            return sounds;
-        }
-
-        public boolean emitsEvents() {
-            return events;
-        }
-    }
-
-    protected MovementEmission getMovementEmission() {
-        return MovementEmission.ALL;
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // ░░ RECORD INTERNE — Movement ░░
-    // ════════════════════════════════════════════════════════════════════════
-
-    private record Movement(Vector from, Vector to, Optional<Vector> axisDependentOriginalMovement) {
-        Movement(Vector from, Vector to, Vector axisMovement) {
-            this(from, to, Optional.of(axisMovement));
-        }
-
-        Movement(Vector from, Vector to) {
-            this(from, to, Optional.empty());
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // ░░ STUBS (à surcharger) ░░
-    // ════════════════════════════════════════════════════════════════════════
-
-    protected Vector maybeBackOffFromEdge(Vector delta, MoverType type) {
-        return delta;
-    }
-
-    protected boolean isHorizontalCollisionMinor(Vector movement) {
-        return false;
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1325,5 +1167,117 @@ public class Mob {
         if (d < -180.0)
             d += 360.0;
         return d;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ░░ DEBUG / AFFICHAGE ░░
+    // ════════════════════════════════════════════════════════════════════════
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("╔════════════════════════════════════════════\n");
+        sb.append("║ MOB INFO (").append(isRealEntity() ? "Vraie Entité Bukkit" : "Entité Virtuelle").append(")\n");
+        sb.append("╠════════════════════════════════════════════\n");
+
+        // --- Identité ---
+        sb.append("║ [Identité]\n");
+        sb.append("║ ID: ").append(getId()).append("\n");
+        sb.append("║ En vie: ").append(isAlive() ? "Oui" : "Non").append("\n");
+        if (getWorld() != null) {
+            sb.append("║ Monde: ").append(getWorld().getName()).append("\n");
+        }
+
+        // --- Position & Rotation ---
+        sb.append("║\n║ [Position & Rotation]\n");
+        sb.append(String.format("║ Position: X:%.2f | Y:%.2f | Z:%.2f\n", getX(), getY(), getZ()));
+        sb.append(String.format("║ Rotation: Yaw:%.2f | Pitch:%.2f\n", getYRot(), getXRot()));
+        sb.append(String.format("║ Tête (Yaw): %.2f\n", getYHeadRot()));
+        sb.append("║ Direction: ").append(getDirection()).append("\n");
+        Block b = blockPosition();
+        if (b != null) {
+            sb.append("║ Bloc actuel: ").append(b.getType()).append("\n");
+        }
+
+        // --- Physique & Mouvement ---
+        sb.append("║\n║ [Physique & Mouvement]\n");
+        Vector dm = getDeltaMovement();
+        sb.append(String.format("║ DeltaMovement: %.3f, %.3f, %.3f\n", dm.getX(), dm.getY(), dm.getZ()));
+        sb.append(String.format("║ Vitesse de base: %.3f\n", getSpeed()));
+        Vector hb = getHitbox();
+        if (hb != null) {
+            sb.append(String.format("║ Hitbox (LxHxP): %.2f x %.2f x %.2f\n", hb.getX(), hb.getY(), hb.getZ()));
+        }
+        sb.append("║ Distance de chute: ").append(String.format("%.2f", fallDistance)).append("\n");
+        sb.append("║ Gravité désactivée: ").append(isNoGravity() ? "Oui" : "Non").append("\n");
+
+        // --- États & Environnement ---
+        sb.append("║\n║ [États]\n");
+        sb.append("║ Au sol (onGround): ").append(onGround() ? "Oui" : "Non").append("\n");
+        sb.append("║ En saut: ").append(isJumping() ? "Oui" : "Non").append("\n");
+        sb.append("║ Dans un liquide: ").append(isInLiquid() ? "Oui" : "Non");
+        if (isInLiquid()) {
+            sb.append(" (Eau: ").append(isInWater()).append(", Lave: ").append(isInLava()).append(")");
+        }
+        sb.append("\n");
+        sb.append("║ Sous l'eau: ").append(isUnderWater() ? "Oui" : "Non").append("\n");
+        sb.append("║ En nage: ").append(isSwimming() ? "Oui" : "Non").append("\n");
+        sb.append("║ Sur surface grimpable: ").append(onClimbable() ? "Oui" : "Non").append("\n");
+
+        // --- IA & Navigation ---
+        sb.append("║\n║ [IA & Pathfinding]\n");
+        sb.append("║ Type Pathfinding: ").append(getPathfindingType() != null ? getPathfindingType().name() : "NONE")
+                .append("\n");
+
+        sb.append("╚════════════════════════════════════════════");
+
+        return sb.toString();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ░░ DEBUG MOUVEMENT ░░
+    // ════════════════════════════════════════════════════════════════════════
+
+    public String showMovement() {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("┌────────────────────────────────────────────\n");
+        sb.append("│ DEBUG MOUVEMENT & PHYSIQUE \n");
+        sb.append("├────────────────────────────────────────────\n");
+
+        // --- 1. Positions et Historique ---
+        sb.append("│ [Positions]\n");
+        sb.append(String.format("│ Actuelle  : X:%.3f | Y:%.3f | Z:%.3f\n", getX(), getY(), getZ()));
+        sb.append(String.format("│ xo,yo,zo  : X:%.3f | Y:%.3f | Z:%.3f\n", xo, yo, zo));
+        sb.append(String.format("│ x,y,z Old : X:%.3f | Y:%.3f | Z:%.3f\n", xOld, yOld, zOld));
+
+        // --- 2. Vélocités (Le moteur réel) ---
+        sb.append("│\n│ [Vélocités]\n");
+        Vector dm = getDeltaMovement();
+        sb.append(String.format("│ deltaMovement  : %.4f, %.4f, %.4f\n", dm.getX(), dm.getY(), dm.getZ()));
+        sb.append(String.format("│ speed (Base)   : %.3f\n", speed));
+
+        // --- 3. Inputs (Ce que l'IA essaie de faire) ---
+        sb.append("│\n│ [Inputs IA (Frictions & Strafe)]\n");
+        sb.append(String.format("│ xxa, yya, zza : %.3f, %.3f, %.3f\n", xxa, yya, zza));
+        sb.append("│ En saut (jumping) : ").append(jumping ? "Oui" : "Non").append("\n");
+        sb.append("│ Ignorer friction  : ").append(discardFriction ? "Oui" : "Non").append("\n");
+
+        // --- 4. Rotations ---
+        sb.append("│\n│ [Rotations]\n");
+        sb.append(String.format("│ Actuelle : yRot:%.2f | xRot:%.2f\n", yRot, xRot));
+        sb.append(String.format("│ Ancienne : yRotO:%.2f | xRotO:%.2f\n", yRotO, xRotO));
+        sb.append(String.format("│ Corps/Tête: yBody:%.2f | yHead:%.2f\n", yBodyRot, yHeadRot));
+
+        // --- 5. Collisions & Gravité ---
+        sb.append("│\n│ [Collisions & Gravité]\n");
+        sb.append("│ onGround               : ").append(onGround).append("\n");
+        sb.append("│ Sans Gravité           : ").append(isNoGravity).append("\n");
+        sb.append(String.format("│ Distance chute (fall)  : %.3f\n", fallDistance));
+
+        sb.append("└────────────────────────────────────────────");
+
+        return sb.toString();
     }
 }

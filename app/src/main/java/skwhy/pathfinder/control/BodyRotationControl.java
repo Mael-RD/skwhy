@@ -5,9 +5,9 @@ import skwhy.pathfinder.Mob;
 
 public class BodyRotationControl implements Control {
     private final Mob mob;
-    private static final int HEAD_STABLE_ANGLE = 15;
-    private static final int DELAY_UNTIL_STARTING_TO_FACE_FORWARD = 10;
-    private static final int HOW_LONG_IT_TAKES_TO_FACE_FORWARD = 10;
+    // private static final int HEAD_STABLE_ANGLE = 15;
+    // private static final int DELAY_UNTIL_STARTING_TO_FACE_FORWARD = 10;
+    // private static final int HOW_LONG_IT_TAKES_TO_FACE_FORWARD = 10;
     private int headStableTime;
     private float lastStableYHeadRot;
 

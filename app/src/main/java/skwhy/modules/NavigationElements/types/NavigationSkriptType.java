@@ -8,7 +8,7 @@ import ch.njol.skript.registrations.Classes;
 import ch.njol.yggdrasil.Fields;
 import skwhy.pathfinder.Navigation;
 
-public class FakePathFindingClass {
+public class NavigationSkriptType {
 
     public static void register() {
         Classes.registerClass(new ClassInfo<>(Navigation.class, "navigation")
@@ -37,17 +37,6 @@ public class FakePathFindingClass {
             .since("1.2.0")
             .parser(new Parser<Navigation>() {
                 @Override
-                public String toString(Navigation data, int flags) {
-                    return data.toString();
-                }
-
-                @Override
-                public String toVariableNameString(Navigation data) {
-                    return data.toString();
-                }
-            })
-            .parser(new Parser<Navigation>() {
-                @Override
                 public Navigation parse(String s, ParseContext context) {
                     return null;
                 }
@@ -64,7 +53,7 @@ public class FakePathFindingClass {
 
                 @Override
                 public String toVariableNameString(Navigation o) {
-                    return o.toString();
+                    return null;
                 }
             })
             .serializer(new Serializer<Navigation>() {

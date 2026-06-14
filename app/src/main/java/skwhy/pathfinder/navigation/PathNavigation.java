@@ -1,5 +1,6 @@
 package skwhy.pathfinder.navigation;
 
+import org.bukkit.Bukkit;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.Tag;
@@ -21,8 +22,8 @@ public abstract class PathNavigation {
    private static final int MAX_TIME_RECOMPUTE = 20;
    private static final int STUCK_CHECK_INTERVAL = 100;
    private static final float STUCK_THRESHOLD_DISTANCE_FACTOR = 0.25F;
+   private static final int MAX_STUCK_COUNT = 3;
    protected final Mob mob;
-   protected final World world;
    protected @Nullable Path path;
    protected int tick;
    protected int lastStuckCheck;
@@ -35,45 +36,48 @@ public abstract class PathNavigation {
    protected boolean hasDelayedRecomputation;
    protected long timeLastRecompute;
    protected NodeEvaluator nodeEvaluator;
-   private @Nullable Vector targetPos;
+   private @Nullable Location targetPos;
    private final PathFinder pathFinder;
    private boolean isStuck;
+   private int stuckCount;
 
    public PathNavigation(final Mob mob) {
       this.mob = mob;
-      this.world = mob.getWorld();
       this.pathFinder = this.createPathFinder();
    }
 
-   public @Nullable Vector getTargetPos() {
+   public @Nullable Location getTargetPos() {
       return this.targetPos;
    }
 
    protected abstract PathFinder createPathFinder();
 
    public void recomputePath() {
-      if (this.world.getFullTime() - this.timeLastRecompute <= 20L || !this.canUpdatePath()) {
+      if (this.mob.getWorld().getFullTime() - this.timeLastRecompute < MAX_TIME_RECOMPUTE || !this.canUpdatePath()) {
          this.hasDelayedRecomputation = true;
       } else if (this.targetPos != null) {
-         this.path = null;
          this.path = this.createPath(this.targetPos, 50);
-         this.timeLastRecompute = this.world.getFullTime();
+         this.timeLastRecompute = this.mob.getWorld().getFullTime();
          this.hasDelayedRecomputation = false;
       }
    }
 
-   protected @Nullable Path createPath(Vector target, float maxPathLength) {
-      if (this.mob.getLocation().getY() < this.world.getMinHeight()) {
+   protected @Nullable Path createPath(Location location, float maxPathLength) {
+      if (this.mob.getLocation().getY() < this.mob.getWorld().getMinHeight()) {
+         Bukkit.getLogger().info("sous le monde");
          return null;
-      } else if (!this.canUpdatePath()) {
-         return null;
-      } else if (this.path != null && !this.path.isDone() && target.equals(this.targetPos)) {
+      } else if (this.path != null && !this.path.isDone() && location.equals(this.targetPos)) {
          return this.path;
       } else {
-         Block fromPos = this.mob.getLocation().getBlock();
-         Path path = this.pathFinder.findPath(this.mob, target, maxPathLength);
+         // Block fromPos = this.mob.getLocation().getBlock();
+         Bukkit.getLogger().info("finding path");
+         Path path = this.pathFinder.findPath(this.mob, location, maxPathLength);
+         
+         Bukkit.getLogger().info(pathFinder.toString());
+         Bukkit.getLogger().info(path.toString());
+
          if (path != null && path.getTarget() != null) {
-            this.targetPos = path.getTarget();
+            this.targetPos = new Location(mob.getWorld(), path.getTargetX(), path.getTargetY(), path.getTargetZ());
             this.resetStuckTimeout();
          }
 
@@ -81,8 +85,9 @@ public abstract class PathNavigation {
       }
    }
 
-   public boolean moveTo(Location location, final int reachRange) {
-      Path newPath = this.createPath(new Vector(location.getX(), location.getY(), location.getZ()), reachRange);
+   public boolean moveTo(Location location, final float maxPathLength) {
+      Bukkit.getLogger().info("Move To : " + location);
+      Path newPath = this.createPath(location, maxPathLength);
       if (newPath == null) {
          this.path = null;
          return false;
@@ -136,8 +141,8 @@ public abstract class PathNavigation {
    }
 
    protected double getGroundY(final Vector target) {
-      Block block = this.world.getBlockAt((int) Math.floor(target.getX()), (int) Math.floor(target.getY()), (int) Math.floor(target.getZ()));
-      return block.getRelative(0, -1, 0).getType().isAir() ? target.getY() : WalkNodeEvaluator.getFloorLevel(this.world, block.getX(), block.getY(), block.getZ());
+      Block block = this.mob.getWorld().getBlockAt((int) Math.floor(target.getX()), (int) Math.floor(target.getY()), (int) Math.floor(target.getZ()));
+      return block.getRelative(0, -1, 0).getType().isAir() ? target.getY() : WalkNodeEvaluator.getFloorLevel(this.mob.getWorld(), block.getX(), block.getY(), block.getZ());
    }
 
    protected void followThePath() {
@@ -148,6 +153,7 @@ public abstract class PathNavigation {
       double xDistance = Math.abs(this.mob.getLocation().getX() - (currentNodePos.getX() + 0.5));
       double yDistance = Math.abs(this.mob.getLocation().getY() - currentNodePos.getY());
       double zDistance = Math.abs(this.mob.getLocation().getZ() - (currentNodePos.getZ() + 0.5));
+      Bukkit.getLogger().info("distances : " + xDistance + " " + yDistance + " " + zDistance);
       boolean isCloseEnoughToCurrentNode = xDistance < this.maxDistanceToWaypoint && zDistance < this.maxDistanceToWaypoint && yDistance < 1.0;
       if (isCloseEnoughToCurrentNode || this.canCutCorner(this.path.getNextNode().type) && this.shouldTargetNextNodeInDirection(mobPos)) {
          this.path.advance();
@@ -189,14 +195,21 @@ public abstract class PathNavigation {
    }
 
    protected void doStuckDetection(final Vector mobPos) {
-      if (this.tick - this.lastStuckCheck > 100) {
+      if (this.tick - this.lastStuckCheck > STUCK_CHECK_INTERVAL) {
          float effectiveSpeed = this.mob.getSpeed() >= 1.0F ? this.mob.getSpeed() : this.mob.getSpeed() * this.mob.getSpeed();
-         float thresholdDistance = effectiveSpeed * 100.0F * 0.25F;
+         float thresholdDistance = effectiveSpeed * STUCK_CHECK_INTERVAL * STUCK_THRESHOLD_DISTANCE_FACTOR;
          if (mobPos.distanceSquared(this.lastStuckCheckPos) < thresholdDistance * thresholdDistance) {
             this.isStuck = true;
-            this.stop();
+            this.stuckCount++;
+            if (this.stuckCount >= MAX_STUCK_COUNT) {
+               this.stuckCount = 0;
+               this.stop();
+            } else {
+               this.recomputePath();
+            }
          } else {
             this.isStuck = false;
+            this.stuckCount = 0;
          }
 
          this.lastStuckCheck = this.tick;
@@ -205,7 +218,7 @@ public abstract class PathNavigation {
 
       if (this.path != null && !this.path.isDone()) {
          Vector pos = this.path.getNextNodePos();
-         long time = this.world.getFullTime();
+         long time = this.mob.getWorld().getFullTime();
          if (pos.equals(this.timeoutCachedNode)) {
             this.timeoutTimer = this.timeoutTimer + (time - this.lastTimeoutCheck);
          } else {
@@ -232,6 +245,7 @@ public abstract class PathNavigation {
       this.timeoutTimer = 0L;
       this.timeoutLimit = 0.0;
       this.isStuck = false;
+      this.stuckCount = 0;
    }
 
    public boolean isDone() {
@@ -255,7 +269,7 @@ public abstract class PathNavigation {
          for (int i = 0; i < this.path.getNodeCount(); i++) {
             Node node = this.path.getNode(i);
             Node nextNode = i + 1 < this.path.getNodeCount() ? this.path.getNode(i + 1) : null;
-            Block block = this.world.getBlockAt(node.x, node.y, node.z);
+            Block block = this.mob.getWorld().getBlockAt(node.x, node.y, node.z);
             if (isCauldron(block)) {
                this.path.replaceNode(i, node.cloneAndMove(node.x, node.y + 1, node.z));
                if (nextNode != null && node.y >= nextNode.y) {
@@ -284,7 +298,7 @@ public abstract class PathNavigation {
       Vector to = new Vector(stopPos.getX(), stopPos.getY() + mob.getHitbox().getY() * 0.5, stopPos.getZ());
       Vector direction = to.clone().subtract(startPos);
       double distance = direction.length();
-      if (distance == 0.0) {
+      if (distance == 0) {
          return true;
       }
 
@@ -342,4 +356,58 @@ public abstract class PathNavigation {
    public void setCanOpenDoors(final boolean canOpenDoors) {
       this.nodeEvaluator.setCanOpenDoors(canOpenDoors);
    }
+
+   // ════════════════════════════════════════════════════════════════════════
+    // ░░ DEBUG / AFFICHAGE ░░
+    // ════════════════════════════════════════════════════════════════════════
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("┌────────────────────────────────────────────\n");
+        sb.append("│ PATH NAVIGATION (Logique Interne)\n");
+        sb.append("├────────────────────────────────────────────\n");
+        
+        // --- État Général ---
+        sb.append("│ [État Général]\n");
+        sb.append("│ Ticks de Nav.     : ").append(tick).append("\n");
+        sb.append("│ Re-calcul différé : ").append(hasDelayedRecomputation ? "Oui" : "Non").append("\n");
+        sb.append(String.format("│ Dist. max waypoint: %.3f blocs\n", maxDistanceToWaypoint));
+
+        // --- Cible & Chemin ---
+        sb.append("│\n│ [Cible & Chemin]\n");
+        if (targetPos != null) {
+            sb.append(String.format("│ Cible actuelle    : X:%.2f | Y:%.2f | Z:%.2f\n", targetPos.getX(), targetPos.getY(), targetPos.getZ()));
+        } else {
+            sb.append("│ Cible actuelle    : Aucune\n");
+        }
+        
+        if (path != null) {
+            sb.append("│ Statut du Chemin  : ").append(isDone() ? "Terminé" : "En cours").append("\n");
+            // On inclut le toString du Path en l'indentant proprement
+            String pathStr = path.toString().replace("\n", "\n│   ");
+            sb.append("│   ").append(pathStr).append("\n");
+        } else {
+            sb.append("│ Statut du Chemin  : Aucun chemin défini (null)\n");
+        }
+
+        // --- Détection de blocage (Stuck) ---
+        sb.append("│\n│ [Anti-Blocage (Stuck Detection)]\n");
+        sb.append("│ Est bloqué (Stuck): ").append(isStuck ? "OUI (Arrêt forcé)" : "Non").append("\n");
+        sb.append(String.format("│ Compteur stuck    : %d / %d\n", stuckCount, MAX_STUCK_COUNT));
+        sb.append("│ Dernier check (tk): ").append(lastStuckCheck).append("\n");
+        sb.append(String.format("│ Pos. dernier check: X:%.2f | Y:%.2f | Z:%.2f\n", 
+                lastStuckCheckPos.getX(), lastStuckCheckPos.getY(), lastStuckCheckPos.getZ()));
+
+        // --- Expiration (Timeout) ---
+        sb.append("│\n│ [Expiration (Timeout)]\n");
+        sb.append(String.format("│ Timer / Limite    : %d / %.2f\n", timeoutTimer, timeoutLimit));
+        sb.append(String.format("│ Noeud en cache    : X:%.2f | Y:%.2f | Z:%.2f\n", 
+                timeoutCachedNode.getX(), timeoutCachedNode.getY(), timeoutCachedNode.getZ()));
+        
+        sb.append("└────────────────────────────────────────────");
+        
+        return sb.toString();
+    }
 }

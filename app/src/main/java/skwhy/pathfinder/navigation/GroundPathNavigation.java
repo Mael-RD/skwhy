@@ -1,5 +1,6 @@
 package skwhy.pathfinder.navigation;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -7,6 +8,7 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.util.Vector;
 
+import ch.njol.skript.Skript;
 import skwhy.pathfinder.Mob;
 import skwhy.pathfinder.pathcalculator.PathFinder;
 import skwhy.pathfinder.pathcalculator.Path;
@@ -39,62 +41,56 @@ public class GroundPathNavigation extends PathNavigation {
    }
 
    @Override
-   public Path createPath(Vector pos, float reachRange) {
-      final World world = this.mob.getWorld();
-      final int chunkX = pos.getBlockX() >> 4;
-      final int chunkZ = pos.getBlockX() >> 4;
+   public Path createPath(Location location, float reachRange) {
+      Bukkit.getLogger().info("creating path");
 
-      if (!world.isChunkLoaded(chunkX, chunkZ)) {
+      final Chunk chunk = location.getChunk();
+
+      if (!mob.getWorld().isChunkLoaded(chunk)) {
+         Skript.warning("Destination isn't loaded !");
          return null;
       } else {
-         final Chunk chunk = world.getChunkAt(chunkX, chunkZ);
 
          if (!this.canPathToTargetsBelowSurface) {
-            pos = this.findSurfacePosition(chunk, pos, reachRange);
+            location = this.findSurfacePosition(chunk, location, reachRange);
          }
 
-         return super.createPath(pos, reachRange);
+         return super.createPath(location, reachRange);
       }
    }
 
-   final Vector findSurfacePosition(final Chunk chunk, Vector pos, float reachRange) {
+   final Location findSurfacePosition(final Chunk chunk, Location location, float reachRange) {
       final World world = mob.getWorld();
-      final int x = pos.getBlockX();
-      final int z = pos.getBlockZ();
-      int y = pos.getBlockY();
-      Block block = world.getBlockAt(x,y,z);
+      Location pos = location.clone();
 
-      if (block.getType().isAir()) {
-         int columnY = y - 1;
+      if (world.getBlockAt(pos).getType().isAir()) {
 
-         while (columnY >= world.getMinHeight() && world.getBlockAt(x, columnY, z).getType().isAir()) {
-            columnY--;
+         while (pos.getY() >= world.getMinHeight() && world.getBlockAt(pos).getType().isAir()) {
+            pos.add(0, -1, 0);
          }
 
-         if (columnY >= world.getMinHeight()) {
-            return new Vector(x, columnY + 1, z);
+         if (pos.getY() >= world.getMinHeight()) {
+            return pos;
          }
 
-         columnY = y + 1;
+         pos.setY(location.getY()+1);
 
-         while (columnY <= world.getMaxHeight() - 1 && world.getBlockAt(x, columnY, z).getType().isAir()) {
-            columnY++;
+         while (pos.getY() <= world.getMaxHeight() -1 && world.getBlockAt(pos).getType().isAir()) {
+            pos.add(0, 1, 0);
          }
-
-         block = world.getBlockAt(x, columnY, z);
-         y = columnY;
+         
       }
 
-      if (!block.getType().isSolid()) {
-         return new Vector(block.getX(), block.getY(), block.getZ());
+      if (!world.getBlockAt(pos).getType().isSolid()) {
+         return pos;
       } else {
-         int columnY = y + 1;
+         pos.add(0, 1, 0);
 
-         while (columnY <= world.getMaxHeight() - 1 && world.getBlockAt(x, columnY, z).getType().isSolid()) {
-            columnY++;
+         while (pos.getY() <= world.getMaxHeight() -1 && world.getBlockAt(pos).getType().isSolid()) {
+            pos.add(0, 1, 0);
          }
 
-         return new Vector(x, columnY, z);
+         return pos;
       }
    }
 
@@ -167,5 +163,10 @@ public class GroundPathNavigation extends PathNavigation {
 
    public void setCanPathToTargetsBelowSurface(final boolean canPathToTargetsBelowSurface) {
       this.canPathToTargetsBelowSurface = canPathToTargetsBelowSurface;
+   }
+
+   @Override
+   public String toString() {
+      return super.toString();
    }
 }

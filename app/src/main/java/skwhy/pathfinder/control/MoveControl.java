@@ -1,5 +1,6 @@
 package skwhy.pathfinder.control;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -33,6 +34,7 @@ public class MoveControl implements Control {
     }
 
     public void setWantedPosition(final double x, final double y, final double z) {
+        Bukkit.getLogger().info("Wanted Position set : " + x + " " + y + " " + z);
         this.wantedX        = x;
         this.wantedY        = y;
         this.wantedZ        = z;
@@ -62,7 +64,7 @@ public class MoveControl implements Control {
             case STRAFE  -> tickStrafe();
             case MOVE_TO -> tickMoveTo();
             case JUMPING -> tickJumping();
-            default      -> mob.setVelocity(mob.getVelocity().setX(0).setZ(0));
+            default      -> mob.setDeltaMovement(mob.getDeltaMovement().setX(0).setZ(0));
         }
     }
 
@@ -91,8 +93,8 @@ public class MoveControl implements Control {
         }
 
         // Applique la vélocité horizontale (conserve la composante Y existante)
-        Vector vel = mob.getVelocity();
-        mob.setVelocity(new Vector(dx, vel.getY(), dz));
+        Vector vel = mob.getDeltaMovement();
+        mob.setDeltaMovement(new Vector(dx, vel.getY(), dz));
 
         this.operation = Operation.WAIT;
     }
@@ -110,25 +112,20 @@ public class MoveControl implements Control {
 
         if (dd < MIN_SPEED_SQR) {
             // Destination atteinte : arrêt horizontal
-            Vector vel = mob.getVelocity();
-            mob.setVelocity(new Vector(0, vel.getY(), 0));
+            Vector vel = mob.getDeltaMovement();
+            mob.setDeltaMovement(new Vector(0, vel.getY(), 0));
             return;
         }
 
         // Rotation vers la cible
-        float targetYaw = (float) (Math.toDegrees(Math.atan2(zd, xd))) - 90.0F;
-        float newYaw    = rotlerp(loc.getYaw(), targetYaw, MAX_TURN);
-
-        Location newLoc = loc.clone();
-        newLoc.setYaw(newYaw);
-        mob.setLocation(newLoc);                  // met à jour le yaw serveur
+        mob.setYaw(rotlerp(loc.getYaw(), (float) (Math.toDegrees(Math.atan2(zd, xd))) - 90.0F, MAX_TURN));                  // met à jour le yaw serveur
 
         // Vélocité horizontale vers la cible
         double horiz  = Math.sqrt(xd * xd + zd * zd);
         double vx     = (xd / horiz) * mob.getSpeed();
         double vz     = (zd / horiz) * mob.getSpeed();
 
-        Vector currentVel = mob.getVelocity();
+        Vector currentVel = mob.getDeltaMovement();
 
         // Saut si nécessaire
         float bbWidth = (float) mob.getHitbox().getX();
@@ -142,10 +139,10 @@ public class MoveControl implements Control {
                 && !blockIsDoorOrFence);
 
         if (shouldJump) {
-            mob.setVelocity(new Vector(vx, 0.42, vz));   // 0.42 = force de saut vanilla
+            mob.setDeltaMovement(new Vector(vx, 0.42, vz));   // 0.42 = force de saut vanilla
             this.operation = Operation.JUMPING;
         } else {
-            mob.setVelocity(new Vector(vx, currentVel.getY(), vz));
+            mob.setDeltaMovement(new Vector(vx, currentVel.getY(), vz));
         }
     }
 
@@ -160,8 +157,8 @@ public class MoveControl implements Control {
         if (horiz > 1e-5) {
             double vx = (xd / horiz) * mob.getSpeed();
             double vz = (zd / horiz) * mob.getSpeed();
-            Vector vel = mob.getVelocity();
-            mob.setVelocity(new Vector(vx, vel.getY(), vz));
+            Vector vel = mob.getDeltaMovement();
+            mob.setDeltaMovement(new Vector(vx, vel.getY(), vz));
         }
 
         // Fin du saut : au sol ou dans un liquide avec flottaison

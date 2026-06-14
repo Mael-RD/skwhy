@@ -9,6 +9,8 @@ import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityRelativeMove;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 
+import ch.njol.skript.Skript;
+
 import java.util.*;
 
 /**
@@ -68,17 +70,15 @@ public class Navigation {
     // =========================================================================
 
     /** Entité virtuelle (sans objet Bukkit Entity). */
-    public Navigation(int entityId, Vector hitbox, Location location, PathfindingType pathfindingType, float speed,
-                      List<Player> players) {
-        this.mob = new Mob(entityId, hitbox, location, pathfindingType, speed);
+    public Navigation(int entityId, Vector hitbox, Location location, PathfindingType pathfindingType, float speed, List<Player> players) {
+        this.mob = new Mob(this, entityId, hitbox, location, pathfindingType, speed);
         this.players         = new ArrayList<>(players);
         register();
     }
 
     /** Entité Bukkit réelle. */
     public Navigation(Entity entity, float speed, PathfindingType pathfindingType) {
-        this.mob = new Mob(entity, pathfindingType, speed);
-        this.players         = new ArrayList<>(players);
+        this.mob = new Mob(this, entity, pathfindingType, speed);
         // Un seul navigateur par entité réelle
         REGISTRY.removeIf(n -> n.isRealEntity() && n.getEntity().getEntityId() == entity.getEntityId());
         register();
@@ -92,7 +92,7 @@ public class Navigation {
         if (pauseTicks == PAUSED_INDEFINITELY) return;
         if (pauseTicks > 0) { pauseTicks--; return; }
         if (destination == null) { return; }
-
+        mob.tick();
     }
 
     // =========================================================================
@@ -153,8 +153,14 @@ public class Navigation {
     public void removePlayer(Player p)              { players.remove(p); }
 
     public Location getDestination() { return destination != null ? destination.clone() : null; }
+
     public void setDestination(Location dest) {
         this.destination = dest != null ? dest.clone() : null;
+        if (!mob.getWorld().equals(destination.getWorld())) {
+            Skript.warning("The destination ins't in the right world !");
+            return;
+        }
+        mob.pathnavigation.moveTo(destination, 50F);
     }
 
     public int  getPauseTicks()     { return pauseTicks; }
@@ -163,4 +169,48 @@ public class Navigation {
     public Entity   getEntity()     { return mob.getEntity(); }
     public boolean  isRealEntity()  { return mob.isRealEntity(); }
 
+    // =========================================================================
+    // Debug / Affichage
+    // =========================================================================
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("\n╔════════════════════════════════════════════\n");
+        sb.append("║ NAVIGATION INFO\n");
+        sb.append("╠════════════════════════════════════════════\n");
+        
+        // --- État global ---
+        sb.append("║ [État de la Navigation]\n");
+        if (pauseTicks == PAUSED_INDEFINITELY) {
+            sb.append("║ Statut: PAUSE INDÉFINIE (Arrêté)\n");
+        } else if (pauseTicks > 0) {
+            sb.append("║ Statut: EN PAUSE (Reste ").append(pauseTicks).append(" ticks)\n");
+        } else {
+            sb.append("║ Statut: ACTIF\n");
+        }
+        
+        Location dest = getDestination();
+        if (dest != null) {
+            sb.append(String.format("║ Destination: X:%.2f | Y:%.2f | Z:%.2f\n", dest.getX(), dest.getY(), dest.getZ()));
+        } else {
+            sb.append("║ Destination: Aucune\n");
+        }
+
+        // --- Réseau / Abonnés ---
+        sb.append("║\n║ [Réseau / Joueurs]\n");
+        if (players != null && !players.isEmpty()) {
+            sb.append("║ Joueurs ciblés par les packets: ").append(players.size()).append("\n");
+        } else {
+            sb.append("║ Joueurs ciblés par les packets: Aucun (ou géré par Bukkit)\n");
+        }
+        
+        // --- Inclusion du Mob ---
+        sb.append("║\n");
+        // On insère le toString du mob (qui possède déjà ses propres bordures)
+        sb.append(mob.toString());
+        
+        return sb.toString();
+    }
 }
