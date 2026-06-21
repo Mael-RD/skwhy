@@ -34,7 +34,6 @@ public class MoveControl implements Control {
     }
 
     public void setWantedPosition(final double x, final double y, final double z) {
-        Bukkit.getLogger().info("Wanted Position set : " + x + " " + y + " " + z);
         this.wantedX        = x;
         this.wantedY        = y;
         this.wantedZ        = z;
@@ -130,7 +129,7 @@ public class MoveControl implements Control {
         // Saut si nécessaire
         float bbWidth = (float) mob.getHitbox().getX();
         Block standingBlock = loc.getBlock();
-        boolean onSolidBlock = !standingBlock.getType().isAir();
+        boolean onSolidBlock = standingBlock.getType().isCollidable();
         boolean blockIsDoorOrFence = isDoorOrFence(standingBlock.getType());
 
         boolean shouldJump =
@@ -139,6 +138,7 @@ public class MoveControl implements Control {
                 && !blockIsDoorOrFence);
 
         if (shouldJump) {
+            Bukkit.getLogger().info("Jumping !");
             mob.setDeltaMovement(new Vector(vx, 0.42, vz));   // 0.42 = force de saut vanilla
             this.operation = Operation.JUMPING;
         } else {
@@ -186,7 +186,7 @@ public class MoveControl implements Control {
                 (int) Math.floor(loc.getZ() + dz));
 
         Material type = target.getType();
-        return !type.isAir()
+        return type.isCollidable()
             || (!isLiquid(type) && !isDangerous(type));
     }
 

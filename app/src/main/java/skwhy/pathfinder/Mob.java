@@ -437,22 +437,16 @@ public class Mob {
      * pour permettre aux sous-classes d'injecter leur propre logique.
      */
     public void move(Vector delta) {
-        Bukkit.getLogger().info("movement : " + delta);
         Vector movement = this.collide(delta);
-        Bukkit.getLogger().info("y1 : " + movement.getY());
         double movementLength = movement.lengthSquared();
 
         if (movementLength > 1.0e-7 || delta.lengthSquared() - movementLength < 1.0e-7) this.moveTo(movement);
 
-        Bukkit.getLogger().info("y2 : " + movement.getY());
 
         if (Math.abs(delta.getY() - movement.getY()) > 1.0e-5) {
             this.deltaMovement.setY(0);
-            Bukkit.getLogger().info("y3 : " + movement.getY());
             if (delta.getY() < 0.0) this.setOnGround(true);
         }
-        
-        Bukkit.getLogger().info("on ground: " + onGround());
 
         if (Math.abs(delta.getX() - movement.getX()) > 1.0e-5) this.deltaMovement.setX(0);
         if (Math.abs(delta.getZ() - movement.getZ()) > 1.0e-5) this.deltaMovement.setZ(0);

@@ -1,6 +1,5 @@
 package skwhy.pathfinder.navigation;
 
-import org.bukkit.Bukkit;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.Tag;
@@ -64,17 +63,12 @@ public abstract class PathNavigation {
 
    protected @Nullable Path createPath(Location location, float maxPathLength) {
       if (this.mob.getLocation().getY() < this.mob.getWorld().getMinHeight()) {
-         Bukkit.getLogger().info("sous le monde");
          return null;
       } else if (this.path != null && !this.path.isDone() && location.equals(this.targetPos)) {
          return this.path;
       } else {
          // Block fromPos = this.mob.getLocation().getBlock();
-         Bukkit.getLogger().info("finding path");
          Path path = this.pathFinder.findPath(this.mob, location, maxPathLength);
-         
-         Bukkit.getLogger().info(pathFinder.toString());
-         Bukkit.getLogger().info(path.toString());
 
          if (path != null && path.getTarget() != null) {
             this.targetPos = new Location(mob.getWorld(), path.getTargetX(), path.getTargetY(), path.getTargetZ());
@@ -86,7 +80,6 @@ public abstract class PathNavigation {
    }
 
    public boolean moveTo(Location location, final float maxPathLength) {
-      Bukkit.getLogger().info("Move To : " + location);
       Path newPath = this.createPath(location, maxPathLength);
       if (newPath == null) {
          this.path = null;
@@ -153,7 +146,6 @@ public abstract class PathNavigation {
       double xDistance = Math.abs(this.mob.getLocation().getX() - (currentNodePos.getX() + 0.5));
       double yDistance = Math.abs(this.mob.getLocation().getY() - currentNodePos.getY());
       double zDistance = Math.abs(this.mob.getLocation().getZ() - (currentNodePos.getZ() + 0.5));
-      Bukkit.getLogger().info("distances : " + xDistance + " " + yDistance + " " + zDistance);
       boolean isCloseEnoughToCurrentNode = xDistance < this.maxDistanceToWaypoint && zDistance < this.maxDistanceToWaypoint && yDistance < 1.0;
       if (isCloseEnoughToCurrentNode || this.canCutCorner(this.path.getNextNode().type) && this.shouldTargetNextNodeInDirection(mobPos)) {
          this.path.advance();

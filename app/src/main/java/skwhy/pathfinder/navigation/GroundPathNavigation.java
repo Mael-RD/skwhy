@@ -1,6 +1,5 @@
 package skwhy.pathfinder.navigation;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -42,7 +41,6 @@ public class GroundPathNavigation extends PathNavigation {
 
    @Override
    public Path createPath(Location location, float reachRange) {
-      Bukkit.getLogger().info("creating path");
 
       final Chunk chunk = location.getChunk();
 
