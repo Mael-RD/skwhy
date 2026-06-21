@@ -17,7 +17,7 @@ public class BodyRotationControl implements Control {
 
     public void clientTick() {
         if (this.isMoving()) {
-            this.mob.yBodyRot = this.mob.getYRot();
+            this.mob.yBodyRot = this.mob.getYaw();
             this.rotateHeadIfNecessary();
             this.lastStableYHeadRot = this.mob.yHeadRot;
             this.headStableTime = 0;

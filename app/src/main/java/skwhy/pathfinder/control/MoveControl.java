@@ -5,21 +5,25 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.util.Vector;
+import org.bukkit.util.VoxelShape;
+import org.bukkit.util.BoundingBox;
+import org.bukkit.Tag;
+
 import skwhy.pathfinder.Mob;
 
 public class MoveControl implements Control {
 
-    public static final float MIN_SPEED     = 5.0E-4F;
+    public static final float MIN_SPEED = 5.0E-4F;
     public static final float MIN_SPEED_SQR = 2.5000003E-7F;
-    protected static final int MAX_TURN     = 90;
+    protected static final int MAX_TURN = 90;
 
     protected final Mob mob;
 
     protected double wantedX;
     protected double wantedY;
     protected double wantedZ;
-    protected float  strafeForwards;
-    protected float  strafeRight;
+    protected float strafeForwards;
+    protected float strafeRight;
 
     protected Operation operation = Operation.WAIT;
 
@@ -34,61 +38,70 @@ public class MoveControl implements Control {
     }
 
     public void setWantedPosition(final double x, final double y, final double z) {
-        this.wantedX        = x;
-        this.wantedY        = y;
-        this.wantedZ        = z;
+        this.wantedX = x;
+        this.wantedY = y;
+        this.wantedZ = z;
         if (this.operation != Operation.JUMPING) {
             this.operation = Operation.MOVE_TO;
         }
     }
 
     public void strafe(final float forwards, final float right) {
-        this.operation      = Operation.STRAFE;
+        this.operation = Operation.STRAFE;
         this.strafeForwards = forwards;
-        this.strafeRight    = right;
+        this.strafeRight = right;
     }
 
     public void setWait() {
         this.operation = Operation.WAIT;
     }
 
-    public double getWantedX() { return this.wantedX; }
-    public double getWantedY() { return this.wantedY; }
-    public double getWantedZ() { return this.wantedZ; }
+    public double getWantedX() {
+        return this.wantedX;
+    }
+
+    public double getWantedY() {
+        return this.wantedY;
+    }
+
+    public double getWantedZ() {
+        return this.wantedZ;
+    }
 
     // ─── Tick principal ──────────────────────────────────────────────────────
 
     public void tick() {
         switch (this.operation) {
-            case STRAFE  -> tickStrafe();
+            case STRAFE -> tickStrafe();
             case MOVE_TO -> tickMoveTo();
             case JUMPING -> tickJumping();
-            default      -> mob.setDeltaMovement(mob.getDeltaMovement().setX(0).setZ(0));
+            default -> mob.setDeltaMovement(mob.getDeltaMovement().setX(0).setZ(0));
         }
     }
 
     // ─── Logique STRAFE ──────────────────────────────────────────────────────
 
     private void tickStrafe() {
-        float xa   = this.strafeForwards;
-        float za   = this.strafeRight;
+        float xa = this.strafeForwards;
+        float za = this.strafeRight;
         float dist = (float) Math.sqrt(xa * xa + za * za);
-        if (dist < 1.0F) dist = 1.0F;
+        if (dist < 1.0F)
+            dist = 1.0F;
 
         dist = mob.getSpeed() / dist;
-        xa  *= dist;
-        za  *= dist;
+        xa *= dist;
+        za *= dist;
 
         float yawRad = (float) Math.toRadians(mob.getLocation().getYaw());
-        float sin    = (float) Math.sin(yawRad);
-        float cos    = (float) Math.cos(yawRad);
+        float sin = (float) Math.sin(yawRad);
+        float cos = (float) Math.cos(yawRad);
 
         float dx = xa * cos - za * sin;
         float dz = za * cos + xa * sin;
 
         if (!isWalkable(dx, dz)) {
             this.strafeForwards = 1.0F;
-            this.strafeRight    = 0.0F;
+            this.strafeRight = 0.0F;
         }
 
         // Applique la vélocité horizontale (conserve la composante Y existante)
@@ -117,29 +130,39 @@ public class MoveControl implements Control {
         }
 
         // Rotation vers la cible
-        mob.setYaw(rotlerp(loc.getYaw(), (float) (Math.toDegrees(Math.atan2(zd, xd))) - 90.0F, MAX_TURN));                  // met à jour le yaw serveur
+        mob.setYaw(rotlerp(loc.getYaw(), (float) (Math.toDegrees(Math.atan2(zd, xd))) - 90.0F, MAX_TURN)); // met à jour
+                                                                                                           // le yaw
+                                                                                                           // serveur
 
         // Vélocité horizontale vers la cible
-        double horiz  = Math.sqrt(xd * xd + zd * zd);
-        double vx     = (xd / horiz) * mob.getSpeed();
-        double vz     = (zd / horiz) * mob.getSpeed();
+        double horiz = Math.sqrt(xd * xd + zd * zd);
+        double vx = (xd / horiz) * mob.getSpeed();
+        double vz = (zd / horiz) * mob.getSpeed();
 
         Vector currentVel = mob.getDeltaMovement();
 
         // Saut si nécessaire
         float bbWidth = (float) mob.getHitbox().getX();
         Block standingBlock = loc.getBlock();
-        boolean onSolidBlock = standingBlock.getType().isCollidable();
-        boolean blockIsDoorOrFence = isDoorOrFence(standingBlock.getType());
+        Material mat = standingBlock.getType();
+        VoxelShape shape = standingBlock.getCollisionShape();
+        boolean hasCollision = !shape.getBoundingBoxes().isEmpty();
+        double maxShapeY = 0.0;
+        if (hasCollision) {
+            for (BoundingBox box : shape.getBoundingBoxes()) {
+                if (box.getMaxY() > maxShapeY) {
+                    maxShapeY = box.getMaxY();
+                }
+            }
+        }
 
-        boolean shouldJump =
-            (yd > getMaxUpStep() && xd * xd + zd * zd < Math.max(1.0F, bbWidth))
-            || (onSolidBlock && loc.getY() < standingBlock.getY() + 1.0
-                && !blockIsDoorOrFence);
-
-        if (shouldJump) {
-            Bukkit.getLogger().info("Jumping !");
-            mob.setDeltaMovement(new Vector(vx, 0.42, vz));   // 0.42 = force de saut vanilla
+        if ((yd > getMaxUpStep() && xd * xd + zd * zd < Math.max(1.0F, bbWidth))
+                || (hasCollision
+                        && loc.getY() < standingBlock.getY() + maxShapeY
+                        && !(Tag.DOORS.isTagged(mat)
+                                || Tag.FENCES.isTagged(mat)
+                                || Tag.WOODEN_FENCES.isTagged(mat)))) {
+            mob.setDeltaMovement(new Vector(vx, 0.42, vz)); // 0.42 = force de saut vanilla
             this.operation = Operation.JUMPING;
         } else {
             mob.setDeltaMovement(new Vector(vx, currentVel.getY(), vz));
@@ -149,10 +172,10 @@ public class MoveControl implements Control {
     // ─── Logique JUMPING ─────────────────────────────────────────────────────
 
     private void tickJumping() {
-        Location loc  = mob.getLocation();
-        double xd     = this.wantedX - loc.getX();
-        double zd     = this.wantedZ - loc.getZ();
-        double horiz  = Math.sqrt(xd * xd + zd * zd);
+        Location loc = mob.getLocation();
+        double xd = this.wantedX - loc.getX();
+        double zd = this.wantedZ - loc.getZ();
+        double horiz = Math.sqrt(xd * xd + zd * zd);
 
         if (horiz > 1e-5) {
             double vx = (xd / horiz) * mob.getSpeed();
@@ -179,15 +202,15 @@ public class MoveControl implements Control {
 
     /** Vérifie si la case cible est praticable (non-liquide, non-danger). */
     private boolean isWalkable(final float dx, final float dz) {
-        Location loc   = mob.getLocation();
-        Block target   = loc.getWorld().getBlockAt(
+        Location loc = mob.getLocation();
+        Block target = loc.getWorld().getBlockAt(
                 (int) Math.floor(loc.getX() + dx),
                 loc.getBlockY(),
                 (int) Math.floor(loc.getZ() + dz));
 
         Material type = target.getType();
-        return type.isCollidable()
-            || (!isLiquid(type) && !isDangerous(type));
+        return !type.isEmpty()
+                || (!isLiquid(type) && !isDangerous(type));
     }
 
     /** Indique si l'entité est dans un liquide et affectée par celui-ci. */
@@ -201,8 +224,8 @@ public class MoveControl implements Control {
 
     private static boolean isDangerous(Material m) {
         return m == Material.FIRE
-            || m == Material.LAVA
-            || m.name().contains("CACTUS");
+                || m == Material.LAVA
+                || m.name().contains("CACTUS");
     }
 
     private static boolean isDoorOrFence(Material m) {
@@ -211,22 +234,27 @@ public class MoveControl implements Control {
     }
 
     /**
-     * Interpole un angle {@code a} vers {@code b} avec un pas maximum de {@code max}
+     * Interpole un angle {@code a} vers {@code b} avec un pas maximum de
+     * {@code max}
      * degrés, en restant dans [0, 360[.
      */
     protected float rotlerp(final float a, final float b, final float max) {
         float diff = wrapDegrees(b - a);
         diff = Math.max(-max, Math.min(max, diff));
         float result = a + diff;
-        if (result < 0.0F)   result += 360.0F;
-        if (result > 360.0F) result -= 360.0F;
+        if (result < 0.0F)
+            result += 360.0F;
+        if (result > 360.0F)
+            result -= 360.0F;
         return result;
     }
 
     private static float wrapDegrees(float deg) {
         deg %= 360.0F;
-        if (deg >= 180.0F)  deg -= 360.0F;
-        if (deg < -180.0F)  deg += 360.0F;
+        if (deg >= 180.0F)
+            deg -= 360.0F;
+        if (deg < -180.0F)
+            deg += 360.0F;
         return deg;
     }
 

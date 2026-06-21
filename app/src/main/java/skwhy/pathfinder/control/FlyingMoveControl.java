@@ -28,13 +28,13 @@ public class FlyingMoveControl extends MoveControl {
          }
 
          float yRotD = (float)(Math.atan2(zd, xd) * 180.0F / (float)Math.PI) - 90.0F;
-         this.mob.setYRot(this.rotlerp(this.mob.getYRot(), yRotD, 90.0F));
+         this.mob.setYaw(this.rotlerp(this.mob.getYaw(), yRotD, 90.0F));
 
          this.mob.setSpeed(this.mob.getSpeed());
          double sd = Math.sqrt(xd * xd + zd * zd);
          if (Math.abs(yd) > 1.0E-5F || Math.abs(sd) > 1.0E-5F) {
             float xRotD = (float)(-(Math.atan2(yd, sd) * 180.0F / (float)Math.PI));
-            this.mob.setXRot(this.rotlerp(this.mob.getXRot(), xRotD, this.maxTurn));
+            this.mob.setPitch(this.rotlerp(this.mob.getPitch(), xRotD, this.maxTurn));
             this.mob.setYya(yd > 0.0 ? this.mob.getSpeed() : -this.mob.getSpeed());
          }
       } else {

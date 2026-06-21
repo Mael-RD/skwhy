@@ -37,19 +37,19 @@ public class SmoothSwimmingMoveControl extends MoveControl {
             this.mob.setZza(0.0F);
          } else {
             float yRotD = (float)(Math.atan2(zd, xd) * 180.0F / (float)Math.PI) - 90.0F;
-            this.mob.setYRot(this.rotlerp(this.mob.getYRot(), yRotD, this.maxTurnY));
-            this.mob.yBodyRot = this.mob.getYRot();
-            this.mob.yHeadRot = this.mob.getYRot();
+            this.mob.setYaw(this.rotlerp(this.mob.getYaw(), yRotD, this.maxTurnY));
+            this.mob.yBodyRot = this.mob.getYaw();
+            this.mob.yHeadRot = this.mob.getYaw();
             if (this.mob.isInWater()) {
                double sqrt = Math.sqrt(xd * xd + zd * zd);
                if (Math.abs(yd) > 1.0E-5F || Math.abs(sqrt) > 1.0E-5F) {
                   float xRotD = -((float)(Math.atan2(yd, sqrt) * 180.0F / (float)Math.PI));
                   xRotD = Math.clamp(Mth.wrapDegrees(xRotD), (float)(-this.maxTurnX), (float)this.maxTurnX);
-                  this.mob.setXRot(this.rotateTowards(this.mob.getXRot(), xRotD, 5.0F));
+                  this.mob.setPitch(this.rotateTowards(this.mob.getPitch(), xRotD, 5.0F));
                }
 
-               float cos = (float)Math.cos(this.mob.getXRot() * (Math.PI / 180.0));
-               float sin = (float)Math.sin(this.mob.getXRot() * (Math.PI / 180.0));
+               float cos = (float)Math.cos(this.mob.getPitch() * (Math.PI / 180.0));
+               float sin = (float)Math.sin(this.mob.getPitch() * (Math.PI / 180.0));
                this.mob.zza = cos * mob.getSpeed();
                this.mob.yya = -sin * mob.getSpeed();
             }

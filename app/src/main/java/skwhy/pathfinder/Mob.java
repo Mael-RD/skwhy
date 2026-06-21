@@ -8,7 +8,6 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
 
-import org.bukkit.Bukkit;
 // ── Bukkit ───────────────────────────────────────────────────────────────────
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -46,8 +45,6 @@ public class Mob {
 
     private Vector hitbox;
     private Vector position;
-    private float yaw;
-    private float pitch;
     private World world;
 
     private PathfindingType pathfindingType;
@@ -228,14 +225,22 @@ public class Mob {
         }
     }
 
+    public void setYawPitch(float yaw, float pitch) {
+        if (Float.isFinite(yaw) && Float.isFinite(pitch))
+            if (isRealEntity())
+                entity.setRotation(yaw, pitch);
+            else {
+                this.yRot = yaw;
+                this.xRot = pitch;
+            }
+    }
+
     public void setYaw(float yaw) {
-        Location location = getLocation();
-        if (isRealEntity())
-            entity.teleport(location);
-        else {
-            this.yaw = yaw;
-            // SEND ROTATION PACKET !
-        }
+        setYawPitch(yaw, (isRealEntity()) ? entity.getPitch() : xRot);
+    }
+
+    public void setPitch(float pitch) {
+        setYawPitch((isRealEntity()) ? entity.getYaw() : yRot, pitch);
     }
 
     /**
@@ -276,10 +281,10 @@ public class Mob {
     }
 
     public void absSnapRotationTo(final float yRot, final float xRot) {
-        this.setYRot(yRot % 360.0f);
-        this.setXRot((float) Math.max(-90f, Math.min(90f, xRot)) % 360.0f);
-        this.yRotO = this.getYRot();
-        this.xRotO = this.getXRot();
+        this.setYaw(yRot % 360.0f);
+        this.setPitch((float) Math.max(-90f, Math.min(90f, xRot)) % 360.0f);
+        this.yRotO = this.getYaw();
+        this.xRotO = this.getPitch();
     }
 
     public void snapTo(final double x, final double y, final double z) {
@@ -288,8 +293,8 @@ public class Mob {
 
     public void snapTo(final double x, final double y, final double z, final float yRot, final float xRot) {
         this.setPos(x, y, z);
-        this.setYRot(yRot);
-        this.setXRot(xRot);
+        this.setYaw(yRot);
+        this.setPitch(xRot);
     }
 
     public final void setOldPosAndRot() {
@@ -312,27 +317,12 @@ public class Mob {
     // ░░ ROTATION ░░
     // ════════════════════════════════════════════════════════════════════════
 
-    protected void setRot(final float yRot, final float xRot) {
-        this.setYRot(yRot % 360.0f);
-        this.setXRot(xRot % 360.0f);
+    public float getYaw() {
+        return (isRealEntity()) ? entity.getYaw() : yRot;
     }
 
-    public void setYRot(final float yRot) {
-        if (Float.isFinite(yRot))
-            this.yRot = yRot;
-    }
-
-    public void setXRot(final float xRot) {
-        if (Float.isFinite(xRot))
-            this.xRot = (float) Math.max(-90f, Math.min(90f, xRot % 360.0f));
-    }
-
-    public float getYRot() {
-        return yRot;
-    }
-
-    public float getXRot() {
-        return xRot;
+    public float getPitch() {
+        return (isRealEntity()) ? entity.getPitch() : xRot;
     }
 
     public Vector getHitbox() {
@@ -354,8 +344,8 @@ public class Mob {
     public void turn(final double xo, final double yo) {
         float xDelta = (float) yo * 0.15f;
         float yDelta = (float) xo * 0.15f;
-        this.setXRot(this.xRot + xDelta);
-        this.setYRot(this.yRot + yDelta);
+        this.setPitch(this.xRot + xDelta);
+        this.setYaw(this.yRot + yDelta);
         this.xRotO += xDelta;
         this.yRotO += yDelta;
     }
@@ -501,22 +491,33 @@ public class Mob {
     }
 
     private void travelInAir(final Vector input) {
-        // Friction du bloc sous l'entité (valeur Bukkit approchée via Material)
         float blockFriction = this.onGround
                 ? getBlockFriction(getBlockBelowFeet())
                 : 1.0F;
         float friction = blockFriction * 0.91F;
 
-        Vector movement = this.handleRelativeFrictionAndCalculateMovement(input, blockFriction);
-        double movementY = movement.getY() - this.getEffectiveGravity();
+        // 1. Appliquer la gravité sur deltaMovement AVANT move()
+        if (!this.shouldDiscardFriction() && !this.isNoGravity()) {
+            this.setDeltaMovement(
+                getDeltaMovement().getX(),
+                getDeltaMovement().getY() - this.getEffectiveGravity(),
+                getDeltaMovement().getZ()
+            );
+        }
 
+        // 2. moveRelative + move() via handleRelativeFriction
+        Vector movement = this.handleRelativeFrictionAndCalculateMovement(input, blockFriction);
+
+        // 3. Appliquer la friction horizontale (et verticale si créature volante)
+        float vertFriction = isFlyingCreature() ? friction : 0.98F;
         if (this.shouldDiscardFriction()) {
-            this.setDeltaMovement(movement.getX(), movementY, movement.getZ());
+            this.setDeltaMovement(movement.getX(), movement.getY(), movement.getZ());
         } else {
-            // FlyingAnimal check simplifié → toujours 0.98 ici ; sous-classes peuvent
-            // surcharger
-            float vertFriction = isFlyingCreature() ? friction : 0.98F;
-            this.setDeltaMovement(movement.getX() * friction, movementY * vertFriction, movement.getZ() * friction);
+            this.setDeltaMovement(
+                movement.getX() * friction,
+                movement.getY() * vertFriction,
+                movement.getZ() * friction
+            );
         }
     }
 
@@ -997,7 +998,7 @@ public class Mob {
             final double tyRot, final double txRot) {
         double alpha = 1.0 / steps;
         this.setPos(lerp(alpha, getX(), tx), lerp(alpha, getY(), ty), lerp(alpha, getZ(), tz));
-        this.setRot((float) rotLerp(alpha, getYRot(), tyRot), (float) lerp(alpha, getXRot(), txRot));
+        this.setYawPitch((float) rotLerp(alpha, getYaw(), tyRot), (float) lerp(alpha, getPitch(), txRot));
     }
 
     public boolean shouldDiscardFriction() {
@@ -1103,6 +1104,7 @@ public class Mob {
 
     protected void tickHeadTurn(final float yBodyRotT) {
         this.bodyRotationControl.clientTick();
+        this.yRot = this.yBodyRot;
     }
 
     public int getMaxHeadXRot() {
@@ -1140,6 +1142,7 @@ public class Mob {
         this.moveControl.tick();
         this.lookControl.tick();
         this.jumpControl.tick();
+        this.tickHeadTurn(this.yBodyRot);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1186,7 +1189,7 @@ public class Mob {
         // --- Position & Rotation ---
         sb.append("║\n║ [Position & Rotation]\n");
         sb.append(String.format("║ Position: X:%.2f | Y:%.2f | Z:%.2f\n", getX(), getY(), getZ()));
-        sb.append(String.format("║ Rotation: Yaw:%.2f | Pitch:%.2f\n", getYRot(), getXRot()));
+        sb.append(String.format("║ Rotation: Yaw:%.2f | Pitch:%.2f\n", getYaw(), getPitch()));
         sb.append(String.format("║ Tête (Yaw): %.2f\n", getYHeadRot()));
         sb.append("║ Direction: ").append(getDirection()).append("\n");
         Block b = blockPosition();
