@@ -86,9 +86,9 @@ public class ReplyToRequest extends Effect {
             SyntaxRegistry.EFFECT,
             SyntaxInfo.builder(ReplyToRequest.class)
                 // Pattern 0 : sans code
-                .addPattern("reply to %apirequest% with %string%")
+                .addPattern("reply to %api request% with %string%")
                 // Pattern 1 : avec code HTTP explicite
-                .addPattern("reply to %apirequest% with code %number% and %string%")
+                .addPattern("reply to %api request% with code %number% and %string%")
                 .build()
         );
     }
