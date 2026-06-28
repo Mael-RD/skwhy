@@ -19,3 +19,4 @@ types:
 
   #others
   navigation: navigation@navigations
+  api_request: api request@api requests

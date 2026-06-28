@@ -13,6 +13,7 @@ import skwhy.request.APIserver;
 import skwhy.modules.API.events.API_request_event;
 import skwhy.modules.API.types.API_request;
 import skwhy.modules.API.expressions.RequestContent;
+import skwhy.modules.API.effects.ReplyToRequest;
 
 public class APIModule implements AddonModule {
 
@@ -73,6 +74,7 @@ public class APIModule implements AddonModule {
         }
 
         RequestContent.register(addon);
+        ReplyToRequest.register(addon);
     }
 
     /**
