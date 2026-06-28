@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class StreamingSpeechSession {
 
     private static final int AUDIO_QUEUE_CAPACITY = 300;
-    private static final long PHRASE_COOLDOWN_MS = 1200; // Évite que "utilise soin" s'active 2x en 1 seconde
+    private static final long PHRASE_COOLDOWN_MS = 200; // Évite que "utilise soin" s'active 2x en 1 seconde
 
     private final UUID playerId;
     private final Model voskModel;

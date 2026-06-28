@@ -1,12 +1,25 @@
 # Configuration minimale pour VoiceSkript
 modules:
   fake_display: true
-  fake_pathfinding: false
+  fake_pathfinding: true
   random_stuff: true
   voice: true
+  api: true
+  request: true
 
 voice:
   # Nom du dossier du modèle Vosk (présent dans plugins/SkWhy/model/)
   model: model
   # Timeout par défaut pour la fenêtre de payload (ms)
   default_timeout_ms: 3000
+
+api_rest:
+  # Port pour les requête
+  port: 443
+  # Clef API secrète à utiliser dans les requêtes
+  key: ""
+  
+  use_https: true
+  # Chemin vers le certificat et la clef privée, generate the certificat by yourself or disable use_https.
+  certificat: "certificat.cert"
+  private_key: "key.key"

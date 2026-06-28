@@ -132,16 +132,14 @@ public class VoiceModule implements AddonModule {
     // -------------------------------------------------------------------------
 
     public void onPhraseDetected(UUID playerId, String matchedPhrase, double confidence) {
-        Player player = Bukkit.getPlayer(playerId);
-        if (player == null || !player.isOnline()) return;
+        // C'est ici qu'on fait le pont entre le thread Asynchrone de Vosk et le thread Sync de Bukkit
+        Bukkit.getScheduler().runTask(SkWhy.getInstance(), () -> {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline()) return;
 
-        // Restaurer la casse/accents originaux de la phrase (non normalisée)
-        // Note : la phrase stockée dans Skript sera la version normalisée.
-        // Pour retourner la phrase originale, stocker un Map normalise→original dans VoiceListener.
-        // (optionnel, dépend du besoin)
-
-        VoicePhraseDetected event = new VoicePhraseDetected(player, matchedPhrase);
-        Bukkit.getPluginManager().callEvent(event);
+            VoicePhraseDetected event = new VoicePhraseDetected(player, matchedPhrase);
+            Bukkit.getPluginManager().callEvent(event);
+        });
     }
 
     

@@ -21,6 +21,8 @@ import org.skriptlang.skript.docs.Origin;
 import skwhy.modules.VoiceModule;
 import skwhy.voice.VoiceListener;
 
+import de.maxhenkel.voicechat.api.VoicechatServerApi;
+
 @Name("Has Voice")
 @Description("Checks if one or more players are currently connected and using the voice module.")
 @Examples({
@@ -70,8 +72,20 @@ public class HasVoice extends Condition {
         VoiceListener listener = VoiceModule.getVoiceListener();
         if (listener == null) return isNegated();
 
+        // 1. Récupérer l'API SimpleVoiceChat depuis ton VoiceListener
+        VoicechatServerApi api = (VoicechatServerApi) listener.getApi(); 
+        
+        // Si l'API n'est pas chargée, on considère que le joueur n'a pas le vocal
+        if (api == null) return isNegated();
+
         for (Player player : players) {
-            if (listener.isListening(player) == isNegated()) return false;
+            // 2. La vérification se fait directement ici :
+            // Si getConnectionOf ne renvoie pas null, le joueur est connecté au vocal
+            boolean hasVoice = api.getConnectionOf(player.getUniqueId()) != null;
+            
+            if (hasVoice == isNegated()) {
+                return false;
+            }
         }
         return true;
     }

@@ -38,6 +38,10 @@ public class VoiceListener implements VoicechatPlugin {
         this.voicechatApi = api;
     }
 
+    public VoicechatApi getApi() {
+        return voicechatApi;
+    }
+
     public VoiceListener(JavaPlugin plugin, SpeechRecognizer recognizer) {
         this.plugin     = plugin;
         this.recognizer = recognizer;
