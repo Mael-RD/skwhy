@@ -18,8 +18,19 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.cert.CertificateFactory;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
+
+import java.security.cert.X509Certificate;
+import org.bouncycastle.openssl.PEMKeyPair;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import java.io.FileReader;
+import java.io.Reader;
 
 public class APIserver {
 
@@ -31,8 +42,8 @@ public class APIserver {
         int     port      = cfg.getInt    ("api_rest.port",        443);
         String  apiKey    = cfg.getString ("api_rest.key",         "");
         boolean useHttps  = cfg.getBoolean("api_rest.use_https",   true);
-        String  certPath  = cfg.getString ("api_rest.certificat",  "certificat.cert");
-        String  keyPath   = cfg.getString ("api_rest.private_key", "key.key");
+        String  certPath  = cfg.getString ("api_rest.certificate",  "certificate.cert");
+        String  keyPath   = cfg.getString ("api_rest.private_key", "private.key");
 
         try {
             InetSocketAddress addr = new InetSocketAddress(port);
@@ -150,32 +161,41 @@ public class APIserver {
 
     private SSLContext buildSSLContext(File certFile, File keyFile) {
         try {
-            // Bukkit / Paper embarque BouncyCastle; sinon il faudra un KeyStore PKCS12
-            // On utilise ici un KeyStore PKCS12 généré depuis les fichiers PEM via openssl :
-            //   openssl pkcs12 -export -in certificat.cert -inkey key.key -out keystore.p12 -passout pass:changeit
-            // Si tu préfères rester en .cert/.key bruts, remplace par une lib comme Bouncy Castle.
-
-            // Pour simplifier, on essaie de charger un keystore PKCS12 dont le nom
-            // est dérivé du cert (sans extension → .p12)
-            String ksName = certFile.getName().replaceAll("\\.[^.]+$", "") + ".p12";
-            File   ksFile = new File(certFile.getParentFile(), ksName);
-
-            if (!ksFile.exists()) {
-                log.severe("[ApiServer] KeyStore PKCS12 introuvable : " + ksFile.getAbsolutePath());
-                log.severe("[ApiServer] Générez-le avec : openssl pkcs12 -export -in "
-                        + certFile.getName() + " -inkey " + keyFile.getName()
-                        + " -out " + ksName + " -passout pass:changeit");
-                return null;
+            // ── 1. Lire le certificat PEM ──
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            X509Certificate cert;
+            try (InputStream certStream = Files.newInputStream(certFile.toPath())) {
+                cert = (X509Certificate) cf.generateCertificate(certStream);
             }
 
-            char[] password = "changeit".toCharArray();
+            // ── 2. Lire la clef privée PKCS#1 (BEGIN RSA PRIVATE KEY) via BouncyCastle ──
+            PrivateKey privateKey;
+            try (Reader reader = new FileReader(keyFile)) {
+                PEMParser pemParser = new PEMParser(reader);
+                Object obj = pemParser.readObject();
+                pemParser.close();
+
+                JcaPEMKeyConverter converter = new JcaPEMKeyConverter()
+                        .setProvider(new BouncyCastleProvider());
+
+                if (obj instanceof PEMKeyPair) {
+                    privateKey = converter.getKeyPair((PEMKeyPair) obj).getPrivate();
+                } else if (obj instanceof PrivateKeyInfo) {
+                    privateKey = converter.getPrivateKey((PrivateKeyInfo) obj);
+                } else {
+                    log.severe("[ApiServer] Format de clef non reconnu : " + obj.getClass().getName());
+                    return null;
+                }
+            }
+
+            // ── 3. Construire un KeyStore en mémoire ──
             KeyStore ks = KeyStore.getInstance("PKCS12");
-            try (InputStream ksStream = Files.newInputStream(ksFile.toPath())) {
-                ks.load(ksStream, password);
-            }
+            ks.load(null, null);
+            ks.setKeyEntry("key", privateKey, new char[0], new java.security.cert.Certificate[]{cert});
 
+            // ── 4. Initialiser le SSLContext ──
             KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-            kmf.init(ks, password);
+            kmf.init(ks, new char[0]);
 
             SSLContext ctx = SSLContext.getInstance("TLS");
             ctx.init(kmf.getKeyManagers(), null, null);
