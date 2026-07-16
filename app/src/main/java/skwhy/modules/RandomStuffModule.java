@@ -6,6 +6,7 @@ import org.skriptlang.skript.addon.SkriptAddon;
 import com.github.retrooper.packetevents.PacketEvents;
 
 import skwhy.modules.RandomStuff.expressions.*;
+import skwhy.modules.RandomStuff.effects.*;
 
 public class RandomStuffModule implements AddonModule {
 
@@ -38,5 +39,9 @@ public class RandomStuffModule implements AddonModule {
         GenerateId.register(addon);
         SplitRegex.register(addon);
         TrackedEntities.register(addon);
+
+        SecretHide.register(addon);
+        SecretReveal.register(addon);
+        SecretDestroy.register(addon);
     }
 }
