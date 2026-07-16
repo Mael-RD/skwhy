@@ -28,7 +28,7 @@ import java.util.Locale;
 @Name("[Navigation] Creation")
 @Description("Creates a new navigation object. Can be created from a numeric entity ID or a real entity. " +
     "Requires a hitbox vector (width/height), a starting location, and a movement type string (WALK, FLY, SWIM). " +
-    "Speed and a viewer list are both optional.")
+    "Speed and a viewer list are both optional. Note the the navigation will not start until you set the pause time.")
 @Examples({
     "# Pattern 0: create from a numeric ID",
     "set {_navigation} to a new navigation with id 12345 hitbox vector(0.6, 1.8, 0.6) location location of player type \"WALK\"",
@@ -39,8 +39,8 @@ import java.util.Locale;
     "# Pattern 1: create from a real entity",
     "set {_navigation} to a new navigation with entity target entity type \"FLY\"",
     "",
-    "# Pattern 1: with optional speed and players",
-    "set {_navigation} to a new navigation with entity target entity type \"SWIM\" speed 0.15 with players player"
+    "# Pattern 1: with optional speed",
+    "set {_navigation} to a new navigation with entity target entity type \"SWIM\" speed 0.15"
 })
 @Since("1.2.0")
 public class NavigationCreate extends SimpleExpression<Navigation> {
@@ -161,7 +161,6 @@ public class NavigationCreate extends SimpleExpression<Navigation> {
             sb.append(entityExpr.toString(event, debug))
               .append(" type ").append(typeExpr.toString(event, debug));
             if (speedExpr   != null) sb.append(" speed ").append(speedExpr.toString(event, debug));
-            if (playersExpr != null) sb.append(" with players ").append(playersExpr.toString(event, debug));
             return sb.toString();
         }
     }
@@ -173,7 +172,7 @@ public class NavigationCreate extends SimpleExpression<Navigation> {
                 // exprs : [0]number [1]vector [2]location [3]string [4]number? [5]players?
                 .addPattern("[a] [new] navigation with id %number% hitbox %vector% location %location% type %string% [speed %-number%] [with players %-players%]")
                 // exprs : [0]entity [1]string [2]number? [3]players?
-                .addPattern("[a] [new] navigation with entity %entity% type %string% [speed %-number%] [with players %-players%]")
+                .addPattern("[a] [new] navigation with entity %entity% type %string% [speed %-number%]")
                 .build()
         );
     }
