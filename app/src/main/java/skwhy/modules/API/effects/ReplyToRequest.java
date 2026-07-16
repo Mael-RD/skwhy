@@ -27,7 +27,7 @@ import skwhy.modules.API.types.API_request;
     "\treply to event-apirequest with code 404 and \"not found\"",
     "",
     "on api request:",
-    "\tset {_body} to \"{\\\"ok\\\": true}\"",
+    "\tset {_body} to \"{\"\"ok\"\": true}\"",
     "\treply to event-apirequest with {_body}"
 })
 @Since("1.3.0")
