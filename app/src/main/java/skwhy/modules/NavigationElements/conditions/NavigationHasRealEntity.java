@@ -17,8 +17,6 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import org.skriptlang.skript.docs.Origin;
 
 import skwhy.pathfinder.Navigation;
-import skwhy.modules.VoiceModule;
-import skwhy.voice.VoiceListener;
 
 @Name("[Navigation] Has Real Entity")
 @Description("Checks if one or more fakes navigations are using real entities.")
@@ -64,9 +62,6 @@ public class NavigationHasRealEntity extends Condition {
     public boolean check(Event event) {
         Navigation[] paths = pathsExpr.getArray(event);
         if (paths.length == 0) return isNegated();
-
-        VoiceListener listener = VoiceModule.getVoiceListener();
-        if (listener == null) return isNegated();
 
         for (Navigation path : paths) {
             if (path.isRealEntity() == isNegated()) return false;

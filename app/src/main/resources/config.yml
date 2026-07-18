@@ -3,15 +3,8 @@ modules:
   fake_display: true
   fake_pathfinding: true
   random_stuff: true
-  voice: true
   api: true
   request: true
-
-voice:
-  # Nom du dossier du modèle Vosk (présent dans plugins/SkWhy/model/)
-  model: model
-  # Timeout par défaut pour la fenêtre de payload (ms)
-  default_timeout_ms: 3000
 
 api_rest:
   # Port pour les requête

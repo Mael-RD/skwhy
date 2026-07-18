@@ -27,7 +27,6 @@ import skwhy.pathfinder.Navigation;
 import skwhy.modules.FakeDisplayModule;
 import skwhy.modules.NavigationModule;
 import skwhy.modules.RandomStuffModule;
-import skwhy.modules.VoiceModule;
 import skwhy.modules.APIModule;
 
 
@@ -80,11 +79,6 @@ public class SkWhy extends JavaPlugin {
             skriptAddon.loadModules(new RandomStuffModule());
         } else {
             getLogger().info("[SkWhy] Module RandomStuff désactivé dans la config.");
-        }
-        if (isModuleEnabled("modules.voice")) {
-            skriptAddon.loadModules(new VoiceModule());
-        } else {
-            getLogger().info("[SkWhy] Module Voice désactivé dans la config.");
         }
         if (isModuleEnabled("modules.api")) {
             skriptAddon.loadModules(new APIModule());
