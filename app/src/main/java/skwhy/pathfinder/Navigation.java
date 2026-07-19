@@ -47,6 +47,7 @@ public class Navigation {
 
     public static List<Navigation> getRegistry() { return Collections.unmodifiableList(REGISTRY); }
 
+    @SuppressWarnings("null")
     public static void tickAll() {
         REGISTRY.removeIf(nav -> nav.isRealEntity() && !nav.getEntity().isValid());
         new ArrayList<>(REGISTRY).forEach(Navigation::tick);

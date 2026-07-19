@@ -1,6 +1,5 @@
 package skwhy.pathfinder.control;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -228,10 +227,10 @@ public class MoveControl implements Control {
                 || m.name().contains("CACTUS");
     }
 
-    private static boolean isDoorOrFence(Material m) {
-        String name = m.name();
-        return name.contains("DOOR") || name.contains("FENCE") || name.contains("GATE");
-    }
+    // private static boolean isDoorOrFence(Material m) {
+    //     String name = m.name();
+    //     return name.contains("DOOR") || name.contains("FENCE") || name.contains("GATE");
+    // }
 
     /**
      * Interpole un angle {@code a} vers {@code b} avec un pas maximum de

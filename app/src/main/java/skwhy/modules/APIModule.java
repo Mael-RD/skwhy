@@ -37,6 +37,7 @@ public class APIModule implements AddonModule {
 
     // load() : sections, effets, conditions, expressions
     @Override
+    @SuppressWarnings("null")
     public void load(SkriptAddon addon) {
 
         // ── 1. Enregistrement de l'event Skript ──
