@@ -1,0 +1,20 @@
+# Configuration minimale pour VoiceSkript
+modules:
+  fake_display: true
+  fake_pathfinding: true
+  random_stuff: true
+  api: true
+  request: true
+  # this event is weird, I don't know if it can cause bug, be careful if you use it.
+  all_block_change_event: false
+
+api_rest:
+  # Port pour les requête
+  port: 443
+  # Clef API secrète à utiliser dans les requêtes
+  key: ""
+  
+  use_https: true
+  # Chemin vers le certificat et la clef privée, generate the certificat by yourself or disable use_https.
+  certificate: "certificate.crt"
+  private_key: "private.key"
