@@ -91,7 +91,6 @@ public class NavigationCreate extends SimpleExpression<Navigation> {
             this.entityExpr  = (Expression<Entity>) exprs[0];
             this.typeExpr    = (Expression<String>) exprs[1];
             this.speedExpr   = (Expression<Number>) exprs[2]; // null si omis
-            this.playersExpr = (Expression<Player>) exprs[3]; // null si omis
         }
 
         return true;

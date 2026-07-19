@@ -8,6 +8,9 @@ repositories {
     maven("https://repo.skriptlang.org/releases")
     maven("https://repo.codemc.io/repository/maven-public/")
     maven("https://maven.maxhenkel.de/repository/public")
+    flatDir {
+        dirs("libs")
+    }
 }
 
 dependencies {
@@ -16,7 +19,7 @@ dependencies {
     compileOnly("com.github.SkriptLang:Skript:2.15.2")
 
     compileOnly("com.github.retrooper:packetevents-spigot:2.11.2")
-    
+    compileOnly(files("libs/nuvotifier.jar"))
     // API REST (certificat)
     implementation("org.bouncycastle:bcpkix-jdk18on:1.78")
     implementation("org.bouncycastle:bcprov-jdk18on:1.78")

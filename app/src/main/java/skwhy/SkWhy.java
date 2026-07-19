@@ -54,7 +54,7 @@ public class SkWhy extends JavaPlugin {
         mergeConfigWithDefaults();
 
 
-        getLogger().info("[VoiceSkript] Addon chargé avec succès !");
+        getLogger().info("Addon chargé avec succès !");
 
 
         skriptAddon = Skript.instance().registerAddon(SkWhy.class, "SkWhy");
@@ -67,23 +67,23 @@ public class SkWhy extends JavaPlugin {
         if (isModuleEnabled("modules.fake_display")) {
             skriptAddon.loadModules(new FakeDisplayModule());
         } else {
-            getLogger().info("[SkWhy] Module FakeDisplay désactivé dans la config.");
+            getLogger().info("Module FakeDisplay désactivé dans la config.");
         }
         if (isModuleEnabled("modules.fake_pathfinding")) {
             skriptAddon.loadModules(new NavigationModule());
             Bukkit.getScheduler().runTaskTimer(this, Navigation::tickAll, 0L, 1L);
         } else {
-            getLogger().info("[SkWhy] Module FakePathFinding désactivé dans la config.");
+            getLogger().info("Module FakePathFinding désactivé dans la config.");
         }
         if (isModuleEnabled("modules.random_stuff")) {
             skriptAddon.loadModules(new RandomStuffModule());
         } else {
-            getLogger().info("[SkWhy] Module RandomStuff désactivé dans la config.");
+            getLogger().info("Module RandomStuff désactivé dans la config.");
         }
         if (isModuleEnabled("modules.api")) {
             skriptAddon.loadModules(new APIModule());
         } else {
-            getLogger().info("[SkWhy] Module API REST désactivé dans la config.");
+            getLogger().info("Module API REST désactivé dans la config.");
         }
         getServer().getPluginManager().registerEvents(new EntityRemove(), this);
         getServer().getPluginManager().registerEvents(new BodyTracker(), this);
@@ -104,7 +104,7 @@ public class SkWhy extends JavaPlugin {
     public static SkWhy getInstance() { return instance; }
     public static SkriptAddon getSkriptAddon() { return skriptAddon; }
 
-    private boolean isModuleEnabled(String path) {
+    public boolean isModuleEnabled(String path) {
         return getConfig().getBoolean(path, true);
     }
 
