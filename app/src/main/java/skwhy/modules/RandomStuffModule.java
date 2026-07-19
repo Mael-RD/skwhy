@@ -1,6 +1,8 @@
 package skwhy.modules;
 
 import org.bukkit.Bukkit;
+import org.bukkit.event.Listener;
+import org.bukkit.event.EventHandler;
 import org.skriptlang.skript.addon.AddonModule;
 import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.bukkit.lang.eventvalue.EventValue;
@@ -11,9 +13,9 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import com.github.retrooper.packetevents.PacketEvents;
 
 import ch.njol.skript.lang.util.SimpleEvent;
+import skwhy.SkWhy;
 import skwhy.modules.RandomStuff.expressions.*;
 import skwhy.modules.RandomStuff.effects.*;
-import skwhy.SkWhy;
 import skwhy.modules.RandomStuff.events.Votes;
 
 public class RandomStuffModule implements AddonModule {
@@ -66,6 +68,13 @@ public class RandomStuffModule implements AddonModule {
             );
             return;
         }
+
+        Bukkit.getPluginManager().registerEvents(new Listener() {
+            @EventHandler
+            public void onVotifierVote(com.vexsoftware.votifier.model.VotifierEvent event) {
+                Bukkit.getPluginManager().callEvent(new Votes(event.getVote()));
+            }
+        }, SkWhy.getInstance());
         
         SyntaxRegistry syntaxRegistry = this.moduleRegistry(addon);
         syntaxRegistry.register(
