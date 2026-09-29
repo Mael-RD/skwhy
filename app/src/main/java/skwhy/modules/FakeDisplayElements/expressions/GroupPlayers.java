@@ -31,16 +31,16 @@ import java.util.ArrayList;
     "set {_cosmetique} to a new cosmetique for player",
     "",
     "# Add a viewer to a group",
-    "add player to viewers of {_group}",
+    "add player to group viewers of {_group}",
     "",
     "# Remove a viewer from a cosmetic",
-    "remove player from viewers of {_cosmetique}",
+    "remove player from group viewers of {_cosmetique}",
     "",
     "# Replace all viewers of a group with a single player",
-    "set viewers of {_group} to player",
+    "set group viewers of {_group} to player",
     "",
     "# Clear all viewers",
-    "remove all from viewers of {_cosmetique}"
+    "remove all from group viewers of {_cosmetique}"
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")
@@ -157,7 +157,7 @@ public class GroupPlayers extends SimpleExpression<Player> {
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(GroupPlayers.class, Player.class)
                 // Le pattern accepte maintenant les displaygroups ou les cosmetiques enregistrés dans Skript
-                .addPattern("[the] viewers of %displaygroups/cosmetiques%")
+                .addPattern("[the] group viewers of %displaygroups/cosmetiques%")
                 .build()
         );
     }

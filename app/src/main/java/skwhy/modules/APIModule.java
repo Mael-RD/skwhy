@@ -9,11 +9,11 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import ch.njol.skript.lang.util.SimpleEvent;
 
 import skwhy.SkWhy;
+import skwhy.modules.ApiElements.effects.ReplyToRequest;
+import skwhy.modules.ApiElements.events.API_request_event;
+import skwhy.modules.ApiElements.expressions.RequestContent;
+import skwhy.modules.ApiElements.types.API_request;
 import skwhy.request.APIserver;
-import skwhy.modules.API.events.API_request_event;
-import skwhy.modules.API.types.API_request;
-import skwhy.modules.API.expressions.RequestContent;
-import skwhy.modules.API.effects.ReplyToRequest;
 
 public class APIModule implements AddonModule {
 

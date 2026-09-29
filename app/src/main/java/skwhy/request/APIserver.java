@@ -10,8 +10,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import skwhy.SkWhy;
-import skwhy.modules.API.events.API_request_event;
-import skwhy.modules.API.types.API_request;
+import skwhy.modules.ApiElements.events.API_request_event;
+import skwhy.modules.ApiElements.types.API_request;
 
 import javax.net.ssl.*;
 import java.io.*;

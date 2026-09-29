@@ -28,6 +28,7 @@ import skwhy.modules.FakeDisplayModule;
 import skwhy.modules.NavigationModule;
 import skwhy.modules.RandomStuffModule;
 import skwhy.modules.APIModule;
+import skwhy.modules.ChunkPathModule;
 
 
 // import com.github.retrooper.packetevents.PacketEvents;
@@ -85,6 +86,11 @@ public class SkWhy extends JavaPlugin {
         } else {
             getLogger().info("Module API REST désactivé dans la config.");
         }
+        if (isModuleEnabled("modules.chunk_path")) {
+            skriptAddon.loadModules(new ChunkPathModule());
+        } else {
+            getLogger().info("Module ChunkPath désactivé dans la config.");
+        }
         getServer().getPluginManager().registerEvents(new EntityRemove(), this);
         getServer().getPluginManager().registerEvents(new BodyTracker(), this);
         getServer().getPluginManager().registerEvents(new FutureRotationTracker(), this);
@@ -98,6 +104,7 @@ public class SkWhy extends JavaPlugin {
     @Override
     public void onDisable() {
         APIModule.shutdown();
+        ChunkPathModule.shutdown();
         getLogger().info("SkWhy désactivé.");
     }
 
@@ -269,10 +276,18 @@ public class SkWhy extends JavaPlugin {
      *
      * Stratégie :
      *  1. Trouver dans `defaultLines` le prédécesseur immédiat de la clé manquante
-     *     (la ligne juste avant dans le même bloc, en ignorant commentaires/vides).
-     *  2. Chercher ce prédécesseur dans `current` → insérer juste après.
-     *  3. Sinon, trouver la ligne du bloc parent dans `current` → insérer après elle.
+     *     (la ligne juste avant dans le même bloc, en ignorant commentaires/vides),
+     *     identifié par sa clé YAML COMPLÈTE (chemin depuis la racine).
+     *  2. Chercher cette clé complète dans `current` → insérer juste après (après
+     *     tout son propre sous-bloc éventuel).
+     *  3. Sinon, trouver la clé complète du bloc parent dans `current` → insérer
+     *     après elle (après son dernier enfant existant).
      *  4. Sinon, ajouter à la fin.
+     *
+     * Le matching se fait toujours sur la clé complète (et non le seul nom de clé)
+     * pour éviter qu'un nom de clé réutilisé dans un autre bloc (ex: "enabled" ou
+     * "test" présents à la fois sous "truc" et sous "bidule") ne fasse insérer la
+     * ligne dans le mauvais groupe.
      */
     private int findInsertionPoint(
             List<String> current,
@@ -280,89 +295,108 @@ public class SkWhy extends JavaPlugin {
             String missingKey,
             String parentKey) {
 
-        // ── 1. Trouver le prédécesseur dans defaultLines ──
-        String predecessorKeyPart = null;
-        {
-            Deque<String> stack    = new ArrayDeque<>();
-            String        prevKey  = null;
+        // ── 1. Trouver le prédécesseur (clé complète) dans defaultLines ──
+        String predecessorFullKey = findPredecessorFullKey(defaultLines, missingKey, parentKey);
 
-            for (String line : defaultLines) {
-                String trimmed = line.stripLeading();
-                if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
-                if (!trimmed.contains(":")) continue;
-
-                int indent    = line.length() - trimmed.length();
-                while (stack.size() > indent / 2) stack.pollLast();
-
-                String keyPart = trimmed.substring(0, trimmed.indexOf(':')).trim();
-                String fullKey = stack.isEmpty() ? keyPart : String.join(".", stack) + "." + keyPart;
-
-                if (fullKey.equals(missingKey)) {
-                    predecessorKeyPart = prevKey;
-                    break;
-                }
-
-                // Même niveau de bloc que la clé cherchée → candidat prédécesseur
-                String currentParent = fullKey.contains(".")
-                        ? fullKey.substring(0, fullKey.lastIndexOf('.'))
-                        : null;
-                boolean sameBlock = (parentKey == null && currentParent == null)
-                        || (parentKey != null && parentKey.equals(currentParent));
-
-                if (sameBlock) prevKey = keyPart;
-
-                String afterColon = trimmed.substring(trimmed.indexOf(':') + 1).trim();
-                if (afterColon.isEmpty()) stack.addLast(keyPart);
-            }
+        // ── 2. Chercher ce prédécesseur dans current → insérer après son bloc ──
+        if (predecessorFullKey != null) {
+            int idx = findFullKeyLineIndex(current, predecessorFullKey);
+            if (idx >= 0) return endOfBlock(current, idx);
         }
 
-        // ── 2. Chercher le prédécesseur dans current ──
-        if (predecessorKeyPart != null) {
-            for (int i = current.size() - 1; i >= 0; i--) {
-                String trimmed = current.get(i).stripLeading();
-                if (trimmed.startsWith(predecessorKeyPart + ":")) {
-                    // Avancer jusqu'à la fin du bloc de ce prédécesseur
-                    int indent = current.get(i).length() - trimmed.length();
-                    int j = i + 1;
-                    while (j < current.size()) {
-                        String t = current.get(j).stripLeading();
-                        if (!t.isEmpty() && !t.startsWith("#")) {
-                            int nextIndent = current.get(j).length() - t.length();
-                            if (nextIndent <= indent) break;
-                        }
-                        j++;
-                    }
-                    return j;
-                }
-            }
-        }
-
-        // ── 3. Chercher le bloc parent dans current ──
+        // ── 3. Sinon, chercher le bloc parent dans current → insérer après son dernier enfant ──
         if (parentKey != null) {
-            String parentKeyPart = parentKey.contains(".")
-                    ? parentKey.substring(parentKey.lastIndexOf('.') + 1)
-                    : parentKey;
-
-            for (int i = 0; i < current.size(); i++) {
-                String trimmed = current.get(i).stripLeading();
-                if (trimmed.startsWith(parentKeyPart + ":")) {
-                    // Fin du bloc parent
-                    int indent = current.get(i).length() - trimmed.length();
-                    int j = i + 1;
-                    while (j < current.size()) {
-                        String t = current.get(j).stripLeading();
-                        if (!t.isEmpty() && !t.startsWith("#")) {
-                            int nextIndent = current.get(j).length() - t.length();
-                            if (nextIndent <= indent) break;
-                        }
-                        j++;
-                    }
-                    return j;
-                }
-            }
+            int idx = findFullKeyLineIndex(current, parentKey);
+            if (idx >= 0) return endOfBlock(current, idx);
         }
 
         // ── 4. Fallback : fin de fichier ──
         return current.size();
+    }
+
+    /**
+     * Retourne la clé YAML complète du prédécesseur immédiat (même bloc) de {@code missingKey}
+     * dans {@code defaultLines}, ou {@code null} s'il n'y en a pas (première clé du bloc).
+     */
+    private String findPredecessorFullKey(List<String> defaultLines, String missingKey, String parentKey) {
+        Deque<String> stack = new ArrayDeque<>();
+        String prevFullKey = null;
+
+        for (String line : defaultLines) {
+            String trimmed = line.stripLeading();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
+            if (!trimmed.contains(":")) continue;
+
+            int indent = line.length() - trimmed.length();
+            while (stack.size() > indent / 2) stack.pollLast();
+
+            String keyPart = trimmed.substring(0, trimmed.indexOf(':')).trim();
+            String fullKey = stack.isEmpty() ? keyPart : String.join(".", stack) + "." + keyPart;
+
+            if (fullKey.equals(missingKey)) {
+                return prevFullKey;
+            }
+
+            // Même niveau de bloc que la clé cherchée → candidat prédécesseur
+            String currentParent = fullKey.contains(".")
+                    ? fullKey.substring(0, fullKey.lastIndexOf('.'))
+                    : null;
+            boolean sameBlock = (parentKey == null && currentParent == null)
+                    || (parentKey != null && parentKey.equals(currentParent));
+
+            if (sameBlock) prevFullKey = fullKey;
+
+            String afterColon = trimmed.substring(trimmed.indexOf(':') + 1).trim();
+            if (afterColon.isEmpty()) stack.addLast(keyPart);
+        }
+        return null;
+    }
+
+    /**
+     * Cherche l'index de la ligne portant la clé YAML complète {@code targetFullKey} dans
+     * {@code lines}, en reconstituant le chemin de clés au fur et à mesure (comme
+     * {@link #extractKeys}) plutôt qu'en comparant le seul nom de clé — deux clés de même
+     * nom mais de blocs parents différents ne peuvent donc pas se confondre.
+     */
+    private int findFullKeyLineIndex(List<String> lines, String targetFullKey) {
+        Deque<String> stack = new ArrayDeque<>();
+
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            String trimmed = line.stripLeading();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
+            if (!trimmed.contains(":")) continue;
+
+            int indent = line.length() - trimmed.length();
+            while (stack.size() > indent / 2) stack.pollLast();
+
+            String keyPart = trimmed.substring(0, trimmed.indexOf(':')).trim();
+            String fullKey = stack.isEmpty() ? keyPart : String.join(".", stack) + "." + keyPart;
+
+            if (fullKey.equals(targetFullKey)) {
+                return i;
+            }
+
+            String afterColon = trimmed.substring(trimmed.indexOf(':') + 1).trim();
+            if (afterColon.isEmpty()) stack.addLast(keyPart);
+        }
+        return -1;
+    }
+
+    /** Retourne l'index juste après la fin du (sous-)bloc de la ligne {@code lineIndex} (ses enfants plus indentés inclus). */
+    private int endOfBlock(List<String> lines, int lineIndex) {
+        String trimmed = lines.get(lineIndex).stripLeading();
+        int indent = lines.get(lineIndex).length() - trimmed.length();
+
+        int j = lineIndex + 1;
+        while (j < lines.size()) {
+            String t = lines.get(j).stripLeading();
+            if (!t.isEmpty() && !t.startsWith("#")) {
+                int nextIndent = lines.get(j).length() - t.length();
+                if (nextIndent <= indent) break;
+            }
+            j++;
+        }
+        return j;
     }
 }

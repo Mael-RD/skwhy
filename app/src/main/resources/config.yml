@@ -5,6 +5,7 @@ modules:
   random_stuff: true
   api: true
   request: true
+  chunk_path: true
 
 api_rest:
   # Port pour les requête
@@ -16,3 +17,7 @@ api_rest:
   # Chemin vers le certificat et la clef privée, generate the certificat by yourself or disable use_https.
   certificate: "certificate.crt"
   private_key: "private.key"
+
+chunkpath:
+  # Dossier (dans le dossier du plugin) contenant les bases de données de chemins, une par monde
+  database_folder: "chunkpath-data"
