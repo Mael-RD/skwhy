@@ -21,3 +21,6 @@ api_rest:
 chunkpath:
   # Dossier (dans le dossier du plugin) contenant les bases de données de chemins, une par monde
   database_folder: "chunkpath-data"
+  # Dossier de base des dimensions du monde (relatif au dossier du serveur, ou absolu).
+  # Les fichiers région sont lus dans <world_folder>/<overworld|the_nether|the_end>/region
+  world_folder: "world/dimensions/minecraft"

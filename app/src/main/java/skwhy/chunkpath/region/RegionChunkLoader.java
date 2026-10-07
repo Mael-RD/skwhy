@@ -17,7 +17,8 @@ import java.util.zip.InflaterInputStream;
  * sans jamais passer par le pipeline de chargement de Bukkit/Paper.
  *
  * Ne gère QUE les chunks déjà générés (offset != 0 dans le header ET Status == "full").
- * Tout autre cas -> ChunkNotGeneratedException, jamais de génération à la volée.
+ * Chunk absent ou incomplet -> ChunkNotGeneratedException, jamais de génération à la volée.
+ * Fichier illisible (vide, tronqué, en-tête incohérent, compression non supportée) -> RegionReadException.
  *
  * Format Anvil ciblé : chunks post-1.18 (pas de tag "Level", sections indexées de -4 à 19
  * typiquement, palette de blocs dans section.block_states.palette / .data).
@@ -25,6 +26,8 @@ import java.util.zip.InflaterInputStream;
 public final class RegionChunkLoader {
 
     private static final int SECTOR_SIZE = 4096;
+    /** Table des offsets + table des timestamps, 1 secteur chacune. */
+    private static final int HEADER_SIZE = 2 * SECTOR_SIZE;
 
     private RegionChunkLoader() {
     }
@@ -48,6 +51,12 @@ public final class RegionChunkLoader {
         int headerIndex = localX + localZ * 32;
 
         try (RandomAccessFile raf = new RandomAccessFile(regionFile.toFile(), "r")) {
+            long fileLength = raf.length();
+            if (fileLength < HEADER_SIZE) {
+                throw new RegionReadException(chunkX, chunkZ,
+                        "fichier région vide ou tronqué (" + fileLength + " octets): " + regionFile);
+            }
+
             raf.seek(headerIndex * 4L);
             int entry = raf.readInt(); // 3 octets offset (secteurs) + 1 octet sectorCount
             int sectorOffset = entry >>> 8;
@@ -57,21 +66,32 @@ public final class RegionChunkLoader {
                 throw new ChunkNotGeneratedException(chunkX, chunkZ, "chunk absent du fichier région (jamais généré)");
             }
 
-            raf.seek(sectorOffset * (long) SECTOR_SIZE);
+            long chunkStart = sectorOffset * (long) SECTOR_SIZE;
+            long chunkEnd = chunkStart + sectorCount * (long) SECTOR_SIZE;
+            if (sectorOffset < HEADER_SIZE / SECTOR_SIZE || sectorCount == 0 || chunkEnd > fileLength) {
+                throw new RegionReadException(chunkX, chunkZ, "entrée d'en-tête incohérente (offset=" + sectorOffset
+                        + ", secteurs=" + sectorCount + ", taille fichier=" + fileLength + ")");
+            }
+
+            raf.seek(chunkStart);
             int length = raf.readInt(); // inclut l'octet de type de compression
+            if (length < 1 || length > sectorCount * (long) SECTOR_SIZE - 4) {
+                throw new RegionReadException(chunkX, chunkZ, "longueur de chunk incohérente (" + length
+                        + " octets pour " + sectorCount + " secteur(s))");
+            }
             byte compressionTypeByte = raf.readByte();
 
             if ((compressionTypeByte & 0x80) != 0) {
                 // Bit "stocké en externe" (.mcc) : cas rarissime pour du terrain normal.
-                throw new IOException("Chunk stocké dans un fichier .mcc externe (non supporté par ce loader): "
-                        + chunkX + "," + chunkZ);
+                throw new RegionReadException(chunkX, chunkZ,
+                        "chunk stocké dans un fichier .mcc externe (non supporté par ce loader)");
             }
 
             byte[] payload = new byte[length - 1];
             raf.readFully(payload);
 
             NbtTag root;
-            try (DataInputStream nbtIn = new DataInputStream(decompress(compressionTypeByte, payload))) {
+            try (DataInputStream nbtIn = new DataInputStream(decompress(chunkX, chunkZ, compressionTypeByte, payload))) {
                 root = NbtReader.readRoot(nbtIn);
             }
 
@@ -82,20 +102,24 @@ public final class RegionChunkLoader {
             }
 
             return root;
-        } catch (ChunkNotGeneratedException e) {
-            throw e;
-        } catch (IOException e) {
-            throw new RuntimeException("Erreur de lecture du chunk (" + chunkX + "," + chunkZ + ")", e);
+        } catch (IOException | NegativeArraySizeException e) {
+            // EOF, NBT ou flux compressé invalide : fichier probablement en cours d'écriture ou corrompu
+            throw new RegionReadException(chunkX, chunkZ, "erreur de lecture: " + e.getMessage(), e);
         }
     }
 
-    private static java.io.InputStream decompress(byte compressionType, byte[] payload) throws IOException {
+    private static java.io.InputStream decompress(int chunkX, int chunkZ, byte compressionType, byte[] payload)
+            throws IOException {
         ByteArrayInputStream raw = new ByteArrayInputStream(payload);
         return switch (compressionType) {
             case 1 -> new GZIPInputStream(raw);
             case 2 -> new InflaterInputStream(raw); // zlib (RFC1950), défaut vanilla
             case 3 -> raw; // non compressé
-            default -> throw new IOException("Type de compression non supporté: " + compressionType);
+            case 4 -> throw new RegionReadException(chunkX, chunkZ, "compression LZ4 non supportée : "
+                    + "mettre region-file-compression=deflate dans server.properties (les chunks déjà "
+                    + "écrits en LZ4 ne seront relisibles qu'après avoir été réécrits par le serveur)");
+            default -> throw new RegionReadException(chunkX, chunkZ,
+                    "type de compression non supporté: " + compressionType);
         };
     }
 }

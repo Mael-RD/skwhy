@@ -20,6 +20,7 @@ import skwhy.SkWhy;
 import skwhy.chunkpath.ChunkGateService;
 import skwhy.chunkpath.block.PathCostRules;
 import skwhy.chunkpath.region.ChunkNotGeneratedException;
+import skwhy.chunkpath.region.RegionReadException;
 import skwhy.modules.LongNavigationElements.ChunkPathManager;
 import skwhy.modules.LongNavigationElements.types.PathCostRuleData;
 
@@ -65,7 +66,7 @@ public class RegisterChunkPath extends Effect {
         PathCostRules customRules = buildCustomRules(event);
         try {
             service.reanalyze(chunk.getX(), chunk.getZ(), customRules);
-        } catch (ChunkNotGeneratedException e) {
+        } catch (ChunkNotGeneratedException | RegionReadException e) {
             SkWhy.getInstance().getLogger().warning(
                     "[ChunkPath] Impossible d'enregistrer le chunk (" + chunk.getX() + "," + chunk.getZ()
                             + ") du monde " + chunk.getWorld().getName() + " : " + e.getMessage());

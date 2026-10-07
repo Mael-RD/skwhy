@@ -24,6 +24,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.skriptlang.skript.addon.SkriptAddon;
 
 import skwhy.pathfinder.Navigation;
+import skwhy.chunkpath.longnav.LongNavigation;
 import skwhy.modules.FakeDisplayModule;
 import skwhy.modules.NavigationModule;
 import skwhy.modules.RandomStuffModule;
@@ -88,6 +89,7 @@ public class SkWhy extends JavaPlugin {
         }
         if (isModuleEnabled("modules.chunk_path")) {
             skriptAddon.loadModules(new ChunkPathModule());
+            Bukkit.getScheduler().runTaskTimer(this, LongNavigation::tickAll, 0L, 1L);
         } else {
             getLogger().info("Module ChunkPath désactivé dans la config.");
         }

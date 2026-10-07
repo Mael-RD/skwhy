@@ -25,6 +25,7 @@ public class ChunkPathModule implements AddonModule {
     public void init(SkriptAddon addon) {
         ChunkPathRecord.register();
         PathCostRuleData.register();
+        LongNavigationSkriptType.register();
     }
 
     @Override
@@ -47,6 +48,20 @@ public class ChunkPathModule implements AddonModule {
         PathCostRuleBlocks.register(addon);
         PathCostRuleTags.register(addon);
         PathCostRuleCost.register(addon);
+
+        DestroyLongNavigation.register(addon);
+        LongNavigationCreate.register(addon);
+        LongNavigationEntity.register(addon);
+        LongNavigationLocation.register(addon);
+        LongNavigationNumber.register(addon);
+        LongNavigationStatus.register(addon);
+
+        try {
+            Class.forName("com.github.retrooper.packetevents.PacketEvents");
+            LongNavigationPlayers.register(addon);
+        } catch (ClassNotFoundException e) {
+            SkWhy.getInstance().getLogger().info("[ChunkPath] PacketEvents absent — LongNavigationPlayers non chargé.");
+        }
     }
 
     /**

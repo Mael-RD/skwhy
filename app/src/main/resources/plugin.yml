@@ -1,7 +1,7 @@
 name: SkWhy
 version: ${version}
 main: skwhy.SkWhy
-api-version: '1.21'
+api-version: '26.2'
 author: Whity
 description: Système de cosmétiques en display entity
 depend: [Skript]

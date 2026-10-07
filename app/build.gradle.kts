@@ -14,7 +14,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:26.2.build.129-stable")
     
     compileOnly("com.github.SkriptLang:Skript:2.15.2")
 
@@ -29,12 +29,12 @@ tasks.register<Copy>("copyJarToPlugins") {
     val jarTask = tasks.named<Jar>("jar")
     dependsOn(jarTask)
     from(jarTask.flatMap { it.archiveFile })
-    into("C:/Users/orimi/Desktop/proxti/plugins")
+    into("C:/Users/orimi/Desktop/proxti/serveur vide/plugins")
 }
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 
@@ -70,6 +70,6 @@ tasks.javadoc {
     (options as StandardJavadocDocletOptions).apply {
         author(true)
         version(true)
-        links("https://docs.oracle.com/en/java/javase/21/docs/api/")
+        links("https://docs.oracle.com/en/java/javase/25/docs/api/")
     }
 }

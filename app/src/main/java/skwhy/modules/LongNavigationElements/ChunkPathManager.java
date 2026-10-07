@@ -1,5 +1,6 @@
 package skwhy.modules.LongNavigationElements;
 
+import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -20,7 +21,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class ChunkPathManager {
 
+    public static final String DEFAULT_WORLD_FOLDER = "world/dimensions/minecraft";
+
     private static ChunkGateStore store;
+    private static Path worldFolder;
     private static final Map<String, ChunkGateService> services = new ConcurrentHashMap<>();
 
     private ChunkPathManager() {
@@ -31,6 +35,9 @@ public final class ChunkPathManager {
         String databaseFolder = plugin.getConfig().getString(
                 "chunkpath.database_folder", ChunkGateStore.DEFAULT_DATABASE_FOLDER);
         store = new ChunkGateStore(plugin.getDataFolder().toPath(), databaseFolder);
+        String worldFolderName = plugin.getConfig().getString("chunkpath.world_folder", DEFAULT_WORLD_FOLDER);
+        worldFolder = Bukkit.getWorldContainer().toPath().resolve(
+                worldFolderName == null || worldFolderName.isBlank() ? DEFAULT_WORLD_FOLDER : worldFolderName);
     }
 
     /** Ferme les bases de données ouvertes (à appeler depuis l'arrêt du plugin). */
@@ -50,11 +57,11 @@ public final class ChunkPathManager {
     }
 
     private static Path regionFolderOf(World world) {
-        Path base = world.getWorldFolder().toPath();
-        return switch (world.getEnvironment()) {
-            case NETHER -> base.resolve("DIM-1").resolve("region");
-            case THE_END -> base.resolve("DIM1").resolve("region");
-            default -> base.resolve("region");
+        String dimension = switch (world.getEnvironment()) {
+            case NETHER -> "the_nether";
+            case THE_END -> "the_end";
+            default -> "overworld";
         };
+        return worldFolder.resolve(dimension).resolve("region");
     }
 }

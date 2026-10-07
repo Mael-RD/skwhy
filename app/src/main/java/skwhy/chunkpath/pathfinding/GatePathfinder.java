@@ -6,6 +6,7 @@ import skwhy.chunkpath.gate.ChunkGateData;
 import skwhy.chunkpath.gate.Gate;
 import skwhy.chunkpath.graph.ChunkNavMesh;
 import skwhy.chunkpath.region.ChunkNotGeneratedException;
+import skwhy.chunkpath.region.RegionReadException;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -88,7 +89,7 @@ public final class GatePathfinder {
         try {
             startChunkData = service.getOrAnalyze(startChunkX, startChunkZ);
             endChunkData = service.getOrAnalyze(endChunkX, endChunkZ);
-        } catch (ChunkNotGeneratedException e) {
+        } catch (ChunkNotGeneratedException | RegionReadException e) {
             LOGGER.warning("[ChunkPath] Calcul de chemin impossible : " + e.getMessage());
             return null;
         }

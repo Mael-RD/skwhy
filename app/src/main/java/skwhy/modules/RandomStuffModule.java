@@ -53,6 +53,7 @@ public class RandomStuffModule implements AddonModule {
         SecretHide.register(addon);
         SecretReveal.register(addon);
         SecretDestroy.register(addon);
+        SendAdvancementNotification.register(addon);
 
         loadVoteModule(addon);
     }
