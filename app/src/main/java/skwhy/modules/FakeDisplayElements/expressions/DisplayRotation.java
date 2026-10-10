@@ -22,7 +22,7 @@ import skwhy.data.DisplayData;
 import skwhy.data.Quat4;
 
 @Name("Display Rotation")
-@Description("Gets or sets the left or right rotation quaternion of a fake display entity. Both rotations are represented as Quat4 objects and affect how the display is oriented in the world.")
+@Description("Gets or sets the left or right rotation quaternion of fake display entities. Both rotations are represented as Quat4 objects and affect how the display is oriented in the world. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_group} to a new fake display group at player",
     "set {_display} to [a new fake item display]:",
@@ -45,30 +45,29 @@ import skwhy.data.Quat4;
 public class DisplayRotation extends SimpleExpression<Quat4> {
 
     private int matchedPattern;
-    private Expression<DisplayData> displayExpr;
+    private boolean pluralTargets;
+    private Expression<?> targets;
 
     @Override
-    @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        this.matchedPattern = matchedPattern;
-        displayExpr = (Expression<DisplayData>) exprs[0];
+        this.pluralTargets = matchedPattern >= 2;
+        this.matchedPattern = matchedPattern % 2;
+        targets = exprs[0];
         return true;
     }
 
     @Override
     protected @Nullable Quat4[] get(Event event) {
-        DisplayData d = displayExpr.getSingle(event);
-        if (d == null) return null;
-
+        if (pluralTargets) return null;
+        Object value = targets.getSingle(event);
+        if (!(value instanceof DisplayData display)) return null;
         Quaternionf rotation = switch (matchedPattern) {
-            case 0 -> d.getLeftRotation().toQuaternionf();
-            case 1 -> d.getRightRotation().toQuaternionf();
+            case 0 -> display.getLeftRotation().toQuaternionf();
+            case 1 -> display.getRightRotation().toQuaternionf();
             default -> null;
         };
-
-        // On utilise ton constructeur de Quat4 qui accepte un Quaternionf
-        return rotation != null ? new Quat4[]{ new Quat4(rotation) } : null;
+        return rotation == null ? null : new Quat4[]{ new Quat4(rotation) };
     }
 
     @Override
@@ -82,13 +81,11 @@ public class DisplayRotation extends SimpleExpression<Quat4> {
     public void change(Event event, Object @Nullable [] delta, ChangeMode mode) {
         if (mode != ChangeMode.SET || delta == null || !(delta[0] instanceof Quat4 q)) return;
         
-        DisplayData d = displayExpr.getSingle(event);
-        if (d == null) return;
-
-        // On applique la rotation en convertissant Quat4 en Quaternionf
-        switch (matchedPattern) {
-            case 0 -> d.setLeftRotation(q);
-            case 1 -> d.setRightRotation(q);
+        for (DisplayData display : DisplayExpressionTargets.resolveForChange(targets, event, pluralTargets)) {
+            switch (matchedPattern) {
+                case 0 -> display.setLeftRotation(q);
+                case 1 -> display.setRightRotation(q);
+            }
         }
     }
 
@@ -101,15 +98,17 @@ public class DisplayRotation extends SimpleExpression<Quat4> {
     @Override
     public String toString(@Nullable Event event, boolean debug) {
         String type = (matchedPattern == 0) ? "left rotation" : "right rotation";
-        return type + " of " + displayExpr.toString(event, debug);
+        return type + " of " + targets.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayRotation.class, Quat4.class)
-                .addPattern("[the] left rotation of %displaydata%")    // 0
-                .addPattern("[the] right rotation of %displaydata%")   // 1
+                .addPattern("[the] left rotation of %displaydata/displaygroup%")    // 0
+                .addPattern("[the] right rotation of %displaydata/displaygroup%")   // 1
+                .addPattern("[the] left rotation of %displaydatas/displaygroups%")    // 2
+                .addPattern("[the] right rotation of %displaydatas/displaygroups%")   // 3
                 .build()
         );
     }

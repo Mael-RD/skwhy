@@ -25,7 +25,7 @@ import skwhy.data.DisplayData;
 import skwhy.data.ItemDisplayData;
 
 @Name("Display Item")
-@Description("Gets or sets the item displayed by an item display entity. Only works on DisplayData instances of the ItemDisplay type. Accepts ItemType or ItemStack on set.")
+@Description("Gets or sets the item displayed by item displays. Targets can be one or more displays or a display group. Accepts ItemType or ItemStack on set.")
 @Examples({
     "set {_group} to a new fake display group at player",
     "set {_display} to [a new fake item display]:",
@@ -44,29 +44,26 @@ import skwhy.data.ItemDisplayData;
 @RequiredPlugins("PacketEvents")
 public class DisplayItem extends SimpleExpression<ItemType> {
 
-    private Expression<DisplayData> displayExpr;
+    private Expression<?> targets;
+    private boolean pluralTargets;
 
     @Override
-    @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        displayExpr = (Expression<DisplayData>) exprs[0];
+        pluralTargets = matchedPattern >= 1;
+        targets = exprs[0];
         return true;
     }
 
     @Override
     protected @Nullable ItemType[] get(Event event) {
-        DisplayData d = displayExpr.getSingle(event);
-        if (!(d instanceof ItemDisplayData itemDisplay)) return null;
-
+        if (pluralTargets) return null;
+        Object value = targets.getSingle(event);
+        if (!(value instanceof ItemDisplayData itemDisplay)) return null;
         String raw = itemDisplay.getItemStack();
         if (raw == null || raw.isBlank()) return null;
-
-        // Essaie de parser via Skript (supporte "diamond sword", "DIAMOND_SWORD", etc.)
         ItemType parsed = Classes.parse(raw, ItemType.class, ParseContext.DEFAULT);
         if (parsed != null) return new ItemType[]{ parsed };
-
-        // Fallback : parse par nom de matériau Bukkit
         try {
             Material mat = Material.valueOf(raw.toUpperCase().replace(" ", "_").replace("MINECRAFT:", ""));
             return new ItemType[]{ new ItemType(new ItemStack(mat)) };
@@ -84,15 +81,13 @@ public class DisplayItem extends SimpleExpression<ItemType> {
     @Override
     public void change(Event event, Object @Nullable [] delta, ChangeMode mode) {
         if (mode != ChangeMode.SET || delta == null || delta[0] == null) return;
-        DisplayData d = displayExpr.getSingle(event);
-        if (!(d instanceof ItemDisplayData itemDisplay)) return;
-
-        if (delta[0] instanceof ItemType itemType) {
-            // ItemType → nom du matériau
-            Material mat = itemType.getMaterial();
-            itemDisplay.setItemStack(mat.name());
-        } else if (delta[0] instanceof ItemStack itemStack) {
-            itemDisplay.setItemStack(itemStack.getType().name());
+        for (DisplayData display : DisplayExpressionTargets.resolveForChange(targets, event, pluralTargets)) {
+            if (!(display instanceof ItemDisplayData itemDisplay)) continue;
+            if (delta[0] instanceof ItemType itemType) {
+                itemDisplay.setItemStack(itemType.getMaterial().name());
+            } else if (delta[0] instanceof ItemStack itemStack) {
+                itemDisplay.setItemStack(itemStack.getType().name());
+            }
         }
     }
 
@@ -104,14 +99,15 @@ public class DisplayItem extends SimpleExpression<ItemType> {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return "item of " + displayExpr.toString(event, debug);
+        return "item of " + targets.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayItem.class, ItemType.class)
-                .addPattern("[the] item[[ ]stack] of %displaydata%")
+                .addPattern("[the] item[[ ]stack] of %displaydata/displaygroup%")
+                .addPattern("[the] item[[ ]stack] of %displaydatas/displaygroups%")
                 .build()
         );
     }

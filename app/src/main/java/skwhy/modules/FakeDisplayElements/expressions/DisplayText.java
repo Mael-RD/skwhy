@@ -20,14 +20,16 @@ import skwhy.data.DisplayData;
 import skwhy.data.TextDisplayData;
 
 @Name("Display Text Content")
-@Description("Gets, sets, or appends to the text content of a text display entity. Only works on DisplayData instances of the TextDisplay type. Supports SET and ADD change modes.")
+@Description("Gets, sets, or appends to the text content of text displays. Targets can be one or more displays or a display group. Supports SET and ADD change modes.")
 @Examples({
     "set {_group} to a new fake display group at player",
     "set {_display} to [a new fake item display]:",
     "    set item of display to dirt",
+    "set {_group} to a new fake display group at player from {_display}",
     "",
     "# Set the displayed text",
     "set text of {_display} to \"&aHello world!\"",
+    "set text of {_group} to \"&aHello group!\"",
     "",
     "# Append text to the existing content",
     "add \" &b(extra)\" to text content of {_display}",
@@ -39,22 +41,23 @@ import skwhy.data.TextDisplayData;
 @RequiredPlugins("PacketEvents")
 public class DisplayText extends SimpleExpression<String> {
 
-    private Expression<DisplayData> displayExpr;
+    private Expression<?> targets;
+    private boolean pluralTargets;
 
     @Override
-    @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        displayExpr = (Expression<DisplayData>) exprs[0];
+        pluralTargets = matchedPattern >= 1;
+        targets = exprs[0];
         return true;
     }
 
     @Override
     protected @Nullable String[] get(Event event) {
-        DisplayData d = displayExpr.getSingle(event);
-        if (!(d instanceof TextDisplayData text)) return null;
-        String content = text.getText();
-        return content != null ? new String[]{ content } : null;
+        if (pluralTargets) return null;
+        Object value = targets.getSingle(event);
+        if (!(value instanceof TextDisplayData text) || text.getText() == null) return null;
+        return new String[]{ text.getText() };
     }
 
     @Override
@@ -65,16 +68,17 @@ public class DisplayText extends SimpleExpression<String> {
 
     @Override
     public void change(Event event, Object @Nullable [] delta, ChangeMode mode) {
-        if (delta == null || !(delta[0] instanceof String s)) return;
-        DisplayData d = displayExpr.getSingle(event);
-        if (!(d instanceof TextDisplayData text)) return;
-
-        switch (mode) {
-            case SET -> text.setText(s);
-            // ADD permet de concaténer du texte existant
-            case ADD -> text.setText((text.getText() != null ? text.getText() : "") + s);
-            case REMOVE, DELETE, RESET -> text.setText("");
-            default -> {}
+        if ((mode == ChangeMode.SET || mode == ChangeMode.ADD)
+                && (delta == null || !(delta[0] instanceof String))) return;
+        String value = (mode == ChangeMode.SET || mode == ChangeMode.ADD) ? (String) delta[0] : null;
+        for (DisplayData display : DisplayExpressionTargets.resolveForChange(targets, event, pluralTargets)) {
+            if (!(display instanceof TextDisplayData text)) continue;
+            switch (mode) {
+                case SET -> text.setText(value);
+                case ADD -> text.setText((text.getText() != null ? text.getText() : "") + value);
+                case REMOVE, DELETE, RESET -> text.setText("");
+                default -> {}
+            }
         }
     }
 
@@ -86,14 +90,15 @@ public class DisplayText extends SimpleExpression<String> {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return "text of " + displayExpr.toString(event, debug);
+        return "text of " + targets.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayText.class, String.class)
-                .addPattern("[the] text [content] of %displaydata%")
+                .addPattern("[the] text [content] of %displaydata/displaygroup%")
+                .addPattern("[the] text [content] of %displaydatas/displaygroups%")
                 .build()
         );
     }

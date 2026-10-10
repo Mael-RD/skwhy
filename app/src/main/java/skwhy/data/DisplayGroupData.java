@@ -287,7 +287,9 @@ public class DisplayGroupData {
             var user = PacketEvents.getAPI().getPlayerManager().getUser(player);
             if (user != null) user.sendPacket(destroyPacket);
         }
-        finalMount(targetPlayers, attachedId);
+        if (attachedId != null) {
+            finalMount(targetPlayers, attachedId);
+        }
     }
 
     /**

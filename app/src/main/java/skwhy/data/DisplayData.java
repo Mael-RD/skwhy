@@ -31,6 +31,8 @@ public abstract class DisplayData {
     protected Quat4 leftRotation = new Quat4(0f, 0f, 0f, 1f);
     protected Quat4 rightRotation = new Quat4(0f, 0f, 0f, 1f);
     protected int   glowColor     = -1;   // -1 = pas de glow
+    @Nullable
+    protected Integer brightness;
     protected float shadowRadius  = 0f;
     protected float shadowStrength = 1f;
     protected float viewRange     = 128f;
@@ -195,8 +197,8 @@ public abstract class DisplayData {
         // Index 15 – billboard mode (byte)
         data.add(new EntityData<>(15, EntityDataTypes.BYTE, (byte) billboardMode));
 
-        // Index 16 – brightness override (-1 = utilise la valeur du monde)
-        data.add(new EntityData<>(16, EntityDataTypes.INT, -1));
+        // In modern protocols (including 26.2), brightness is an int; -1 means no override.
+        data.add(new EntityData<>(16, EntityDataTypes.INT, packBrightness(brightness)));
 
         // Index 17 – view range
         data.add(new EntityData<>(17, EntityDataTypes.FLOAT, viewRange));
@@ -301,6 +303,30 @@ public abstract class DisplayData {
         cachedData.add(new EntityData<>(22, EntityDataTypes.INT, glowColor));
     }
 
+    @Nullable
+    public Integer getBrightness() { return brightness; }
+
+    public void setBrightness(@Nullable Integer brightness) {
+        if (brightness != null && (brightness < 0 || brightness > 15)) {
+            throw new IllegalArgumentException("Display brightness must be between 0 and 15.");
+        }
+        this.brightness = brightness;
+        cachedDataRemove(16);
+        cachedData.add(new EntityData<>(16, EntityDataTypes.INT, packBrightness(brightness)));
+    }
+
+    private static int packBrightness(@Nullable Integer brightness) {
+        return brightness == null ? -1 : (brightness << 4) | brightness;
+    }
+
+    public static boolean isValidBrightness(Number value) {
+        double brightness = value.doubleValue();
+        return Double.isFinite(brightness)
+            && brightness >= 0
+            && brightness <= 15
+            && brightness == Math.rint(brightness);
+    }
+
     public float getShadowRadius() { return shadowRadius; }
     public void setShadowRadius(float v) {
         shadowRadius = v;
@@ -386,6 +412,7 @@ public abstract class DisplayData {
         cloned.leftRotation = this.leftRotation.clone_for_display(mirrorX, mirrorY, mirrorZ);
         cloned.rightRotation = this.rightRotation.clone(mirrorX, mirrorY, mirrorZ);
         cloned.glowColor = this.glowColor;
+        cloned.brightness = this.brightness;
         cloned.shadowRadius = this.shadowRadius;
         cloned.shadowStrength = this.shadowStrength;
         cloned.viewRange = this.viewRange;

@@ -22,7 +22,7 @@ import skwhy.data.BlockDisplayData;
 import skwhy.data.DisplayData;
 
 @Name("Display Block Data")
-@Description("Gets or sets the block data string of a block display entity. Only works on DisplayData instances that are of the BlockDisplay type.")
+@Description("Gets or sets the block data of block displays. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_group} to a new fake display group at player",
     "set {_display} to [a new fake item display]:",
@@ -38,24 +38,24 @@ import skwhy.data.DisplayData;
 @RequiredPlugins("PacketEvents")
 public class DisplayBlockData extends SimpleExpression<BlockData> {
 
-    private Expression<DisplayData> displayExpr;
+    private Expression<?> targets;
+    private boolean pluralTargets;
 
     @Override
-    @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        displayExpr = (Expression<DisplayData>) exprs[0];
+        pluralTargets = matchedPattern >= 1;
+        targets = exprs[0];
         return true;
     }
 
     @Override
     protected @Nullable BlockData[] get(Event event) {
-        DisplayData d = displayExpr.getSingle(event);
-        if (!(d instanceof BlockDisplayData block)) return null;
-
+        if (pluralTargets) return null;
+        Object value = targets.getSingle(event);
+        if (!(value instanceof BlockDisplayData block)) return null;
         String raw = block.getBlockData();
         if (raw == null || raw.isBlank()) return null;
-
         try {
             return new BlockData[]{ Bukkit.createBlockData(raw) };
         } catch (IllegalArgumentException e) {
@@ -72,10 +72,11 @@ public class DisplayBlockData extends SimpleExpression<BlockData> {
     @Override
     public void change(Event event, Object @Nullable [] delta, ChangeMode mode) {
         if (mode != ChangeMode.SET || delta == null || !(delta[0] instanceof BlockData bd)) return;
-        DisplayData d = displayExpr.getSingle(event);
-        if (!(d instanceof BlockDisplayData block)) return;
-        // getAsString(false) = sans namespace si possible, true = format complet
-        block.setBlockData(bd.getAsString(false));
+        for (DisplayData display : DisplayExpressionTargets.resolveForChange(targets, event, pluralTargets)) {
+            if (display instanceof BlockDisplayData block) {
+                block.setBlockData(bd.getAsString(false));
+            }
+        }
     }
 
     @Override
@@ -86,14 +87,15 @@ public class DisplayBlockData extends SimpleExpression<BlockData> {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return "block data of " + displayExpr.toString(event, debug);
+        return "block data of " + targets.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayBlockData.class, BlockData.class)
-                .addPattern("[the] block[ ]data of %displaydata%")
+                .addPattern("[the] block[ ]data of %displaydata/displaygroup%")
+                .addPattern("[the] block[ ]data of %displaydatas/displaygroups%")
                 .build()
         );
     }

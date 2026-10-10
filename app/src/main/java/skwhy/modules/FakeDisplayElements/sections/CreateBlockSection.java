@@ -20,6 +20,7 @@ import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
+import skwhy.data.DisplayData;
 import skwhy.data.BlockDisplayData;
 
 import org.bukkit.util.Vector;
@@ -36,7 +37,7 @@ import java.util.Map;
     "block (ItemType, ItemStack, BlockData, Material, or String block data), " +
     "scale/translation (Vector or Number), " +
     "rotation/leftrotation/rightrotation (Quaternionf), " +
-    "glow (int RGB), shadow/shadowradius/radius, strength/shadowstrength, range/viewrange, " +
+    "glow (int RGB), brightness (integer from 0 to 15), shadow/shadowradius/radius, strength/shadowstrength, range/viewrange, " +
     "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay (Number).")
 @Examples({
     "set {_display} to [a new fake block display]:",
@@ -45,6 +46,7 @@ import java.util.Map;
     "    translation: vector(0, 0, 0)",
     "    billboard: 0",
     "    glow: 0",
+    "    brightness: 12",
     "    shadow: 0.5",
     "    strength: 1",
     "    range: 64",
@@ -109,7 +111,7 @@ public class CreateBlockSection extends Section {
                 parser.parseExpression(Vector.class, Number.class);
             case "rotation", "leftrotation", "rightrotation" ->
                 parser.parseExpression(Quaternionf.class);
-            case "glow", "shadow", "shadowradius", "radius",
+            case "glow", "brightness", "shadow", "shadowradius", "radius",
                  "strength", "shadowstrength", "range", "viewrange",
                  "billboard", "interpolation", "interpolationduration",
                  "interpolationstart", "interpolationdelay" ->
@@ -158,6 +160,15 @@ public class CreateBlockSection extends Section {
                 }
                 case "glow" -> {
                     if (value instanceof Number n) display.setGlowColor(n.intValue());
+                }
+                case "brightness" -> {
+                    if (value instanceof Number n) {
+                        if (DisplayData.isValidBrightness(n)) {
+                            display.setBrightness(n.intValue());
+                        } else {
+                            Skript.error("Display brightness must be an integer between 0 and 15; received " + n + ".");
+                        }
+                    }
                 }
                 case "shadow", "shadowradius", "radius" -> {
                     if (value instanceof Number n) display.setShadowRadius(n.floatValue());

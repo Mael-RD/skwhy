@@ -60,6 +60,7 @@ public class FakeDisplayModule implements AddonModule {
 
         DisplayBlockData.register(addon);
         DisplayBoolean.register(addon);
+        DisplayColor.register(addon);
         DisplayFromReal.register(addon);
         DisplayId.register(addon);
         DisplayItem.register(addon);

@@ -220,7 +220,7 @@ public class GroupCreate extends SimpleExpression<DisplayGroupData> {
 
         // Fond — null si non défini
         Color bgColor = entity.getBackgroundColor();
-        int backgroundColor = (bgColor != null) ? bgColor.asRGB() : 0;
+        Color backgroundColor = (bgColor != null) ? bgColor : Color.BLACK;
 
         // CENTER=0 LEFT=1 RIGHT=2
         int textAlignment = switch (entity.getAlignment()) {

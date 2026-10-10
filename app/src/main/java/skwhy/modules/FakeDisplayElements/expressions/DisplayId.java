@@ -18,7 +18,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 
 @Name("Display Entity ID / UUID")
-@Description("Returns the numeric entity ID or the UUID string of a fake display entity. The entity ID is used for packet operations; the UUID is used for persistent identification.")
+@Description("Returns the numeric entity ID or the UUID string of fake display entities. The entity ID is used for packet operations; the UUID is used for persistent identification. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_group} to a new fake display group at player",
     "set {_display} to [a new fake item display]:",
@@ -37,25 +37,23 @@ public class DisplayId extends SimpleExpression<Object> {
     // 0 → entity id  (Number)
     // 1 → uuid       (String)
     private int matchedPattern;
-    private Expression<DisplayData> displayExpr;
+    private Expression<?> targets;
 
     @Override
-    @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
         this.matchedPattern = matchedPattern;
-        this.displayExpr    = (Expression<DisplayData>) exprs[0];
+        this.targets = exprs[0];
         return true;
     }
 
     @Override
     protected @Nullable Object[] get(Event event) {
-        DisplayData d = displayExpr.getSingle(event);
-        if (d == null) return null;
-
+        Object value = targets.getSingle(event);
+        if (!(value instanceof DisplayData display)) return null;
         return switch (matchedPattern) {
-            case 0 -> new Number[]{ d.getEntityId() };
-            case 1 -> new String[]{ d.getEntityUUID().toString() };
+            case 0 -> new Number[]{ display.getEntityId() };
+            case 1 -> new String[]{ display.getEntityUUID().toString() };
             default -> null;
         };
     }
@@ -71,7 +69,7 @@ public class DisplayId extends SimpleExpression<Object> {
     @Override
     public String toString(@Nullable Event event, boolean debug) {
         return (matchedPattern == 0 ? "entity id" : "uuid")
-            + " of " + displayExpr.toString(event, debug);
+            + " of " + targets.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {

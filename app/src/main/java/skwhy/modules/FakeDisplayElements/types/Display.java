@@ -70,6 +70,21 @@ public class Display {
             }
         );
     }
+
+    private static void serializeBrightness(Fields fields, DisplayData data) {
+        Integer brightness = data.getBrightness();
+        fields.putPrimitive("brightnessDefined", brightness != null);
+        if (brightness != null) {
+            fields.putPrimitive("brightness", brightness);
+        }
+    }
+
+    private static void deserializeBrightness(Fields fields, DisplayData data) throws StreamCorruptedException {
+        if (fields.contains("brightnessDefined")
+                && fields.getPrimitive("brightnessDefined", boolean.class)) {
+            data.setBrightness(fields.getPrimitive("brightness", int.class));
+        }
+    }
     
     /**
      * Enregistre la classe de base DisplayData dans Skript
@@ -160,7 +175,7 @@ public class Display {
         Classes.registerClass(new ClassInfo<>(BlockDisplayData.class, "blockdisplay")
             .name("Block Display")
             .description("A fake display entity that renders a block. " +
-                "Supports all common display properties (scale, translation, rotations, glow, shadow, view range, billboard) " +
+                "Supports all common display properties (scale, translation, rotations, glow, brightness, shadow, view range, billboard) " +
                 "plus a block data string that defines which block is shown. " +
                 "Fully serializable for persistent storage in Skript variables.")
             .usage("Created via 'set %objects% to a new fake block display'.")
@@ -169,6 +184,7 @@ public class Display {
                 "set {_display} to [a new fake block display]:",
                 "    block: stone",
                 "    scale: vector(1, 1, 1)",
+                "    brightness: 12",
                 "    shadow: 0.5",
                 "set block data of {_display} to oak_log",
                 "set group scale of {_display} to vector(2, 2, 2)"
@@ -185,6 +201,7 @@ public class Display {
                     fields.putObject("rightRotation", data.getRightRotation());
                     fields.putObject("blockData", data.getBlockData());
                     fields.putPrimitive("glowColor", data.getGlowColor());
+                    serializeBrightness(fields, data);
                     fields.putPrimitive("shadowRadius", data.getShadowRadius());
                     fields.putPrimitive("shadowStrength", data.getShadowStrength());
                     fields.putPrimitive("viewRange", data.getViewRange());
@@ -207,6 +224,7 @@ public class Display {
                         data.setRightRotation(fields.getObject("rightRotation", Quat4.class));
                         data.setBlockData((String) fields.getObject("blockData"));
                         data.setGlowColor(fields.getPrimitive("glowColor", int.class));
+                        deserializeBrightness(fields, data);
                         data.setShadowRadius(fields.getPrimitive("shadowRadius", float.class));
                         data.setShadowStrength(fields.getPrimitive("shadowStrength", float.class));
                         data.setViewRange(fields.getPrimitive("viewRange", float.class));
@@ -254,7 +272,7 @@ public class Display {
         Classes.registerClass(new ClassInfo<>(ItemDisplayData.class, "itemdisplay")
             .name("Item Display")
             .description("A fake display entity that renders an item or block item model. " +
-                "Supports all common display properties (scale, translation, rotations, glow, shadow, view range, billboard) " +
+                "Supports all common display properties (scale, translation, rotations, glow, brightness, shadow, view range, billboard) " +
                 "plus an item stack identifier and a display mode (none/thirdperson/firstperson/head/gui/ground/fixed). " +
                 "Also supports player head skin values via the 'head' key. " +
                 "Fully serializable for persistent storage in Skript variables.")
@@ -264,6 +282,7 @@ public class Display {
                 "set {_display} to [a new fake item display]:",
                 "    item: dirt",
                 "    scale: vector(1, 1, 1)",
+                "    brightness: 12",
                 "    mode: head",
                 "set item of {_display} to diamond sword",
                 "set display mode of {_display} to 5"
@@ -281,6 +300,7 @@ public class Display {
                     fields.putObject("itemStack", data.getItemStack());
                     fields.putPrimitive("displayMode", data.getDisplayMode());
                     fields.putPrimitive("glowColor", data.getGlowColor());
+                    serializeBrightness(fields, data);
                     fields.putPrimitive("shadowRadius", data.getShadowRadius());
                     fields.putPrimitive("shadowStrength", data.getShadowStrength());
                     fields.putPrimitive("viewRange", data.getViewRange());
@@ -304,6 +324,7 @@ public class Display {
                         data.setItemStack((String) fields.getObject("itemStack"));
                         data.setDisplayMode(fields.getPrimitive("displayMode", int.class));
                         data.setGlowColor(fields.getPrimitive("glowColor", int.class));
+                        deserializeBrightness(fields, data);
                         data.setShadowRadius(fields.getPrimitive("shadowRadius", float.class));
                         data.setShadowStrength(fields.getPrimitive("shadowStrength", float.class));
                         data.setViewRange(fields.getPrimitive("viewRange", float.class));
@@ -351,8 +372,8 @@ public class Display {
         Classes.registerClass(new ClassInfo<>(TextDisplayData.class, "textdisplay")
             .name("Text Display")
             .description("A fake display entity that renders formatted text. " +
-                "Supports all common display properties (scale, translation, rotations, glow, shadow, view range, billboard) " +
-                "plus text content, background color, text alignment (center/left/right), line width, and see-through mode. " +
+                "Supports all common display properties (scale, translation, rotations, glow, brightness, shadow, view range, billboard) " +
+                "plus text content, background color (Skript color), text alignment (center/left/right), line width, and see-through mode. " +
                 "Fully serializable for persistent storage in Skript variables.")
             .usage("Created via 'set %objects% to a new fake text display'.")
             .user("display ?text ?datas?")
@@ -361,11 +382,13 @@ public class Display {
                 "    text: \"&aHello world!\"",
                 "    seethrough: true",
                 "    alignment: center",
-                "    background: 0",
+                "    background: white",
+                "    background: \"#8000FF00\" # Semi-transparent green (AARRGGBB)",
                 "    linewidth: 200",
+                "    brightness: 12",
                 "set text of {_display} to \"&cUpdated!\"",
                 "set see through of {_display} to false",
-                "set background color of {_display} to 255"
+                "set background color of {_display} to red"
             )
             .since("1.0.0")
             
@@ -378,11 +401,12 @@ public class Display {
                     fields.putObject("leftRotation", data.getLeftRotation());
                     fields.putObject("rightRotation", data.getRightRotation());
                     fields.putObject("text", data.getText());
-                    fields.putPrimitive("bgColor", data.getBackgroundColor());
+                    fields.putPrimitive("bgColorArgb", data.getBackgroundColor().asARGB());
                     fields.putPrimitive("alignment", data.getTextAlignment());
                     fields.putPrimitive("lineWidth", data.getLineWidth());
                     fields.putPrimitive("seeThrough", data.isSeeThrough());
                     fields.putPrimitive("glowColor", data.getGlowColor());
+                    serializeBrightness(fields, data);
                     fields.putPrimitive("shadowRadius", data.getShadowRadius());
                     fields.putPrimitive("shadowStrength", data.getShadowStrength());
                     fields.putPrimitive("viewRange", data.getViewRange());
@@ -404,11 +428,20 @@ public class Display {
                         data.setLeftRotation(fields.getObject("leftRotation", Quat4.class));
                         data.setRightRotation(fields.getObject("rightRotation", Quat4.class));
                         data.setText((String) fields.getObject("text"));
-                        data.setBackgroundColor(fields.getPrimitive("bgColor", int.class));
+                        if (fields.contains("bgColorArgb")) {
+                            data.setBackgroundColor(org.bukkit.Color.fromARGB(
+                                    fields.getPrimitive("bgColorArgb", int.class)
+                            ));
+                        } else {
+                            data.setBackgroundColor(org.bukkit.Color.fromRGB(
+                                    fields.getPrimitive("bgColor", int.class)
+                            ));
+                        }
                         data.setTextAlignment(fields.getPrimitive("alignment", int.class));
                         data.setLineWidth(fields.getPrimitive("lineWidth", int.class));
                         data.setSeeThrough(fields.getPrimitive("seeThrough", boolean.class));
                         data.setGlowColor(fields.getPrimitive("glowColor", int.class));
+                        deserializeBrightness(fields, data);
                         data.setShadowRadius(fields.getPrimitive("shadowRadius", float.class));
                         data.setShadowStrength(fields.getPrimitive("shadowStrength", float.class));
                         data.setViewRange(fields.getPrimitive("viewRange", float.class));

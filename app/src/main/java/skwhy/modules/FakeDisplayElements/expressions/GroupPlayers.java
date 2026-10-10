@@ -32,12 +32,14 @@ import java.util.ArrayList;
     "",
     "# Add a viewer to a group",
     "add player to group viewers of {_group}",
+    "add {-players::*} to group viewers of {_group}",
     "",
     "# Remove a viewer from a cosmetic",
     "remove player from group viewers of {_cosmetique}",
     "",
     "# Replace all viewers of a group with a single player",
     "set group viewers of {_group} to player",
+    "set group viewers of {_group} to {-players::*}",
     "",
     "# Clear all viewers",
     "remove all from group viewers of {_cosmetique}"
@@ -70,14 +72,29 @@ public class GroupPlayers extends SimpleExpression<Player> {
 
         return null;
     }
-@Override
+    @Override
     public @Nullable Class<?>[] acceptChange(ChangeMode mode) {
-        // On indique à Skript que notre expression accepte d'être modifiée (SET, ADD, REMOVE, REMOVE_ALL)
-        // et que l'objet qu'on va lui passer (le delta) doit être un Player
-        if (mode == ChangeMode.SET || mode == ChangeMode.ADD || mode == ChangeMode.REMOVE || mode == ChangeMode.REMOVE_ALL) {
-            return new Class<?>[] { Player.class }; // C'est cette ligne qui débloque le "set viewers of ... to player"
+        return switch (mode) {
+            case SET, ADD, REMOVE -> new Class<?>[]{Player.class, Player[].class};
+            case REMOVE_ALL -> new Class<?>[0];
+            default -> null;
+        };
+    }
+
+    private List<Player> playersFromDelta(Object @Nullable [] delta) {
+        List<Player> players = new ArrayList<>();
+        if (delta == null) return players;
+
+        for (Object value : delta) {
+            if (value instanceof Player player) {
+                players.add(player);
+            } else if (value instanceof Player[] playerArray) {
+                for (Player player : playerArray) {
+                    if (player != null) players.add(player);
+                }
+            }
         }
-        return null;
+        return players;
     }
 
     @Override
@@ -87,54 +104,30 @@ public class GroupPlayers extends SimpleExpression<Player> {
 
         // Cas 1 : Gestion directe pour DisplayGroupData
         if (target instanceof DisplayGroupData group) {
+            List<Player> changedPlayers = playersFromDelta(delta);
             switch (mode) {
                 case ADD -> {
-                    if (delta == null) return;
-                    for (Object obj : delta) {
-                        if (obj instanceof Player player) group.addViewer(player);
-                    }
+                    for (Player player : changedPlayers) group.addViewer(player);
                 }
                 case REMOVE -> {
-                    if (delta == null) return;
-                    for (Object obj : delta) {
-                        if (obj instanceof Player player) group.removeViewer(player);
-                    }
+                    for (Player player : changedPlayers) group.removeViewer(player);
                 }
-                case SET -> {
-                    if (delta == null) return;
-                    List<Player> newViewers = new ArrayList<>();
-                    for (Object obj : delta) {
-                        if (obj instanceof Player player) newViewers.add(player);
-                    }
-                    group.setViewers(newViewers);
-                }
+                case SET -> group.setViewers(changedPlayers);
                 case REMOVE_ALL -> group.clearViewers();
                 default -> { }
             }
         } 
         // Cas 2 : Gestion directe pour ton Cosmétique
         else if (target instanceof CosmetiqueData cosme) {
+            List<Player> changedPlayers = playersFromDelta(delta);
             switch (mode) {
                 case ADD -> {
-                    if (delta == null) return;
-                    for (Object obj : delta) {
-                        if (obj instanceof Player player) cosme.addViewer(player);
-                    }
+                    for (Player player : changedPlayers) cosme.addViewer(player);
                 }
                 case REMOVE -> {
-                    if (delta == null) return;
-                    for (Object obj : delta) {
-                        if (obj instanceof Player player) cosme.removeViewer(player);
-                    }
+                    for (Player player : changedPlayers) cosme.removeViewer(player);
                 }
-                case SET -> {
-                    if (delta == null) return;
-                    List<Player> newViewers = new ArrayList<>();
-                    for (Object obj : delta) {
-                        if (obj instanceof Player player) newViewers.add(player);
-                    }
-                    cosme.setViewers(newViewers);
-                }
+                case SET -> cosme.setViewers(changedPlayers);
                 case REMOVE_ALL -> cosme.clearViewers();
                 default -> { }
             }

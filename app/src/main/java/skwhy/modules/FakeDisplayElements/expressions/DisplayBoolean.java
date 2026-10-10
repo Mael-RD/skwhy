@@ -20,7 +20,7 @@ import skwhy.data.DisplayData;
 import skwhy.data.TextDisplayData;
 
 @Name("Display See Through")
-@Description("Gets or sets the see-through property of a text display entity. When true, the text is visible through blocks. Only works on DisplayData instances of the TextDisplay type.")
+@Description("Gets or sets the see-through property of text displays. When true, the text is visible through blocks. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_group} to a new fake display group at player",
     "set {_display} to [a new fake item display]:",
@@ -40,23 +40,22 @@ public class DisplayBoolean extends SimpleExpression<Boolean> {
     // 1  see through        → TextDisplayData seulement
     // 2  default background → TextDisplayData seulement
 
-    private Expression<DisplayData> displayExpr;
+    private Expression<?> targets;
+    private boolean pluralTargets;
 
     @Override
-    @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        this.displayExpr    = (Expression<DisplayData>) exprs[0];
+        pluralTargets = matchedPattern >= 1;
+        this.targets = exprs[0];
         return true;
     }
 
     @Override
     protected @Nullable Boolean[] get(Event event) {
-        DisplayData d = displayExpr.getSingle(event);
-        if (!(d instanceof TextDisplayData text)) return null;
-        Boolean value = text.isSeeThrough();
-
-        return value != null ? new Boolean[]{ value } : null;
+        if (pluralTargets) return null;
+        Object value = targets.getSingle(event);
+        return value instanceof TextDisplayData text ? new Boolean[]{ text.isSeeThrough() } : null;
     }
 
     @Override
@@ -68,9 +67,9 @@ public class DisplayBoolean extends SimpleExpression<Boolean> {
     @Override
     public void change(Event event, Object @Nullable [] delta, ChangeMode mode) {
         if (mode != ChangeMode.SET || delta == null || !(delta[0] instanceof Boolean b)) return;
-        DisplayData d = displayExpr.getSingle(event);
-        if (!(d instanceof TextDisplayData text)) return;
-        text.setSeeThrough(b);
+        for (DisplayData display : DisplayExpressionTargets.resolveForChange(targets, event, pluralTargets)) {
+            if (display instanceof TextDisplayData text) text.setSeeThrough(b);
+        }
     }
 
     @Override
@@ -81,17 +80,15 @@ public class DisplayBoolean extends SimpleExpression<Boolean> {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        DisplayData d = displayExpr.getSingle(event);
-        if (!(d instanceof TextDisplayData text)) return null;
-
-        return text.isSeeThrough() ? "true" : "false";
+        return "see through of " + targets.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayBoolean.class, Boolean.class)
-                .addPattern("[the] see[ ]through of %displaydata%")
+                .addPattern("[the] see[ ]through of %displaydata/displaygroup%")
+                .addPattern("[the] see[ ]through of %displaydatas/displaygroups%")
                 .build()
         );
     }

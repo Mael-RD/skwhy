@@ -20,50 +20,53 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 
 @Name("Display Scale / Translation")
-@Description("Gets or sets the scale vector or translation offset of a fake display entity. Scale controls the size on each axis; translation offsets the display relative to its anchor point.")
+@Description("Gets or sets the scale vector or translation offset of fake display entities. Scale controls the size on each axis; translation offsets the display relative to its anchor point. Targets can be one or more displays or a display group.")
 @Examples({
-    "set {_group} to a new fake display group at player",
     "set {_display} to [a new fake item display]:",
     "    set item of display to dirt",
+    "set {_group} to a new fake display group at player from {_display}",
     "",
     "# Read the current scale",
-    "set {_scale} to group scale of {_display}",
+    "set {_scale} to fake display scale of {_display}",
     "",
     "# Set the scale to double on all axes",
-    "set group scale of {_display} to vector(2, 2, 2)",
+    "set fake display scale of {_display} to vector(2, 2, 2)",
+    "set fake display scale of {_group} to vector(2, 2, 2)",
     "",
     "# Read the current translation offset",
-    "set {_offset} to group translation of {_display}",
+    "set {_offset} to fake display translation of {_display}",
     "",
     "# Shift the display upward by 1 block",
-    "set group translation of {_display} to vector(0, 1, 0)"
+    "set fake display translation of {_display} to vector(0, 1, 0)"
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")
 public class DisplayScale extends SimpleExpression<Vector> {
 
     private int matchedPattern;
-    private Expression<DisplayData> displayExpr;
+    private boolean pluralTargets;
+    private Expression<?> targets;
 
     @Override
-    @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        this.matchedPattern = matchedPattern;
-        displayExpr = (Expression<DisplayData>) exprs[0];
+        this.pluralTargets = matchedPattern >= 2;
+        this.matchedPattern = matchedPattern % 2;
+        targets = exprs[0];
         return true;
     }
 
     @Override
     protected @Nullable Vector[] get(Event event) {
-        DisplayData d = displayExpr.getSingle(event);
-        if (d == null) return null;
-        Vector scale = switch (matchedPattern) {
-            case 0 -> d.getScale().toVector();
-            case 1 -> d.getTranslation().toVector();
+        if (pluralTargets) return null;
+        Object value = targets.getSingle(event);
+        if (!(value instanceof DisplayData display)) return null;
+        Vector vector = switch (matchedPattern) {
+            case 0 -> display.getScale().toVector();
+            case 1 -> display.getTranslation().toVector();
             default -> null;
         };
-        return scale != null ? new Vector[]{ new Vector(scale.getX(), scale.getY(), scale.getZ()) } : null;
+        return vector == null ? null : new Vector[]{ new Vector(vector.getX(), vector.getY(), vector.getZ()) };
     }
 
     @Override
@@ -75,11 +78,11 @@ public class DisplayScale extends SimpleExpression<Vector> {
     @Override
     public void change(Event event, Object @Nullable [] delta, ChangeMode mode) {
         if (mode != ChangeMode.SET || delta == null || !(delta[0] instanceof Vector v)) return;
-        DisplayData d = displayExpr.getSingle(event);
-        if (d == null) return;
-        switch (matchedPattern) {
-            case 0 -> d.setScale((float) v.getX(), (float) v.getY(), (float) v.getZ());
-            case 1 -> d.setTranslation((float) v.getX(), (float) v.getY(), (float) v.getZ());
+        for (DisplayData display : DisplayExpressionTargets.resolveForChange(targets, event, pluralTargets)) {
+            switch (matchedPattern) {
+                case 0 -> display.setScale((float) v.getX(), (float) v.getY(), (float) v.getZ());
+                case 1 -> display.setTranslation((float) v.getX(), (float) v.getY(), (float) v.getZ());
+            }
         }
     }
 
@@ -91,15 +94,17 @@ public class DisplayScale extends SimpleExpression<Vector> {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return "scale of " + displayExpr.toString(event, debug);
+        return "fake display transformation of " + targets.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayScale.class, Vector.class)
-                .addPattern("[the] group scale of %displaydata%")           // 0
-                .addPattern("[the] group translation of %displaydata%")     // 1
+                .addPattern("[the] fake display scale of %displaydata/displaygroup%")           // 0
+                .addPattern("[the] fake display translation of %displaydata/displaygroup%")     // 1
+                .addPattern("[the] fake display scale of %displaydatas/displaygroups%")           // 2
+                .addPattern("[the] fake display translation of %displaydatas/displaygroups%")     // 3
                 .build()
         );
     }

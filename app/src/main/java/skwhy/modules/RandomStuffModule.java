@@ -16,6 +16,7 @@ import ch.njol.skript.lang.util.SimpleEvent;
 import skwhy.SkWhy;
 import skwhy.modules.RandomStuff.expressions.*;
 import skwhy.modules.RandomStuff.effects.*;
+import skwhy.modules.RandomStuff.sections.*;
 import skwhy.modules.RandomStuff.events.Votes;
 
 public class RandomStuffModule implements AddonModule {
@@ -54,6 +55,13 @@ public class RandomStuffModule implements AddonModule {
         SecretReveal.register(addon);
         SecretDestroy.register(addon);
         SendAdvancementNotification.register(addon);
+
+        MatchedText.register(addon);
+        MatchedGroup.register(addon);
+        ReplacedText.register(addon);
+        PreviousLastFormat.register(addon);
+
+        ReplaceRegexSection.register(addon);
 
         loadVoteModule(addon);
     }

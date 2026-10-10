@@ -1,6 +1,5 @@
 package skwhy.modules.RandomStuff.effects;
 
-import ch.njol.skript.aliases.ItemType;
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Examples;
 import ch.njol.skript.doc.Name;
@@ -37,8 +36,8 @@ import java.util.UUID;
 @Description("Sends a task, goal, or challenge advancement toast to players using packets only. " +
         "The advancement is hidden from advancement tabs and never produces a chat message.")
 @Examples({
-    "send task notification with item diamond title \"A notification\" to all players",
-    "send challenge notification with item nether star title \"Challenge complete!\" to player"
+    "send task notification with item {_custom item} title \"A notification\" to all players",
+    "send challenge notification with item {_challenge icon} title \"Challenge complete!\" to player"
 })
 @Since("1.4.0")
 @RequiredPlugins("PacketEvents")
@@ -47,7 +46,7 @@ public class SendAdvancementNotification extends Effect {
     private static final ResourceLocation HIDDEN_PARENT = new ResourceLocation("minecraft:recipes/root");
     private static final String IMPOSSIBLE_CRITERION = "impossible";
 
-    private Expression<ItemType> item;
+    private Expression<ItemStack> item;
     private Expression<String> title;
     private Expression<Player> players;
     private AdvancementType advancementType;
@@ -56,7 +55,7 @@ public class SendAdvancementNotification extends Effect {
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, ParseResult pr) {
-        this.item = (Expression<ItemType>) exprs[0];
+        this.item = (Expression<ItemStack>) exprs[0];
         this.title = (Expression<String>) exprs[1];
         this.players = (Expression<Player>) exprs[2];
         this.advancementType = switch (matchedPattern) {
@@ -69,13 +68,10 @@ public class SendAdvancementNotification extends Effect {
 
     @Override
     protected void execute(Event event) {
-        ItemType itemType = item.getSingle(event);
+        ItemStack icon = item.getSingle(event);
         String notificationTitle = title.getSingle(event);
         Player[] targetPlayers = players.getAll(event);
-        if (itemType == null || notificationTitle == null || targetPlayers == null) return;
-
-        ItemStack icon = itemType.getRandom();
-        if (icon == null || icon.isEmpty()) return;
+        if (icon == null || icon.isEmpty() || notificationTitle == null || targetPlayers == null) return;
 
         for (Player player : targetPlayers) {
             var user = PacketEvents.getAPI().getPlayerManager().getUser(player);
@@ -126,9 +122,9 @@ public class SendAdvancementNotification extends Effect {
         addon.syntaxRegistry().register(
                 SyntaxRegistry.EFFECT,
                 SyntaxInfo.builder(SendAdvancementNotification.class)
-                        .addPattern("send task notification with item %item% title %string% to %players%")
-                        .addPattern("send goal notification with item %item% title %string% to %players%")
-                        .addPattern("send challenge notification with item %item% title %string% to %players%")
+                        .addPattern("send task notification with item %itemstack% title %string% to %players%")
+                        .addPattern("send goal notification with item %itemstack% title %string% to %players%")
+                        .addPattern("send challenge notification with item %itemstack% title %string% to %players%")
                         .build()
         );
     }

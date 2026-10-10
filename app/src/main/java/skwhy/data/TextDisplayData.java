@@ -4,6 +4,7 @@ import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
+import org.bukkit.Color;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,7 +16,7 @@ import java.util.List;
 public class TextDisplayData extends DisplayData {
     
     private String text;
-    private int backgroundColor;
+    private Color backgroundColor;
     private int textAlignment; // 0=center, 1=left, 2=right
     private int lineWidth; // Largeur de ligne maximale (0=illimité)
     private boolean seeThrough;
@@ -34,7 +35,7 @@ public class TextDisplayData extends DisplayData {
             0,
             0,
             "Text",
-            0xFFFFFF,
+            Color.WHITE,
             0,
             100,
             false
@@ -45,7 +46,7 @@ public class TextDisplayData extends DisplayData {
         Vec3 scale, Vec3 translation, Quat4 leftRotation, Quat4 rightRotation,
         int glowColor, float shadowRadius, float shadowStrength, float viewRange, int billboardMode,
         int interpolationStart, int interpolationDuration,
-        String text, int backgroundColor, int textAlignment, int lineWidth, boolean seeThrough
+        String text, Color backgroundColor, int textAlignment, int lineWidth, boolean seeThrough
     ) {
         super();
         this.scale = scale;
@@ -60,6 +61,7 @@ public class TextDisplayData extends DisplayData {
         this.interpolationStart = interpolationStart;
         this.interpolationDuration = interpolationDuration;
         this.text = (text != null) ? text : "Text";
+        this.backgroundColor = backgroundColor;
         this.textAlignment = textAlignment;
         this.lineWidth = lineWidth;
         this.seeThrough = seeThrough;
@@ -84,10 +86,8 @@ public class TextDisplayData extends DisplayData {
         // Index 24 – largeur de ligne
         data.add(new EntityData<>(24, EntityDataTypes.INT, lineWidth));
 
-        // Index 25 – couleur de fond (ARGB)
-        // On force l'alpha à 0xFF pour un fond opaque
-        int argbBackground = 0xFF000000 | (backgroundColor & 0xFFFFFF);
-        data.add(new EntityData<>(25, EntityDataTypes.INT, argbBackground));
+        // Index 25 – background color, including its alpha channel.
+        data.add(new EntityData<>(25, EntityDataTypes.INT, backgroundColor.asARGB()));
 
         // Index 26 – opacité du texte (-1 = 0xFF = complètement opaque)
         data.add(new EntityData<>(26, EntityDataTypes.BYTE, (byte) -1));
@@ -127,19 +127,19 @@ public class TextDisplayData extends DisplayData {
     }
     
     /**
-     * Définit la couleur de fond (format RGB).
+     * Définit la couleur de fond, alpha inclus.
      */
-    public void setBackgroundColor(int rgb) {
-        this.backgroundColor = rgb;
+    public void setBackgroundColor(Color color) {
+        if (color == null) throw new IllegalArgumentException("Background color cannot be null.");
+        this.backgroundColor = color;
         cachedDataRemove(25);
-        int argbBackground = 0xFF000000 | (backgroundColor & 0xFFFFFF);
-        cachedData.add(new EntityData<>(25, EntityDataTypes.INT, argbBackground));
+        cachedData.add(new EntityData<>(25, EntityDataTypes.INT, backgroundColor.asARGB()));
     }
     
     /**
      * Récupère la couleur de fond.
      */
-    public int getBackgroundColor() {
+    public Color getBackgroundColor() {
         return backgroundColor;
     }
     
@@ -217,7 +217,7 @@ public class TextDisplayData extends DisplayData {
         return String.format(
             "TextDisplay{" +
             "scale=(%.2f,%.2f,%.2f),translation=(%.2f,%.2f,%.2f),leftRotation=%s,rightRotation=%s," +
-            "text='%s',backgroundColor=0x%06X,alignment=%d(%s),lineWidth=%d," +
+            "text='%s',backgroundColor=0x%08X,alignment=%d(%s),lineWidth=%d," +
             "seeThrough=%b,glowColor=0x%06X,shadowRadius=%.2f,shadowStrength=%.2f,viewRange=%.2f,billboardMode=%d}",
             scale.x, scale.y, scale.z, translation.x, translation.y, translation.z,
             leftRotation, rightRotation,
@@ -229,7 +229,7 @@ public class TextDisplayData extends DisplayData {
     public String toString() {
         return "text display [" +
             "text='"      + text + "', " +
-            "bg=#"        + String.format("%06X", backgroundColor) + ", " +
+            "bg=#"        + String.format("%08X", backgroundColor.asARGB()) + ", " +
             "align="      + getTextAlignmentName() + ", " +
             "through="    + seeThrough + ", " +
             "width="      + lineWidth + ", " +

@@ -23,6 +23,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 
 import org.joml.Quaternionf;
 import org.bukkit.util.Vector;
+import skwhy.data.DisplayData;
 import skwhy.data.Quat4;
 import skwhy.data.Vec3;
 import skwhy.data.TextDisplayData;
@@ -36,23 +37,26 @@ import java.util.Map;
     "text (String), " +
     "seethrough/see_through/through (Boolean), " +
     "alignment/align/textalignment (center/left/right or 0/1/2), " +
-    "background/backgroundcolor/bgcolor (Color, int RGB, or hex string), " +
+    "background/backgroundcolor/bgcolor (Color or #RRGGBB/#AARRGGBB hex string; 8-digit hex includes alpha), " +
     "linewidth/width/line_width (Number), " +
     "scale/translation (Vector or Number), " +
     "rotation/leftrotation/rightrotation (Quaternionf), " +
-    "glow (int RGB), shadow/shadowradius/radius, strength/shadowstrength, range/viewrange, " +
+    "glow (int RGB), brightness (integer from 0 to 15), shadow/shadowradius/radius, strength/shadowstrength, range/viewrange, " +
     "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay (Number).")
 @Examples({
     "set {_display} to [a new fake text display]:",
     "    text: \"&aHello world!\"",
     "    seethrough: true",
     "    alignment: center",
-    "    background: 0",
+    "    background: white",
+    "    # Semi-transparent green (AARRGGBB)",
+    "    background: \"#8000FF00\"",
     "    linewidth: 200",
     "    scale: vector(1, 1, 1)",
     "    translation: vector(0, 0.5, 0)",
     "    billboard: 3",
     "    glow: 0",
+    "    brightness: 12",
     "    shadow: 0.5",
     "    strength: 1",
     "    range: 64",
@@ -110,7 +114,7 @@ public class CreateTextSection extends Section {
                 parser.parseExpression(Vector.class, Number.class);
             case "rotation", "leftrotation", "rightrotation" ->
                 parser.parseExpression(Quaternionf.class);
-            case "glow", "shadow", "shadowradius", "radius",
+            case "glow", "brightness", "shadow", "shadowradius", "radius",
                  "strength", "shadowstrength", "range", "viewrange",
                  "billboard", "interpolation", "interpolationduration",
                  "interpolationstart", "interpolationdelay",
@@ -123,7 +127,7 @@ public class CreateTextSection extends Section {
             case "alignment", "align", "textalignment" -> 
                 parser.parseExpression(String.class, Number.class);
             case "background", "backgroundcolor", "bgcolor" -> 
-                parser.parseExpression(ch.njol.skript.util.Color.class, org.bukkit.Color.class, String.class, Number.class);
+                parser.parseExpression(ch.njol.skript.util.Color.class, org.bukkit.Color.class, String.class);
             default ->
                 parser.parseExpression(Object.class);
         };
@@ -155,6 +159,15 @@ public class CreateTextSection extends Section {
                 case "glow" -> {
                     if (value instanceof Number n) display.setGlowColor(n.intValue());
                 }
+                case "brightness" -> {
+                    if (value instanceof Number n) {
+                        if (DisplayData.isValidBrightness(n)) {
+                            display.setBrightness(n.intValue());
+                        } else {
+                            Skript.error("Display brightness must be an integer between 0 and 15; received " + n + ".");
+                        }
+                    }
+                }
                 case "shadow", "shadowradius", "radius" -> {
                     if (value instanceof Number n) display.setShadowRadius(n.floatValue());
                 }
@@ -177,12 +190,10 @@ public class CreateTextSection extends Section {
                     display.setText(value.toString());
                 }
                 case "background", "backgroundcolor", "bgcolor" -> {
-                    if (value instanceof Number n) {
-                        display.setBackgroundColor(n.intValue());
-                    } else if (value instanceof ch.njol.skript.util.Color c) {
-                        display.setBackgroundColor(c.asBukkitColor().asRGB());
+                    if (value instanceof ch.njol.skript.util.Color c) {
+                        display.setBackgroundColor(c.asBukkitColor());
                     } else if (value instanceof org.bukkit.Color c) {
-                        display.setBackgroundColor(c.asRGB());
+                        display.setBackgroundColor(c);
                     } else {
                         display.setBackgroundColor(parseColor(value.toString()));
                     }
@@ -211,15 +222,23 @@ public class CreateTextSection extends Section {
         return getNext();
     }
 
-    private int parseColor(String value) {
+    private org.bukkit.Color parseColor(String value) {
         String v = value.trim();
         try {
-            if (v.startsWith("#"))                      return Integer.parseInt(v.substring(1), 16);
-            if (v.startsWith("0x") || v.startsWith("0X")) return Integer.parseInt(v.substring(2), 16);
-            return Integer.parseInt(v);
+            if (v.startsWith("#")) v = v.substring(1);
+            else if (v.startsWith("0x") || v.startsWith("0X")) v = v.substring(2);
+
+            if (v.length() == 6) return org.bukkit.Color.fromRGB(Integer.parseInt(v, 16));
+            if (v.length() == 8) return org.bukkit.Color.fromARGB((int) Long.parseLong(v, 16));
+
+            int rgb = Integer.parseInt(v);
+            return org.bukkit.Color.fromRGB(rgb);
         } catch (NumberFormatException e) {
             Skript.warning("Couleur invalide : '" + value + "', utilisation de blanc (#FFFFFF)");
-            return 0xFFFFFF;
+            return org.bukkit.Color.WHITE;
+        } catch (IllegalArgumentException e) {
+            Skript.warning("Couleur invalide : '" + value + "', utilisation de blanc (#FFFFFF)");
+            return org.bukkit.Color.WHITE;
         }
     }
 
