@@ -20,7 +20,7 @@ import skwhy.data.DisplayData;
 import skwhy.data.TextDisplayData;
 
 @Name("Display Text Content")
-@Description("Gets, sets, or appends to the text content of text displays. Targets can be one or more displays or a display group. Supports SET and ADD change modes.")
+@Description("Gets, sets, or appends to the text content of text displays. Targets can be one or more displays or a display group. Supports SET and ADD change modes. Colors use the Skript tags (<red>, <#ff8800>, <bold>...); the legacy &a codes still work.")
 @Examples({
     "set {_group} to a new fake display group at player",
     "set {_display} to a new fake item display:",
@@ -28,11 +28,11 @@ import skwhy.data.TextDisplayData;
     "set {_group} to a new fake display group at player from {_display}",
     "",
     "# Set the displayed text",
-    "set fake display text of {_display} to \"&aHello world!\"",
-    "set fake display text of {_group} to \"&aHello group!\"",
+    "set fake display text of {_display} to \"<green>Hello world!\"",
+    "set fake display text of {_group} to \"<green>Hello group!\"",
     "",
     "# Append text to the existing content",
-    "add \" &b(extra)\" to fake display text content of {_display}",
+    "add \" <aqua>(extra)\" to fake display text content of {_display}",
     "",
     "# Read the current text",
     "set {_text} to the fake display text of {_display}"

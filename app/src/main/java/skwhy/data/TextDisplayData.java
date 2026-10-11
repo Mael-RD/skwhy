@@ -77,10 +77,7 @@ public class TextDisplayData extends DisplayData {
         List<EntityData<?>> data = new ArrayList<>();
 
         // Index 23 – texte (Adventure Component, supporte les codes &)
-        net.kyori.adventure.text.Component component =
-            net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
-                .legacyAmpersand()
-                .deserialize(text != null ? text : "");
+        net.kyori.adventure.text.Component component = skwhy.util.TextComponents.fromSkript(text);
         data.add(new EntityData<>(23, EntityDataTypes.ADV_COMPONENT, component));
 
         // Index 24 – largeur de ligne
@@ -107,7 +104,7 @@ public class TextDisplayData extends DisplayData {
 
     /**
      * Définit le texte à afficher.
-     * Supporte les codes couleur Minecraft: &0-&9, &a-&f, &l, &o, &n, &m, &k, &r
+     * Supporte les couleurs Skript (<red>, <#ff8800>, <bold>...) et les codes &0-&9, &a-&f, &l, &o, &n, &m, &k, &r
      */
     public void setText(String text) {
         this.text = text;

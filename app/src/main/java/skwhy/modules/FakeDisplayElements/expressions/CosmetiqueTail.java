@@ -44,9 +44,12 @@ import skwhy.data.CosmetiqueData;
  * 18 random frequency               → fréquence du mouvement aléatoire
  */
 @Name("Cosmetic Tail Physics")
-@Description("Gets or sets any numeric physics or motion parameter of a cosmetic tail. All 19 parameters are individually accessible: rigidity, damping, velocity smoothing, velocity influences (forward/lateral/vertical/yaw), max deflection angle, depth deflection factor, impulse influences (forward/lateral/vertical), undulation amplitudes (x/y/z), undulation frequency and propagation, and random motion amplitude and frequency.")
+@Description("Gets or sets any numeric physics or motion parameter of a cosmetic tail. All 19 parameters are individually accessible: rigidity, damping, velocity smoothing, velocity influences (forward/lateral/vertical/yaw), max deflection angle, depth deflection factor, impulse influences (forward/lateral/vertical), undulation amplitudes (x/y/z), undulation frequency and propagation, and random motion amplitude and frequency. The tail must exist first: create it with 'set tail of %cosmetique% to %tailpart%'. Without a tail, setting a parameter does nothing and reading one gives 0.")
 @Examples({
     "set {_cosmetique} to a new cosmetique for player with hats false back false and tail true",
+    "set {_group} to a new fake display group at player",
+    "set {_root} to a new tailpart from {_group} with offset vector(0, 1, 0)",
+    "set tail of {_cosmetique} to {_root}",
     "",
     "set tail rigidity of {_cosmetique} to 0.8",
     "set tail damping of {_cosmetique} to 0.3",
