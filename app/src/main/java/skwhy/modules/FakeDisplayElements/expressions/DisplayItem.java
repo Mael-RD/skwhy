@@ -32,13 +32,13 @@ import skwhy.data.ItemDisplayData;
     "    set item of display to dirt",
     "",
     "# Read the current item",
-    "set {_item} to item of {_display}",
+    "set {_item} to fake display item of {_display}",
     "",
     "# Change the displayed item",
-    "set item of {_display} to diamond sword",
+    "set fake display item of {_display} to diamond sword",
     "",
     "# Change using item stack expression",
-    "set itemstack of {_display} to stone"
+    "set fake display itemstack of {_display} to stone"
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")
@@ -106,8 +106,8 @@ public class DisplayItem extends SimpleExpression<ItemType> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayItem.class, ItemType.class)
-                .addPattern("[the] item[[ ]stack] of %displaydata/displaygroup%")
-                .addPattern("[the] item[[ ]stack] of %displaydatas/displaygroups%")
+                .addPattern("[the] fake display item[[ ]stack] of %displaydata/displaygroup%")
+                .addPattern("[the] fake display item[[ ]stack] of %displaydatas/displaygroups%")
                 .build()
         );
     }

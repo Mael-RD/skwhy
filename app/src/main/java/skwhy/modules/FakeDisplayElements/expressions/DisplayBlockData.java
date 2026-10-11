@@ -29,10 +29,10 @@ import skwhy.data.DisplayData;
     "    set item of display to dirt",
     "",
     "# Read the block data",
-    "set {_data} to block data of {_display}",
+    "set {_data} to fake display block data of {_display}",
     "",
     "# Change the displayed block",
-    "set blockdata of {_display} to stone"
+    "set fake display blockdata of {_display} to stone"
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")
@@ -94,8 +94,8 @@ public class DisplayBlockData extends SimpleExpression<BlockData> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayBlockData.class, BlockData.class)
-                .addPattern("[the] block[ ]data of %displaydata/displaygroup%")
-                .addPattern("[the] block[ ]data of %displaydatas/displaygroups%")
+                .addPattern("[the] fake display block[ ]data of %displaydata/displaygroup%")
+                .addPattern("[the] fake display block[ ]data of %displaydatas/displaygroups%")
                 .build()
         );
     }

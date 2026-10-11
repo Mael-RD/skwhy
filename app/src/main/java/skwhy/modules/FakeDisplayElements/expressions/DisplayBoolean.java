@@ -27,10 +27,10 @@ import skwhy.data.TextDisplayData;
     "    set item of display to dirt",
     "",
     "# Read the see-through state",
-    "set {_visible} to see through of {_display}",
+    "set {_visible} to fake display see through of {_display}",
     "",
     "# Make the text visible through walls",
-    "set seethrough of {_display} to true"
+    "set fake display seethrough of {_display} to true"
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")
@@ -87,8 +87,8 @@ public class DisplayBoolean extends SimpleExpression<Boolean> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayBoolean.class, Boolean.class)
-                .addPattern("[the] see[ ]through of %displaydata/displaygroup%")
-                .addPattern("[the] see[ ]through of %displaydatas/displaygroups%")
+                .addPattern("[the] fake display see[ ]through of %displaydata/displaygroup%")
+                .addPattern("[the] fake display see[ ]through of %displaydatas/displaygroups%")
                 .build()
         );
     }

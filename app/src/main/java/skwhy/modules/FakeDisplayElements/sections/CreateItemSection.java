@@ -40,7 +40,7 @@ import java.util.Map;
     "scale/translation (Vector or Number), " +
     "rotation/leftrotation/rightrotation (Quaternionf), " +
     "glow (int RGB), brightness (integer from 0 to 15), shadow/shadowradius/radius, strength/shadowstrength, range/viewrange, " +
-    "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay (Number).")
+    "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay, teleportation/teleportationduration (Number).")
 @Examples({
     "# Create a basic item display showing dirt",
     "set {_display} to [a new fake item display]:",
@@ -115,7 +115,8 @@ public class CreateItemSection extends Section {
             case "glow", "brightness", "shadow", "shadowradius", "radius",
                  "strength", "shadowstrength", "range", "viewrange",
                  "billboard", "interpolation", "interpolationduration",
-                 "interpolationstart", "interpolationdelay" ->
+                 "interpolationstart", "interpolationdelay",
+                 "teleportation", "teleportationduration" ->
                 parser.parseExpression(Number.class);
             case "item", "itemstack", "material" ->
                 parser.parseExpression(
@@ -194,6 +195,9 @@ public class CreateItemSection extends Section {
                 }
                 case "interpolationstart", "interpolationdelay" -> {
                     if (value instanceof Number n) display.setInterpolationStart(n.intValue());
+                }
+                case "teleportation", "teleportationduration" -> {
+                    if (value instanceof Number n) display.setTeleportationDuration(n.intValue());
                 }
                 case "item", "itemstack", "material" -> {
                     // Convertit en majuscule et remplace les espaces par des tirets du bas si c'est parsé comme texte classique depuis Skript

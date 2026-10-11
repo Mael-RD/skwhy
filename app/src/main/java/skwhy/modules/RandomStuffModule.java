@@ -18,6 +18,11 @@ import skwhy.modules.RandomStuff.expressions.*;
 import skwhy.modules.RandomStuff.effects.*;
 import skwhy.modules.RandomStuff.sections.*;
 import skwhy.modules.RandomStuff.events.Votes;
+import skwhy.modules.RandomStuff.events.BlockChangePacket;
+import org.bukkit.Location;
+import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.entity.Player;
 
 public class RandomStuffModule implements AddonModule {
 
@@ -64,6 +69,7 @@ public class RandomStuffModule implements AddonModule {
         ReplaceRegexSection.register(addon);
 
         loadVoteModule(addon);
+        loadBlockChangePacket(addon);
     }
 
     @SuppressWarnings("null")
@@ -90,8 +96,12 @@ public class RandomStuffModule implements AddonModule {
             BukkitSyntaxInfos.Event.KEY,
             BukkitSyntaxInfos.Event.builder(SimpleEvent.class, "Vote Event")
                 .addEvent(Votes.class)
-                .addPatterns("[on] vote")
-                .addDescription("Fires when a player votes for the server on a voting site.")
+                .addPatterns("vote")
+                .addDescription(
+                    "Fires when a player votes for the server on a voting site (received through Votifier/NuVotifier).",
+                    "Event values (all strings): 'event-vote username' (or 'voter'), 'event-vote service' (or 'voting service'), " +
+                    "'event-vote address' (or 'voter address'), 'event-vote timestamp' (or 'vote time')."
+                )
                 .addExamples(
                     "on vote:",
                     "\tset {_username} to event-vote username",
@@ -99,6 +109,8 @@ public class RandomStuffModule implements AddonModule {
                     "\tset {_address} to event-vote address",
                     "\tset {_timestamp} to event-vote timestamp"
                 )
+                .addKeywords("vote", "votifier", "nuvotifier")
+                .addRequiredPlugins("Votifier")
                 .addSince("1.3.3")
                 .build()
         );
@@ -132,5 +144,39 @@ public class RandomStuffModule implements AddonModule {
             .getter(Votes::getTimestamp)
             .time(EventValue.Time.NOW)
             .build());
+    }
+
+    @SuppressWarnings("null")
+    private void loadBlockChangePacket(SkriptAddon addon) {
+        BlockChangePacket.registerListener();
+
+        this.moduleRegistry(addon).register(
+            BukkitSyntaxInfos.Event.KEY,
+            BukkitSyntaxInfos.Event.builder(SimpleEvent.class, "Block Change Packet")
+                .addEvent(BlockChangePacket.class)
+                .addPattern("block change packet")
+                .addDescription(
+                    "Fires whenever a block update packet is sent to a player (block placed or broken, natural updates, " +
+                    "or a fake block sent with 'make player see block as ...'). Cancelling removes the block from the packet, " +
+                    "so only cancel it after checking the block. The event is asynchronous when the packet is sent off the main thread.",
+                    "Event values: 'event-player' (the receiver), 'event-location', 'event-blockdata' (the block data sent in the packet) " +
+                    "and 'event-block' (the real block currently at the location, not what the packet sends). This event can be cancelled."
+                )
+                .addExamples(
+                    "on block change packet:",
+                    "\tif event-blockdata is stone[]:",
+                    "\t\tcancel event"
+                )
+                .addKeywords("packet", "block", "fake block")
+                .addRequiredPlugins("packetevents")
+                .addSince("1.4.0")
+                .build()
+        );
+
+        EventValueRegistry reg = addon.registry(EventValueRegistry.class);
+        reg.register(EventValue.simple(BlockChangePacket.class, Player.class, BlockChangePacket::getPlayer));
+        reg.register(EventValue.simple(BlockChangePacket.class, Location.class, BlockChangePacket::getLocation));
+        reg.register(EventValue.simple(BlockChangePacket.class, BlockData.class, BlockChangePacket::getBlockData));
+        reg.register(EventValue.simple(BlockChangePacket.class, Block.class, BlockChangePacket::getBlock));
     }
 }

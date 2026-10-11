@@ -48,12 +48,16 @@ public class APIModule implements AddonModule {
             BukkitSyntaxInfos.Event.builder(SimpleEvent.class, "API Request")
                 .addEvent(API_request_event.class)
                 .addPattern("api request")
-                .addDescription("Fires when the built-in HTTP/HTTPS server receives a valid API request.")
+                .addDescription(
+                    "Fires when the built-in HTTP/HTTPS server receives a valid API request.",
+                    "Event value: 'event-apirequest' (the request, which can be answered with the 'reply to' effect)."
+                )
                 .addExamples(
                     "on api request:",
                     "\tset {_req} to event-apirequest",
                     "\treply to {_req} with \"Hello!\""
                 )
+                .addKeywords("api", "http", "request")
                 .addSince("1.3.0")
                 .build()
         );

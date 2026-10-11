@@ -29,16 +29,16 @@ import skwhy.data.Quat4;
     "    set item of display to dirt",
     "",
     "# Read the left rotation",
-    "set {_leftRot} to left rotation of {_display}",
+    "set {_leftRot} to fake display left rotation of {_display}",
     "",
     "# Read the right rotation",
-    "set {_rightRot} to right rotation of {_display}",
+    "set {_rightRot} to fake display right rotation of {_display}",
     "",
     "# Set a new left rotation",
-    "set left rotation of {_display} to {_quaternion}",
+    "set fake display left rotation of {_display} to {_quaternion}",
     "",
     "# Set a new right rotation",
-    "set right rotation of {_display} to {_quaternion}"
+    "set fake display right rotation of {_display} to {_quaternion}"
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")
@@ -105,10 +105,10 @@ public class DisplayRotation extends SimpleExpression<Quat4> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayRotation.class, Quat4.class)
-                .addPattern("[the] left rotation of %displaydata/displaygroup%")    // 0
-                .addPattern("[the] right rotation of %displaydata/displaygroup%")   // 1
-                .addPattern("[the] left rotation of %displaydatas/displaygroups%")    // 2
-                .addPattern("[the] right rotation of %displaydatas/displaygroups%")   // 3
+                .addPattern("[the] fake display left rotation of %displaydata/displaygroup%")    // 0
+                .addPattern("[the] fake display right rotation of %displaydata/displaygroup%")   // 1
+                .addPattern("[the] fake display left rotation of %displaydatas/displaygroups%")    // 2
+                .addPattern("[the] fake display right rotation of %displaydatas/displaygroups%")   // 3
                 .build()
         );
     }

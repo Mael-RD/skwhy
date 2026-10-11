@@ -28,14 +28,14 @@ import skwhy.data.TextDisplayData;
     "set {_group} to a new fake display group at player from {_display}",
     "",
     "# Set the displayed text",
-    "set text of {_display} to \"&aHello world!\"",
+    "set fake display text of {_display} to \"&aHello world!\"",
     "set text of {_group} to \"&aHello group!\"",
     "",
     "# Append text to the existing content",
-    "add \" &b(extra)\" to text content of {_display}",
+    "add \" &b(extra)\" to fake display text content of {_display}",
     "",
     "# Read the current text",
-    "set {_text} to the text of {_display}"
+    "set {_text} to the fake display text of {_display}"
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")
@@ -97,8 +97,8 @@ public class DisplayText extends SimpleExpression<String> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayText.class, String.class)
-                .addPattern("[the] text [content] of %displaydata/displaygroup%")
-                .addPattern("[the] text [content] of %displaydatas/displaygroups%")
+                .addPattern("[the] fake display text [content] of %displaydata/displaygroup%")
+                .addPattern("[the] fake display text [content] of %displaydatas/displaygroups%")
                 .build()
         );
     }

@@ -31,19 +31,19 @@ import skwhy.data.TextDisplayData;
     "# A group target applies to each display it contains",
     "set fake display interpolation duration of {_group} to 5",
     "",
-    "set glow of {_display} to 16711680",
-    "set brightness of {_display} to 12",
-    "delete brightness of {_display} # Restore world lighting",
-    "set interpolation start of {_display} to 0",
-    "set interpolation duration of {_display} to 5",
-    "set teleportation duration of {_display} to 2",
-    "set shadow radius of {_display} to 0.5",
-    "set shadow strength of {_display} to 1.0",
-    "set view range of {_display} to 64",
-    "set billboard of {_display} to 0",
-    "set display mode of {_display} to 5",
-    "set text alignment of {_display} to 0",
-    "set line width of {_display} to 200",
+    "set fake display glow of {_display} to 16711680",
+    "set fake display brightness of {_display} to 12",
+    "delete fake display brightness of {_display} # Restore world lighting",
+    "set fake display interpolation start of {_display} to 0",
+    "set fake display interpolation duration of {_display} to 5",
+    "set fake display teleportation duration of {_display} to 2",
+    "set fake display shadow radius of {_display} to 0.5",
+    "set fake display shadow strength of {_display} to 1.0",
+    "set fake display view range of {_display} to 64",
+    "set fake display billboard of {_display} to 0",
+    "set fake display display mode of {_display} to 5",
+    "set fake display text alignment of {_display} to 0",
+    "set fake display line width of {_display} to 200",
     "set fake display interpolation start of {_display} to 0",
     "set fake display interpolation duration of {_display} to 5",
     "set fake display teleportation duration of {_display} to 2"
@@ -168,27 +168,27 @@ public class DisplayNumber extends SimpleExpression<Number> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayNumber.class, Number.class)
-                .addPattern("[the] glow [color] of %displaydata/displaygroup%")           // 0
-                .addPattern("[the] shadow radius of %displaydata/displaygroup%")           // 1
-                .addPattern("[the] shadow strength of %displaydata/displaygroup%")         // 2
-                .addPattern("[the] view range of %displaydata/displaygroup%")              // 3
-                .addPattern("[the] billboard [mode] of %displaydata/displaygroup%")        // 4
-                .addPattern("[the] display mode of %displaydata/displaygroup%")            // 5
-                .addPattern("[the] text alignment of %displaydata/displaygroup%")          // 6
-                .addPattern("[the] line width of %displaydata/displaygroup%")              // 7
-                .addPattern("[the] brightness of %displaydata/displaygroup%")               // 8
+                .addPattern("[the] fake display glow [color] of %displaydata/displaygroup%")           // 0
+                .addPattern("[the] fake display shadow radius of %displaydata/displaygroup%")           // 1
+                .addPattern("[the] fake display shadow strength of %displaydata/displaygroup%")         // 2
+                .addPattern("[the] fake display view range of %displaydata/displaygroup%")              // 3
+                .addPattern("[the] fake display billboard [mode] of %displaydata/displaygroup%")        // 4
+                .addPattern("[the] fake display display mode of %displaydata/displaygroup%")            // 5
+                .addPattern("[the] fake display text alignment of %displaydata/displaygroup%")          // 6
+                .addPattern("[the] fake display line width of %displaydata/displaygroup%")              // 7
+                .addPattern("[the] fake display brightness of %displaydata/displaygroup%")               // 8
                 .addPattern("[the] fake display interpolation start [delay] of %displaydata/displaygroup%") // 9
                 .addPattern("[the] fake display interpolation duration of %displaydata/displaygroup%")   // 10
                 .addPattern("[the] fake display teleportation duration of %displaydata/displaygroup%")   // 11
-                .addPattern("[the] glow [color] of %displaydatas/displaygroups%")           // 12
-                .addPattern("[the] shadow radius of %displaydatas/displaygroups%")           // 13
-                .addPattern("[the] shadow strength of %displaydatas/displaygroups%")         // 14
-                .addPattern("[the] view range of %displaydatas/displaygroups%")              // 15
-                .addPattern("[the] billboard [mode] of %displaydatas/displaygroups%")        // 16
-                .addPattern("[the] display mode of %displaydatas/displaygroups%")            // 17
-                .addPattern("[the] text alignment of %displaydatas/displaygroups%")          // 18
-                .addPattern("[the] line width of %displaydatas/displaygroups%")              // 19
-                .addPattern("[the] brightness of %displaydatas/displaygroups%")               // 20
+                .addPattern("[the] fake display glow [color] of %displaydatas/displaygroups%")           // 12
+                .addPattern("[the] fake display shadow radius of %displaydatas/displaygroups%")           // 13
+                .addPattern("[the] fake display shadow strength of %displaydatas/displaygroups%")         // 14
+                .addPattern("[the] fake display view range of %displaydatas/displaygroups%")              // 15
+                .addPattern("[the] fake display billboard [mode] of %displaydatas/displaygroups%")        // 16
+                .addPattern("[the] fake display display mode of %displaydatas/displaygroups%")            // 17
+                .addPattern("[the] fake display text alignment of %displaydatas/displaygroups%")          // 18
+                .addPattern("[the] fake display line width of %displaydatas/displaygroups%")              // 19
+                .addPattern("[the] fake display brightness of %displaydatas/displaygroups%")               // 20
                 .addPattern("[the] fake display interpolation start [delay] of %displaydatas/displaygroups%") // 21
                 .addPattern("[the] fake display interpolation duration of %displaydatas/displaygroups%")   // 22
                 .addPattern("[the] fake display teleportation duration of %displaydatas/displaygroups%")   // 23

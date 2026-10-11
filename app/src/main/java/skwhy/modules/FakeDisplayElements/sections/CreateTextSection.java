@@ -42,7 +42,7 @@ import java.util.Map;
     "scale/translation (Vector or Number), " +
     "rotation/leftrotation/rightrotation (Quaternionf), " +
     "glow (int RGB), brightness (integer from 0 to 15), shadow/shadowradius/radius, strength/shadowstrength, range/viewrange, " +
-    "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay (Number).")
+    "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay, teleportation/teleportationduration (Number).")
 @Examples({
     "set {_display} to [a new fake text display]:",
     "    text: \"&aHello world!\"",
@@ -118,6 +118,7 @@ public class CreateTextSection extends Section {
                  "strength", "shadowstrength", "range", "viewrange",
                  "billboard", "interpolation", "interpolationduration",
                  "interpolationstart", "interpolationdelay",
+                 "teleportation", "teleportationduration",
                  "linewidth", "width", "line_width" ->
                 parser.parseExpression(Number.class);
             case "text" -> 
@@ -185,6 +186,9 @@ public class CreateTextSection extends Section {
                 }
                 case "interpolationstart", "interpolationdelay" -> {
                     if (value instanceof Number n) display.setInterpolationStart(n.intValue());
+                }
+                case "teleportation", "teleportationduration" -> {
+                    if (value instanceof Number n) display.setTeleportationDuration(n.intValue());
                 }
                 case "text" -> {
                     display.setText(value.toString());

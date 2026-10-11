@@ -25,8 +25,8 @@ import skwhy.data.TextDisplayData;
         "Alpha is preserved. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_display} to a new fake text display",
-    "set background color of {_display} to lime",
-    "set {_color} to the background color of {_display}"
+    "set fake display background color of {_display} to lime",
+    "set {_color} to the fake display background color of {_display}"
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")
@@ -88,8 +88,8 @@ public class DisplayColor extends SimpleExpression<Color> {
         addon.syntaxRegistry().register(
                 SyntaxRegistry.EXPRESSION,
                 SyntaxInfo.Expression.builder(DisplayColor.class, Color.class)
-                        .addPattern("[the] background [color] of %displaydata/displaygroup%")
-                        .addPattern("[the] background [color] of %displaydatas/displaygroups%")
+                        .addPattern("[the] fake display background [color] of %displaydata/displaygroup%")
+                        .addPattern("[the] fake display background [color] of %displaydatas/displaygroups%")
                         .build()
         );
     }

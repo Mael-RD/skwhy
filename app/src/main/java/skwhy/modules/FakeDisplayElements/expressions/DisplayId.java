@@ -25,10 +25,10 @@ import skwhy.data.DisplayData;
     "    set item of display to dirt",
     "",
     "# Get the numeric entity ID",
-    "set {_id} to entity id of {_display}",
+    "set {_id} to fake display entity id of {_display}",
     "",
     "# Get the UUID string",
-    "set {_uuid} to entity uuid of {_display}"
+    "set {_uuid} to fake display entity uuid of {_display}"
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")
@@ -76,8 +76,8 @@ public class DisplayId extends SimpleExpression<Object> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(DisplayId.class, Object.class)
-                .addPattern("[the] entity id of %displaydata%")   // 0
-                .addPattern("[the] entity uuid of %displaydata%") // 1
+                .addPattern("[the] fake display entity id of %displaydata%")   // 0
+                .addPattern("[the] fake display entity uuid of %displaydata%") // 1
                 .build()
         );
     }
