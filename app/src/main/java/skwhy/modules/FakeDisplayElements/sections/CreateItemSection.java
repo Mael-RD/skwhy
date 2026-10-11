@@ -32,7 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-@Name("Create Fake Item Display")
+@Name("[Fake Display] Create Fake Item Display")
 @Description("Creates a new fake item display entity using a configuration section. Accepted keys: " +
     "item/itemstack/material (ItemType, ItemStack, or Material), " +
     "head (String — sets item to PLAYER_HEAD and applies the skin value; mutually exclusive with item), " +

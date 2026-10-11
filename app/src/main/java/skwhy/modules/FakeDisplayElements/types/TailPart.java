@@ -16,7 +16,7 @@ public class TailPart {
     // Appelé une seule fois depuis init() du module principal
     public static void register() {
         Classes.registerClass(new ClassInfo<>(TailNode.class, "tailpart")
-            .name("Tail Part")
+            .name("[Fake Display] Tail Part")
             .description("Represents a single segment (node) in an animated tail structure. " +
                 "Nodes are chained together from a root node outward; each node references a display group and a positional offset. " +
                 "Cannot be parsed from text and is not persistently serializable.")

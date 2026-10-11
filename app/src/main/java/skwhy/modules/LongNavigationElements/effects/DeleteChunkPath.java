@@ -26,7 +26,7 @@ import skwhy.modules.LongNavigationElements.ChunkPathManager;
     "delete chunk path of target block's chunk",
     "delete chunk path record of player's chunk"
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class DeleteChunkPath extends Effect {
 
     private Expression<Chunk> chunkExpr;

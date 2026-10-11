@@ -37,7 +37,7 @@ import java.util.List;
     "set tags of path cost rule {_rule} to minecraft tag \"leaves\" and minecraft tag \"logs\"",
     "delete tags of path cost rule {_rule}"
 })
-@Since("1.4.0")
+@Since("1.5.0")
 @SuppressWarnings("rawtypes") // Tag is used raw to match Skript's own "minecrafttag" ClassInfo<Tag>, which covers both block and entity tags.
 public class PathCostRuleTags extends SimpleExpression<Tag> {
 

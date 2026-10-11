@@ -24,7 +24,7 @@ import skwhy.data.Vec3;
 
 import org.bukkit.util.Vector;
 
-@Name("Create Tail Part")
+@Name("[Fake Display] Create Tail Part")
 @Description("Creates a new tail node linked to a display group with a positional offset. Optionally connects it to a parent tail node to build a chain. If no parent is provided, the node becomes the root of a new tail structure.")
 @Examples({
     "set {_group} to a new fake display group at player",

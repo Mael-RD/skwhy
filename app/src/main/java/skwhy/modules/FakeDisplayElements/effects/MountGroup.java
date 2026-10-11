@@ -24,7 +24,7 @@ import skwhy.data.CosmetiqueData;
 import java.util.Arrays;
 import java.util.List;
 
-@Name("Mount Group")
+@Name("[Fake Display] Mount Group")
 @Description("Mounts or dismounts fake display groups or cosmetics onto entities or virtual entity IDs. Supports four patterns: simple self-mount, mount on a real entity, mount on a virtual ID at a location, and packet-based mount/dismount for specific players.")
 @Examples({
     "set {_group} to a new fake display group at player",

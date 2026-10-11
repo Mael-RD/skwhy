@@ -22,7 +22,7 @@ import skwhy.data.DisplayGroupData;
 import java.util.ArrayList;
 import java.util.List;
 
-@Name("Clone Displays")
+@Name("[Fake Display] Clone Displays")
 @Description("Clones one or more display datas or display groups, optionally applying a mirror transformation on one or more axes during cloning. Without an axis, produces an exact copy.")
 @Examples({
     "set {_group} to a new fake display group at player",

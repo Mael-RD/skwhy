@@ -19,7 +19,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 import skwhy.data.TextDisplayData;
 
-@Name("Display Text Content")
+@Name("[Fake Display] Display Text Content")
 @Description("Gets, sets, or appends to the text content of text displays. Targets can be one or more displays or a display group. Supports SET and ADD change modes. Colors use the Skript tags (<red>, <#ff8800>, <bold>...); the legacy &a codes still work.")
 @Examples({
     "set {_group} to a new fake display group at player",

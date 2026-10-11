@@ -34,7 +34,7 @@ import java.util.List;
     "loop gate path locations from {_start} to {_end}:",
     "\tbroadcast \"gate at %loop-value%\""
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class GatePathLocations extends SimpleExpression<Location> {
 
     private Expression<Location> fromExpr;

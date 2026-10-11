@@ -18,7 +18,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 
 import skwhy.data.CosmetiqueData;
 
-@Name("Delete Cosmetic Part")
+@Name("[Fake Display] Delete Cosmetic Part")
 @Description("Removes a specific part (hat, back, or tail) from a cosmetic. The hat pattern supports an optional slot identifier to remove only a specific hat layer.")
 @Examples({
     "set {_cosmetique} to a new cosmetique for player",

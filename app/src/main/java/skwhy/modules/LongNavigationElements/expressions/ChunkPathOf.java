@@ -31,7 +31,7 @@ import skwhy.modules.LongNavigationElements.types.ChunkPathRecord;
     "\tregister chunk path of target block's chunk",
     "\tset {_record} to chunk path record of target block's chunk"
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class ChunkPathOf extends SimpleExpression<ChunkPathRecord> {
 
     private Expression<Chunk> chunkExpr;

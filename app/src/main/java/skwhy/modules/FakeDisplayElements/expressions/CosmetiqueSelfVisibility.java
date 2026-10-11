@@ -19,7 +19,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 
 import skwhy.data.CosmetiqueData;
 
-@Name("Cosmetic Self Visibility")
+@Name("[Fake Display] Cosmetic Self Visibility")
 @Description("Gets or sets whether the player wearing the cosmetic can see their own hat, back, or tail parts. Useful for hiding first-person overlapping cosmetics like masks or helmets.")
 @Examples({
     "set {_cosmetique} to a new cosmetique for player with hats true back true and tail true",

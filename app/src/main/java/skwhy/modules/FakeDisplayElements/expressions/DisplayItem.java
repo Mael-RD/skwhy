@@ -24,7 +24,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 import skwhy.data.ItemDisplayData;
 
-@Name("Display Item")
+@Name("[Fake Display] Display Item")
 @Description("Gets or sets the item displayed by item displays. Targets can be one or more displays or a display group. Accepts ItemType or ItemStack on set.")
 @Examples({
     "set {_group} to a new fake display group at player",

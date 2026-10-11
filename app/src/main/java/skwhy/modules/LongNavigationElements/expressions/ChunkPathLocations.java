@@ -38,7 +38,7 @@ import java.util.List;
     "\tset {_border::*} to border block locations of chunk path {_record}",
     "\tset {_deadends::*} to dead end gate locations of chunk path {_record}"
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class ChunkPathLocations extends SimpleExpression<Location> {
 
     private int matchedPattern;

@@ -31,7 +31,7 @@ import java.util.List;
     "loop all chunk path records of world \"world\":",
     "\tbroadcast \"%loop-value%\""
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class ChunkPathAllOf extends SimpleExpression<ChunkPathRecord> {
 
     private Expression<World> worldExpr;

@@ -24,7 +24,7 @@ import skwhy.data.CosmetiqueData;
 import java.util.List;
 import java.util.ArrayList;
 
-@Name("Group Viewers")
+@Name("[Fake Display] Group Viewers")
 @Description("Gets, sets, adds, or removes the players who can see a display group or a cosmetic. Supports set, add, remove, remove all and delete/reset (clears the viewers).")
 @Examples({
     "set {_group} to a new fake display group at player",

@@ -17,7 +17,7 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 
-@Name("Set Group Direction")
+@Name("[Fake Display] Set Group Direction")
 @Description("Orients a display group toward a specific direction by setting its yaw and pitch values directly.")
 @Examples({
     "set {_group} to a new fake display group at player",

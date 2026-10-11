@@ -26,7 +26,7 @@ import skwhy.modules.LongNavigationElements.types.PathCostRuleData;
     "add stone and cobblestone to blocks of path cost rule {_rule}",
     "add minecraft tag \"leaves\" to tags of path cost rule {_rule}"
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class PathCostRuleCreate extends SimpleExpression<PathCostRuleData> {
 
     private Expression<Number> costExpr;

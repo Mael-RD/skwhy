@@ -43,7 +43,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-@Name("Create Display Group")
+@Name("[Fake Display] Create Display Group")
 @Description("Creates a new fake display group anchored at a location or attached to an entity. Optionally takes a list of display datas to populate the group with, and a list of players who will see it. Both are optional and can be combined freely.")
 @Examples({
     "set {_display} to a new fake item display:",

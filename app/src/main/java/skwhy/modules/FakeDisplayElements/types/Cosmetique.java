@@ -15,7 +15,7 @@ public class Cosmetique {
     // Appelé une seule fois depuis init() du module
     public static void register() {
         Classes.registerClass(new ClassInfo<>(CosmetiqueData.class, "cosmetique")
-            .name("Cosmetique")
+            .name("[Fake Display] Cosmetique")
             .description("A cosmetic object that groups hat, back, and tail parts for a specific entity or player. " +
                 "All parts share a common mount and scale. Cannot be parsed from text.")
             .usage("Created via 'a new cosmetique for %entity%' or 'a new cosmetique for %player% with hats %boolean% back %boolean% and tail %boolean%'.")

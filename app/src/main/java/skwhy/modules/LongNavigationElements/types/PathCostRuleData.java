@@ -130,7 +130,7 @@ public final class PathCostRuleData {
 
     public static void register() {
         Classes.registerClass(new ClassInfo<>(PathCostRuleData.class, "pathcostrule")
-            .name("Path Cost Rule")
+            .name("[ChunkPath] Path Cost Rule")
             .description(
                 "A single pathfinding cost rule: a set of blocks and/or block tags that, when matched, apply a " +
                 "given movement cost instead of the world's default cost. Used to build a custom rule set passed " +
@@ -144,7 +144,7 @@ public final class PathCostRuleData {
                 "add minecraft tag \"leaves\" to tags of path cost rule {_rule}",
                 "register chunk path of target block's chunk using rules {_rule}"
             )
-            .since("1.4.0")
+            .since("1.5.0")
 
             .parser(new Parser<>() {
                 @Override

@@ -22,7 +22,7 @@ import skwhy.data.DisplayGroupData;
 import skwhy.data.Vec3;
 import skwhy.data.Quat4;
 
-@Name("Group Transformation")
+@Name("[Fake Display] Group Transformation")
 @Description("Gets or sets the center, translation, rotation, or scale of a display group. Center and translation return a Vector; rotation returns a Quaternionf; scale returns a Number.")
 @Examples({
     "set {_group} to a new fake display group at player",

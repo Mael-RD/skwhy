@@ -45,7 +45,7 @@ public class APIModule implements AddonModule {
 
         syntaxRegistry.register(
             BukkitSyntaxInfos.Event.KEY,
-            BukkitSyntaxInfos.Event.builder(SimpleEvent.class, "API Request")
+            BukkitSyntaxInfos.Event.builder(SimpleEvent.class, "[API] API Request")
                 .addEvent(API_request_event.class)
                 .addPattern("api request")
                 .addDescription(

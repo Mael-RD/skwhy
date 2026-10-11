@@ -19,7 +19,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 import skwhy.data.CosmetiqueData; // N'oublie pas l'import
 
-@Name("Send Metadata Update")
+@Name("[Fake Display] Send Metadata Update")
 @Description("Forces a metadata packet update for a display group or a cosmetic, pushing the latest state to all relevant players.")
 @Examples({
     "set {_group} to a new fake display group at player",

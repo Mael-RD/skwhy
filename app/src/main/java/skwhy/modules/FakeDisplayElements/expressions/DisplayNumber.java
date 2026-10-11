@@ -21,7 +21,7 @@ import skwhy.data.DisplayData;
 import skwhy.data.ItemDisplayData;
 import skwhy.data.TextDisplayData;
 
-@Name("Display Numeric Properties")
+@Name("[Fake Display] Display Numeric Properties")
 @Description("Gets or sets numeric properties of display entities, including interpolation start, interpolation duration, and teleportation duration. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_display} to a new fake item display:",

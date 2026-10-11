@@ -20,7 +20,7 @@ import skwhy.data.CosmetiqueData;
 import skwhy.data.DisplayGroupData;
 import skwhy.data.Tail.TailNode;
 
-@Name("Set Cosmetic Part")
+@Name("[Fake Display] Set Cosmetic Part")
 @Description("Sets or replaces a specific part of a cosmetic: a hat (linked to a display group, a slot name, and rotation flags), a back (linked to a display group and a type string), or a tail (linked to a tail node).")
 @Examples({
     "set {_cosmetique} to a new cosmetique for player",

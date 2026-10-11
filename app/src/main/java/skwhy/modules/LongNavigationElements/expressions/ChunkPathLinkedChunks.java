@@ -34,7 +34,7 @@ import java.util.Set;
     "\tloop linked chunks of chunk path {_record}:",
     "\t\tbroadcast \"linked to %loop-value%\""
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class ChunkPathLinkedChunks extends SimpleExpression<Chunk> {
 
     private Expression<ChunkPathRecord> recordExpr;

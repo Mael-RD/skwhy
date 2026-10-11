@@ -81,7 +81,7 @@ public final class ChunkPathRecord {
 
     public static void register() {
         Classes.registerClass(new ClassInfo<>(ChunkPathRecord.class, "chunkpathrecord")
-            .name("Chunk Path Record")
+            .name("[ChunkPath] Chunk Path Record")
             .description(
                 "Represents the chunk-to-chunk pathfinding record of an analyzed chunk: the world it belongs to " +
                 "and the gates (connections to neighboring chunks) computed for it. " +
@@ -94,7 +94,7 @@ public final class ChunkPathRecord {
                 "if {_record} is set:",
                 "\tbroadcast \"%{_record}%\""
             )
-            .since("1.4.0")
+            .since("1.5.0")
 
             .parser(new Parser<>() {
                 @Override

@@ -17,7 +17,7 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.CosmetiqueData;
 
-@Name("Destroy Cosmetic")
+@Name("[Fake Display] Destroy Cosmetic")
 @Description("Fully destroys one or more cosmetics and removes them from all targeted players. Calls the internal delete method on each cosmetic object.")
 @Examples({
     "set {_cosmetique} to a new cosmetique for player",

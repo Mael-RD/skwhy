@@ -19,7 +19,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 import skwhy.data.Quat4;
 
-@Name("Set Group Rotation")
+@Name("[Fake Display] Set Group Rotation")
 @Description("Sets the full 3D rotation of a display group using Euler angles (X, Y, Z in degrees). Internally converts to a quaternion using JOML's rotationXYZ method.")
 @Examples({
     "set {_group} to a new fake display group at player",

@@ -24,7 +24,7 @@ import skwhy.modules.LongNavigationElements.types.ChunkPathRecord;
     "if {_record} is set:",
     "\tbroadcast \"chunk (%chunk x of chunk path {_record}%, %chunk z of chunk path {_record}%) has %gate count of chunk path {_record}% gate(s)\""
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class ChunkPathNumber extends SimpleExpression<Number> {
 
     private int matchedPattern;

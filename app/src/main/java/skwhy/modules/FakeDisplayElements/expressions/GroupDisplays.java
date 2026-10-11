@@ -19,7 +19,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 import skwhy.data.DisplayGroupData;
 
-@Name("Group Displays")
+@Name("[Fake Display] Group Displays")
 @Description("Gets, adds, or removes the display entities contained in a display group. Supports add, remove, remove all and delete/reset (clears the group).")
 @Examples({
     "set {_group} to a new fake display group at player",

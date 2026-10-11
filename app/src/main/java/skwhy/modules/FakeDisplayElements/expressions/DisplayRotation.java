@@ -21,7 +21,7 @@ import org.joml.Quaternionf;
 import skwhy.data.DisplayData;
 import skwhy.data.Quat4;
 
-@Name("Display Rotation")
+@Name("[Fake Display] Display Rotation")
 @Description("Gets or sets the left or right rotation quaternion of fake display entities. Both rotations are represented as Quat4 objects and affect how the display is oriented in the world. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_group} to a new fake display group at player",

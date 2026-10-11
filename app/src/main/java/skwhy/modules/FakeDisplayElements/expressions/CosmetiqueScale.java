@@ -26,7 +26,7 @@ import skwhy.data.CosmetiqueData;
  *
  * Applique le scale à tous les éléments du cosmétique (chapeaux, dos, queue).
  */
-@Name("Cosmetic Scale")
+@Name("[Fake Display] Cosmetic Scale")
 @Description("Gets or sets the uniform scale factor of a cosmetic. The scale is applied to all parts of the cosmetic (hats, back, tail).")
 @Examples({
     "set {_cosmetique} to a new cosmetique for player",

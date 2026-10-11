@@ -32,7 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-@Name("Create Fake Block Display")
+@Name("[Fake Display] Create Fake Block Display")
 @Description("Creates a new fake block display entity using a configuration section. Accepted keys: " +
     "block (ItemType, ItemStack, BlockData, Material, or String block data), " +
     "scale/translation (Vector or Number), " +

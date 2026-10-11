@@ -20,7 +20,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 
 import skwhy.data.CosmetiqueData;
 
-@Name("Create Cosmetic")
+@Name("[Fake Display] Create Cosmetic")
 @Description("Creates a new cosmetic data object attached to an entity or player. When targeting a player, three booleans choose whether the hat, back, and tail are also visible to the player himself (they do not create the parts: use 'set hat/back/tail of'). Non-player entities always have all three slots disabled.")
 @Examples({
     "# Pattern 0: create a cosmetic for a non-player entity",

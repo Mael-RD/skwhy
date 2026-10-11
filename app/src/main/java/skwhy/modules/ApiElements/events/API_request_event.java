@@ -9,7 +9,7 @@ import skwhy.modules.ApiElements.types.API_request;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 
-@Name("API Request")
+@Name("[API] API Request")
 @Description("Fires when the built-in HTTP/HTTPS server receives a valid API request.")
 @Examples({
     "on api request:",

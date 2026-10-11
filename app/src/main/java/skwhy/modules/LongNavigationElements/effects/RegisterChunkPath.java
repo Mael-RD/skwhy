@@ -42,7 +42,7 @@ import java.util.List;
     "add stone and cobblestone to blocks of path cost rule {_rule}",
     "register chunk path of target block's chunk using rules {_rule}"
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class RegisterChunkPath extends Effect {
 
     private Expression<Chunk> chunkExpr;

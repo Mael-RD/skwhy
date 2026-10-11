@@ -34,7 +34,7 @@ import skwhy.data.TextDisplayData;
 import skwhy.data.Vec3;
 import skwhy.data.Quat4;
 
-@Name("Display From Real Entity")
+@Name("[Fake Display] Display From Real Entity")
 @Description("Converts a real Bukkit display entity (BlockDisplay, ItemDisplay, or TextDisplay) into a fake DisplayData object that can be used in display groups and cosmetics.")
 @Examples({
     "# Convert a real display entity into fake display data",

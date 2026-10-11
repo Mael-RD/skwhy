@@ -20,7 +20,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 import skwhy.data.TextDisplayData;
 
-@Name("Display Background Color")
+@Name("[Fake Display] Display Background Color")
 @Description("Gets or sets the background color of a text display entity using Skript's color type. " +
         "Alpha is preserved. Targets can be one or more displays or a display group.")
 @Examples({

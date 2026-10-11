@@ -21,7 +21,7 @@ public class DisplayGroup {
     // Appelé une seule fois depuis init() du module
     public static void register() {
         Classes.registerClass(new ClassInfo<>(DisplayGroupData.class, "displaygroup")
-            .name("Display Group")
+            .name("[Fake Display] Display Group")
             .description("A group of fake display entities (item, block, or text displays) that share a common location or attached entity, " +
                 "and are sent to specific players via packets. Supports transformation, rotation, mirroring, mounting, and viewer management. " +
                 "Can be serialized and restored across reloads when attached to a location.")

@@ -19,7 +19,7 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 
-@Name("Group Location")
+@Name("[Fake Display] Group Location")
 @Description("Gets or sets the current location of a fake display group. Setting the location will teleport the group to the new position.")
 @Examples({
     "set {_group} to a new fake display group at player",

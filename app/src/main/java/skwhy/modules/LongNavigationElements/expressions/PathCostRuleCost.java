@@ -27,7 +27,7 @@ import skwhy.modules.LongNavigationElements.types.PathCostRuleData;
     "set cost of path cost rule {_rule} to 1",
     "broadcast \"cost: %cost of path cost rule {_rule}%\""
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class PathCostRuleCost extends SimpleExpression<Number> {
 
     private Expression<PathCostRuleData> ruleExpr;

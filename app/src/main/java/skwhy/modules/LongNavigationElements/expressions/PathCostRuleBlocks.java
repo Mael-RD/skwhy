@@ -42,7 +42,7 @@ import java.util.List;
     "set blocks of path cost rule {_rule} to stone and deepslate",
     "delete blocks of path cost rule {_rule}"
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class PathCostRuleBlocks extends SimpleExpression<Material> {
 
     private Expression<PathCostRuleData> ruleExpr;

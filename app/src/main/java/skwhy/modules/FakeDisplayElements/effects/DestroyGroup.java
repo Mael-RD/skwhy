@@ -17,7 +17,7 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayGroupData;
 
-@Name("Destroy Display Group")
+@Name("[Fake Display] Destroy Display Group")
 @Description("Destroys one or more fake display entity groups, removing them from all targeted players via packets.")
 @Examples({
     "set {_group} to a new fake display group at player",

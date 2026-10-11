@@ -21,7 +21,7 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.BlockDisplayData;
 import skwhy.data.DisplayData;
 
-@Name("Display Block Data")
+@Name("[Fake Display] Display Block Data")
 @Description("Gets or sets the block data of block displays. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_group} to a new fake display group at player",

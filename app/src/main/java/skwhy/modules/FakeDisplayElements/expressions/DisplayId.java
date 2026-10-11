@@ -17,7 +17,7 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 
-@Name("Display Entity ID / UUID")
+@Name("[Fake Display] Display Entity ID / UUID")
 @Description("Returns the numeric entity ID or the UUID string of fake display entities. The entity ID is used for packet operations; the UUID is used for persistent identification. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_group} to a new fake display group at player",

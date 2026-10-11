@@ -91,7 +91,7 @@ public class Display {
      */
     private static void registerDisplayDataClass() {
         Classes.registerClass(new ClassInfo<>(DisplayData.class, "displaydata")
-            .name("Display Data")
+            .name("[Fake Display] Display Data")
             .description("Base type representing a fake display entity. " +
                 "Can be a block, item, or text display. " +
                 "Cannot be parsed from text — instances are created via the dedicated section syntax for each subtype.")
@@ -173,7 +173,7 @@ public class Display {
      */
     private static void registerBlockDisplayData() {
         Classes.registerClass(new ClassInfo<>(BlockDisplayData.class, "blockdisplay")
-            .name("Block Display")
+            .name("[Fake Display] Block Display")
             .description("A fake display entity that renders a block. " +
                 "Supports all common display properties (scale, translation, rotations, glow, brightness, shadow, view range, billboard) " +
                 "plus a block data string that defines which block is shown. " +
@@ -270,7 +270,7 @@ public class Display {
      */
     private static void registerItemDisplayData() {
         Classes.registerClass(new ClassInfo<>(ItemDisplayData.class, "itemdisplay")
-            .name("Item Display")
+            .name("[Fake Display] Item Display")
             .description("A fake display entity that renders an item or block item model. " +
                 "Supports all common display properties (scale, translation, rotations, glow, brightness, shadow, view range, billboard) " +
                 "plus an item stack identifier and a display mode (none/thirdperson/firstperson/head/gui/ground/fixed). " +
@@ -370,7 +370,7 @@ public class Display {
      */
     private static void registerTextDisplayData() {
         Classes.registerClass(new ClassInfo<>(TextDisplayData.class, "textdisplay")
-            .name("Text Display")
+            .name("[Fake Display] Text Display")
             .description("A fake display entity that renders formatted text. " +
                 "Supports all common display properties (scale, translation, rotations, glow, brightness, shadow, view range, billboard) " +
                 "plus text content, background color (Skript color), text alignment (center/left/right), line width, and see-through mode. " +

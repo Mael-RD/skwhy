@@ -88,7 +88,7 @@ public class API_request {
 
     public static void register() {
         Classes.registerClass(new ClassInfo<>(API_request.class, "apirequest")
-            .name("API Request")
+            .name("[API] API Request")
             .description(
                 "Represents an incoming HTTP or HTTPS request received by the built-in API server. " +
                 "Exposes the method, path, query string, and body. " +

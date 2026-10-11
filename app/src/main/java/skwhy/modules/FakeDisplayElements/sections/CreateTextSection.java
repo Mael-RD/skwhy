@@ -32,7 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-@Name("Create Fake Text Display")
+@Name("[Fake Display] Create Fake Text Display")
 @Description("Creates a new fake text display entity using a configuration section. Accepted keys: " +
     "text (String), " +
     "seethrough/see_through/through (Boolean), " +

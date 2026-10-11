@@ -19,7 +19,7 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.data.DisplayData;
 
-@Name("Display Scale / Translation")
+@Name("[Fake Display] Display Scale / Translation")
 @Description("Gets or sets the scale vector or translation offset of fake display entities. Scale controls the size on each axis; translation offsets the display relative to its anchor point. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_display} to a new fake item display:",

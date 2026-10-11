@@ -27,7 +27,7 @@ import skwhy.modules.LongNavigationElements.types.ChunkPathRecord;
     "if {_record} is set:",
     "\tbroadcast \"world: %world of chunk path {_record}%\""
 })
-@Since("1.4.0")
+@Since("1.5.0")
 public class ChunkPathWorld extends SimpleExpression<World> {
 
     private Expression<ChunkPathRecord> recordExpr;
