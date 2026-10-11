@@ -19,13 +19,12 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.pathfinder.Navigation;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Name("[Navigation] Viewers")
 @Description("Gets, adds, removes, or replaces the list of players who can see the (fake) entity fake navigating. " +
-    "Supports SET, ADD, and REMOVE change modes via dedicated syntax patterns.")
+    "Supports set, add, remove and delete/reset (clears the viewers) with one player or a list of players.")
 @Examples({
     "set {_fake} to a new fake navigation with id 12345 hitbox vector(0.6, 1.8, 0.6) location location of player type \"WALK\"",
     "",
@@ -33,42 +32,33 @@ import java.util.stream.Collectors;
     "set {_players::*} to viewers of navigation {_fake}",
     "",
     "# Add a player to the viewer list",
-    "add player player to viewers of navigation {_fake}",
+    "add player to viewers of navigation {_fake}",
     "",
     "# Remove a player from the viewer list",
-    "remove player player from viewers of navigation {_fake}",
+    "remove player from viewers of navigation {_fake}",
     "",
     "# Replace the entire viewer list",
-    "set viewers of navigation {_fake} to all players"
+    "set viewers of navigation {_fake} to all players",
+    "",
+    "# Remove every viewer",
+    "delete viewers of navigation {_fake}"
 })
 @Since("1.2.0")
 @RequiredPlugins("PacketEvents")
 public class NavigationPlayers extends SimpleExpression<Player> {
 
-    private int matchedPattern;
     private Expression<Navigation> fakeExpr;
-    private Expression<Player> playerExpr;
 
     @Override
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        this.matchedPattern = matchedPattern;
-        if (matchedPattern == 0) {
-            this.fakeExpr = (Expression<Navigation>) exprs[0];
-        } else if (matchedPattern == 1 || matchedPattern == 2) {
-            this.playerExpr = (Expression<Player>) exprs[0];
-            this.fakeExpr = (Expression<Navigation>) exprs[1];
-        } else {
-            this.fakeExpr = (Expression<Navigation>) exprs[0];
-            this.playerExpr = (Expression<Player>) exprs[1];
-        }
+        this.fakeExpr = (Expression<Navigation>) exprs[0];
         return true;
     }
 
     @Override
     protected @Nullable Player[] get(Event event) {
-        if (matchedPattern != 0) return null;
         Navigation fake = fakeExpr.getSingle(event);
         if (fake == null) return null;
         List<Player> players = fake.getPlayers();
@@ -77,39 +67,34 @@ public class NavigationPlayers extends SimpleExpression<Player> {
 
     @Override
     public @Nullable Class<?>[] acceptChange(ChangeMode mode) {
-        if (mode == ChangeMode.SET || mode == ChangeMode.ADD || mode == ChangeMode.REMOVE) {
-            return new Class<?>[]{ Player.class };
-        }
-        return null;
+        return switch (mode) {
+            case SET, ADD, REMOVE, REMOVE_ALL -> new Class<?>[]{ Player.class, Player[].class };
+            case DELETE, RESET -> new Class<?>[0];
+            default -> null;
+        };
     }
 
     @Override
     public void change(Event event, Object @Nullable [] delta, ChangeMode mode) {
         Navigation fake = fakeExpr.getSingle(event);
-        if (fake == null || delta == null || delta.length == 0) return;
+        if (fake == null) return;
 
-        if (mode == ChangeMode.ADD) {
-            Player player = playerExpr.getSingle(event);
-            if (player != null) fake.addPlayer(player);
-            return;
-        }
-        if (mode == ChangeMode.REMOVE) {
-            Player player = playerExpr.getSingle(event);
-            if (player != null) fake.removePlayer(player);
-            return;
-        }
-        if (mode == ChangeMode.SET) {
-            if (delta[0] instanceof Player[] players) {
-                fake.setPlayers(Arrays.asList(players));
-            } else if (delta[0] instanceof Player player) {
-                fake.setPlayers(List.of(player));
-            } else if (delta[0] instanceof List<?> list) {
-                List<Player> players = list.stream()
-                    .filter(obj -> obj instanceof Player)
-                    .map(obj -> (Player) obj)
-                    .collect(Collectors.toList());
-                fake.setPlayers(players);
+        List<Player> players = new ArrayList<>();
+        if (delta != null) {
+            for (Object value : delta) {
+                if (value instanceof Player player) players.add(player);
+                else if (value instanceof Player[] array) {
+                    for (Player player : array) if (player != null) players.add(player);
+                }
             }
+        }
+
+        switch (mode) {
+            case SET -> fake.setPlayers(players);
+            case ADD -> { for (Player player : players) fake.addPlayer(player); }
+            case REMOVE, REMOVE_ALL -> { for (Player player : players) fake.removePlayer(player); }
+            case DELETE, RESET -> fake.setPlayers(new ArrayList<>());
+            default -> { }
         }
     }
 
@@ -121,12 +106,7 @@ public class NavigationPlayers extends SimpleExpression<Player> {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return switch (matchedPattern) {
-            case 0 -> "players of " + fakeExpr.toString(event, debug);
-            case 1 -> "add player " + playerExpr.toString(event, debug) + " to players of " + fakeExpr.toString(event, debug);
-            case 2 -> "remove player " + playerExpr.toString(event, debug) + " from players of " + fakeExpr.toString(event, debug);
-            default -> "set players of " + fakeExpr.toString(event, debug);
-        };
+        return "viewers of " + fakeExpr.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {

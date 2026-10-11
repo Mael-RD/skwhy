@@ -23,8 +23,8 @@ import skwhy.data.DisplayGroupData;
 @Description("Applies a mirror (axis flip) transformation to one or more display entities or display groups. Axes can be combined freely: X, Y, Z, XY, XZ, YZ, or XYZ.")
 @Examples({
     "set {_group} to a new fake display group at player",
-    "set {_display} to [a new fake item display]:",
-    "    set item of display to dirt",
+    "set {_display} to a new fake item display:",
+    "    item: dirt",
     "",
     "# Mirror a group on a single axis",
     "mirror {_group} on axis x",

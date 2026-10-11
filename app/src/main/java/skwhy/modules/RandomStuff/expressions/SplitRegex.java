@@ -23,10 +23,29 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 @Name("Split with Regex")
-@Description("Splits a text into multiple parts using a regular expression (Regex).")
+@Description({
+    "Splits a text around every match of a regular expression (Java regex syntax) and returns the result as a list.",
+    "Unlike a classic split, the list KEEPS the matched separators: it alternates the text found before each match and the match itself, "
+        + "and always ends with the text left after the last match: [text 1, match 1, text 2, match 2, ..., last text].",
+    "So with n matches the list has 2n + 1 elements; odd indexes (1, 3, 5...) are the text parts and even indexes (2, 4, 6...) are the separators. "
+        + "A text part is an empty text when two matches are adjacent or when the text starts/ends with a match.",
+    "When the regex matches nothing the list only contains the whole text. An invalid regex gives a Skript warning and no value."
+})
 @Examples({
-    "set {_parts::*} to \"apple,banana;orange\" split at regex \"[,;]\"",
-    "broadcast \"%{_parts::1}%\""
+    "# \"apple,banana;orange\" -> apple , banana ; orange",
+    "set {_parts::*} to split \"apple,banana;orange\" at regex \"[,;]\"",
+    "broadcast \"%{_parts::1}%\" # apple",
+    "broadcast \"%{_parts::2}%\" # , (the separator)",
+    "broadcast \"%{_parts::3}%\" # banana",
+    "",
+    "# keep only the text parts (odd indexes)",
+    "loop {_parts::*}:",
+    "\tif mod(loop-index parsed as integer, 2) is 1:",
+    "\t\tbroadcast loop-value",
+    "",
+    "# no match: the list only contains the whole text",
+    "set {_parts::*} to split \"abc\" at regex \"\\d\"",
+    "# {_parts::*} = \"abc\""
 })
 @Since("1.0.0")
 public class SplitRegex extends SimpleExpression<String> {

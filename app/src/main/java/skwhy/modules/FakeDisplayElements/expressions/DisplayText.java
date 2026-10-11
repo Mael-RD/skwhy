@@ -23,13 +23,13 @@ import skwhy.data.TextDisplayData;
 @Description("Gets, sets, or appends to the text content of text displays. Targets can be one or more displays or a display group. Supports SET and ADD change modes.")
 @Examples({
     "set {_group} to a new fake display group at player",
-    "set {_display} to [a new fake item display]:",
-    "    set item of display to dirt",
+    "set {_display} to a new fake item display:",
+    "    item: dirt",
     "set {_group} to a new fake display group at player from {_display}",
     "",
     "# Set the displayed text",
     "set fake display text of {_display} to \"&aHello world!\"",
-    "set text of {_group} to \"&aHello group!\"",
+    "set fake display text of {_group} to \"&aHello group!\"",
     "",
     "# Append text to the existing content",
     "add \" &b(extra)\" to fake display text content of {_display}",

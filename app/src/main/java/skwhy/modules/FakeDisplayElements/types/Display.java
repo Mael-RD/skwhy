@@ -98,12 +98,12 @@ public class Display {
             .usage("Created via 'set %objects% to a new fake block/item/text display'.")
             .user("display ?datas?")
             .examples(
-                "set {_display} to [a new fake item display]:",
+                "set {_display} to a new fake item display:",
                 "    item: dirt",
-                "set {_id} to entity id of {_display}",
-                "set {_uuid} to entity uuid of {_display}",
-                "set group scale of {_display} to vector(2, 2, 2)",
-                "set group translation of {_display} to vector(0, 1, 0)"
+                "set {_id} to fake display entity id of {_display}",
+                "set {_uuid} to fake display entity uuid of {_display}",
+                "set fake display scale of {_display} to vector(2, 2, 2)",
+                "set fake display translation of {_display} to vector(0, 1, 0)"
             )
             .since("1.0.0")
             
@@ -181,13 +181,13 @@ public class Display {
             .usage("Created via 'set %objects% to a new fake block display'.")
             .user("display ?block ?datas?")
             .examples(
-                "set {_display} to [a new fake block display]:",
+                "set {_display} to a new fake block display:",
                 "    block: stone",
                 "    scale: vector(1, 1, 1)",
                 "    brightness: 12",
                 "    shadow: 0.5",
-                "set block data of {_display} to oak_log",
-                "set group scale of {_display} to vector(2, 2, 2)"
+                "set fake display block data of {_display} to oak_log[axis=x]",
+                "set fake display scale of {_display} to vector(2, 2, 2)"
             )
             .since("1.0.0")
             
@@ -279,13 +279,13 @@ public class Display {
             .usage("Created via 'set %objects% to a new fake item display'.")
             .user("display ?item ?datas?")
             .examples(
-                "set {_display} to [a new fake item display]:",
+                "set {_display} to a new fake item display:",
                 "    item: dirt",
                 "    scale: vector(1, 1, 1)",
                 "    brightness: 12",
                 "    mode: head",
-                "set item of {_display} to diamond sword",
-                "set display mode of {_display} to 5"
+                "set fake display item of {_display} to diamond sword",
+                "set fake display display mode of {_display} to 5"
             )
             .since("1.0.0")
             
@@ -378,17 +378,17 @@ public class Display {
             .usage("Created via 'set %objects% to a new fake text display'.")
             .user("display ?text ?datas?")
             .examples(
-                "set {_display} to [a new fake text display]:",
+                "set {_display} to a new fake text display:",
                 "    text: \"&aHello world!\"",
                 "    seethrough: true",
                 "    alignment: center",
-                "    background: white",
-                "    background: \"#8000FF00\" # Semi-transparent green (AARRGGBB)",
+                "    # background accepts a color (white) or a hex text: \"#RRGGBB\" or \"#AARRGGBB\" (semi-transparent green here)",
+                "    background: \"#8000FF00\"",
                 "    linewidth: 200",
                 "    brightness: 12",
-                "set text of {_display} to \"&cUpdated!\"",
-                "set see through of {_display} to false",
-                "set background color of {_display} to red"
+                "set fake display text of {_display} to \"&cUpdated!\"",
+                "set fake display see through of {_display} to false",
+                "set fake display background color of {_display} to red"
             )
             .since("1.0.0")
             

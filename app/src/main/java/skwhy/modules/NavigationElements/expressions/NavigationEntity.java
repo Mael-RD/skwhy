@@ -21,7 +21,7 @@ import skwhy.pathfinder.Navigation;
 @Description("Returns the real Bukkit entity attached to a navigation object. " +
     "Returns nothing if the fake navigation was created from a numeric ID rather than a real entity.")
 @Examples({
-    "set {_navigation} to a new navigation with entity target entity hitbox vector(0.6, 1.8, 0.6) location location of player type \"WALK\"",
+    "set {_navigation} to a new navigation with entity target entity type \"WALK\"",
     "",
     "# Get the entity using the 'entity of' syntax",
     "set {_entity} to entity of navigation {_navigation}",

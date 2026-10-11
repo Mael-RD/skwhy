@@ -24,7 +24,8 @@ import skwhy.data.TextDisplayData;
 @Description("Gets or sets the background color of a text display entity using Skript's color type. " +
         "Alpha is preserved. Targets can be one or more displays or a display group.")
 @Examples({
-    "set {_display} to a new fake text display",
+    "set {_display} to a new fake text display:",
+    "    text: \"Hello\"",
     "set fake display background color of {_display} to lime",
     "set {_color} to the fake display background color of {_display}"
 })

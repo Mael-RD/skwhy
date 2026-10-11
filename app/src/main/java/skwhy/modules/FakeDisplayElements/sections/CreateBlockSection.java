@@ -40,7 +40,7 @@ import java.util.Map;
     "glow (int RGB), brightness (integer from 0 to 15), shadow/shadowradius/radius, strength/shadowstrength, range/viewrange, " +
     "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay, teleportation/teleportationduration (Number).")
 @Examples({
-    "set {_display} to [a new fake block display]:",
+    "set {_display} to a new fake block display:",
     "    block: stone",
     "    scale: vector(1, 1, 1)",
     "    translation: vector(0, 0, 0)",
@@ -129,6 +129,29 @@ public class CreateBlockSection extends Section {
         };
     }
 
+    /**
+     * Converts any accepted 'block' value (BlockData, ItemType, ItemStack, Material or text such as
+     * "stone", "diamond block" or "oak_log[axis=x]") to a block data string usable by Bukkit.
+     * @return null when the value is not a valid block
+     */
+    @Nullable
+    static String toBlockDataString(Object value) {
+        try {
+            if (value instanceof org.bukkit.block.data.BlockData bd) return bd.getAsString(false);
+            org.bukkit.Material material = null;
+            if (value instanceof ch.njol.skript.aliases.ItemType it) material = it.getMaterial();
+            else if (value instanceof org.bukkit.inventory.ItemStack is) material = is.getType();
+            else if (value instanceof org.bukkit.Material m) material = m;
+            if (material != null) {
+                return material.isBlock() ? org.bukkit.Bukkit.createBlockData(material).getAsString(false) : null;
+            }
+            String text = value.toString().trim().toLowerCase().replace(' ', '_');
+            return org.bukkit.Bukkit.createBlockData(text).getAsString(false);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     @Override
     protected @Nullable TriggerItem walk(Event event) {
         BlockDisplayData display = new BlockDisplayData();
@@ -138,8 +161,14 @@ public class CreateBlockSection extends Section {
             if (value == null) return;
 
             switch (key) {
-                case "block" ->
-                    display.setBlockData(value.toString());
+                case "block" -> {
+                    String data = toBlockDataString(value);
+                    if (data == null) {
+                        Skript.error("Valeur invalide pour le champ 'block' : " + value);
+                    } else {
+                        display.setBlockData(data);
+                    }
+                }
 
                 case "scale" -> {
                     if (value instanceof Vector v)

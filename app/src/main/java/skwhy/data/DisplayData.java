@@ -435,6 +435,11 @@ public abstract class DisplayData {
         return true;
     }
 
+    /** Detaches the display from its group transformation so it can be added to a group again. */
+    public void releaseGlobalTransformation() {
+        this.globalTransformation = null;
+    }
+
     public void updateGlobalTransformation(boolean translation, boolean rotation, boolean scale) {
         if (globalTransformation == null) {
             if (translation) {

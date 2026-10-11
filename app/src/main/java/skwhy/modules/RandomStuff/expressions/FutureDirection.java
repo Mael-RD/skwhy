@@ -20,8 +20,8 @@ import skwhy.FutureRotationTracker;
 @Name("Future Direction")
 @Description("Calculates the future direction or position of an entity based on its current velocity.")
 @Examples({
-    "set {_futurePos} to the future direction of target",
-    "teleport player to future direction of event-entity"
+    "set {_yaw} to the predicted yaw of player",
+    "set {_pitch} to the predicted pitch of player"
 })
 @Since("1.0.0")
 public class FutureDirection extends SimpleExpression<Float> {

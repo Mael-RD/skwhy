@@ -180,6 +180,7 @@ public class DisplayGroupData {
         if (display != null && displays.contains(display)) {
             sendDestroyPacket(List.of(display), viewers);
             displays.remove(display);
+            display.releaseGlobalTransformation();
         }
     }
 
@@ -187,10 +188,12 @@ public class DisplayGroupData {
         if (displaysToRemove == null || displaysToRemove.isEmpty()) return;
         sendDestroyPacket(displaysToRemove, viewers);
         displays.removeAll(displaysToRemove);
+        displaysToRemove.forEach(DisplayData::releaseGlobalTransformation);
     }
 
     public void clearDisplays() {
         sendDestroyPacket(displays, viewers);
+        displays.forEach(DisplayData::releaseGlobalTransformation);
         displays.clear();
     }
 

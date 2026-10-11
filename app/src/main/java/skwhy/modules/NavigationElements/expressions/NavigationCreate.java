@@ -169,9 +169,9 @@ public class NavigationCreate extends SimpleExpression<Navigation> {
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(NavigationCreate.class, Navigation.class)
                 // exprs : [0]number [1]vector [2]location [3]string [4]number? [5]players?
-                .addPattern("[a] [new] navigation with id %number% hitbox %vector% location %location% type %string% [speed %-number%] [with players %-players%]")
+                .addPattern("[a] [new] [fake] navigation with id %number% hitbox %vector% location %location% type %string% [speed %-number%] [with players %-players%]")
                 // exprs : [0]entity [1]string [2]number? [3]players?
-                .addPattern("[a] [new] navigation with entity %entity% type %string% [speed %-number%]")
+                .addPattern("[a] [new] [fake] navigation with entity %entity% type %string% [speed %-number%]")
                 .build()
         );
     }

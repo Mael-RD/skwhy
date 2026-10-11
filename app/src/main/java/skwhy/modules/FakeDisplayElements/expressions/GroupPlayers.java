@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 @Name("Group Viewers")
-@Description("Gets, sets, adds, or removes the players who can see a display group or a cosmetic. Supports SET, ADD, REMOVE, and REMOVE_ALL change modes.")
+@Description("Gets, sets, adds, or removes the players who can see a display group or a cosmetic. Supports set, add, remove, remove all and delete/reset (clears the viewers).")
 @Examples({
     "set {_group} to a new fake display group at player",
     "set {_cosmetique} to a new cosmetique for player",
@@ -42,7 +42,7 @@ import java.util.ArrayList;
     "set group viewers of {_group} to {-players::*}",
     "",
     "# Clear all viewers",
-    "remove all from group viewers of {_cosmetique}"
+    "delete group viewers of {_cosmetique}"
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")
@@ -75,8 +75,8 @@ public class GroupPlayers extends SimpleExpression<Player> {
     @Override
     public @Nullable Class<?>[] acceptChange(ChangeMode mode) {
         return switch (mode) {
-            case SET, ADD, REMOVE -> new Class<?>[]{Player.class, Player[].class};
-            case REMOVE_ALL -> new Class<?>[0];
+            case SET, ADD, REMOVE, REMOVE_ALL -> new Class<?>[]{Player.class, Player[].class};
+            case DELETE, RESET -> new Class<?>[0];
             default -> null;
         };
     }
@@ -109,11 +109,11 @@ public class GroupPlayers extends SimpleExpression<Player> {
                 case ADD -> {
                     for (Player player : changedPlayers) group.addViewer(player);
                 }
-                case REMOVE -> {
+                case REMOVE, REMOVE_ALL -> {
                     for (Player player : changedPlayers) group.removeViewer(player);
                 }
                 case SET -> group.setViewers(changedPlayers);
-                case REMOVE_ALL -> group.clearViewers();
+                case DELETE, RESET -> group.clearViewers();
                 default -> { }
             }
         } 
@@ -124,11 +124,11 @@ public class GroupPlayers extends SimpleExpression<Player> {
                 case ADD -> {
                     for (Player player : changedPlayers) cosme.addViewer(player);
                 }
-                case REMOVE -> {
+                case REMOVE, REMOVE_ALL -> {
                     for (Player player : changedPlayers) cosme.removeViewer(player);
                 }
                 case SET -> cosme.setViewers(changedPlayers);
-                case REMOVE_ALL -> cosme.clearViewers();
+                case DELETE, RESET -> cosme.clearViewers();
                 default -> { }
             }
         }

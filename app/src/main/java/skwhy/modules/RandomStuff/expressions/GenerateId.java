@@ -24,7 +24,7 @@ import io.github.retrooper.packetevents.util.SpigotReflectionUtil;
 @Name("Generate ID")
 @Description("Generates a random unique identifier (ID).")
 @Examples({
-    "set {_id} to a generated id",
+    "set {_id} to a new entity id",
     "send \"Your new code is: %{_id}%\""
 })
 @Since("1.0.0")

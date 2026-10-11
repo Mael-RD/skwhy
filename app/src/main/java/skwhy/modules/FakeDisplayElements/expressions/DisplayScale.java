@@ -22,8 +22,8 @@ import skwhy.data.DisplayData;
 @Name("Display Scale / Translation")
 @Description("Gets or sets the scale vector or translation offset of fake display entities. Scale controls the size on each axis; translation offsets the display relative to its anchor point. Targets can be one or more displays or a display group.")
 @Examples({
-    "set {_display} to [a new fake item display]:",
-    "    set item of display to dirt",
+    "set {_display} to a new fake item display:",
+    "    item: dirt",
     "set {_group} to a new fake display group at player from {_display}",
     "",
     "# Read the current scale",

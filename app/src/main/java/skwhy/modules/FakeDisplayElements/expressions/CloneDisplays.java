@@ -26,8 +26,8 @@ import java.util.List;
 @Description("Clones one or more display datas or display groups, optionally applying a mirror transformation on one or more axes during cloning. Without an axis, produces an exact copy.")
 @Examples({
     "set {_group} to a new fake display group at player",
-    "set {_display} to [a new fake item display]:",
-    "    set item of display to dirt",
+    "set {_display} to a new fake item display:",
+    "    item: dirt",
     "",
     "# Clone a display without mirroring",
     "set {_clone} to fake display clone of {_display}",

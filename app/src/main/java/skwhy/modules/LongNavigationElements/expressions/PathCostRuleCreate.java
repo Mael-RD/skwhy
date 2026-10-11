@@ -19,7 +19,7 @@ import skwhy.modules.LongNavigationElements.types.PathCostRuleData;
 
 @Name("[ChunkPath] Path Cost Rule Creation")
 @Description("Creates a new, empty path cost rule (no blocks/tags yet), optionally with an initial cost (0 if " +
-    "omitted). Populate it with 'blocks of path cost rule %pathcostrules%' and 'tags of path cost rule " +
+    "omitted; a whole number, decimals are rounded). Populate it with 'blocks of path cost rule %pathcostrules%' and 'tags of path cost rule " +
     "%pathcostrules%', then pass one or more rules to 'register chunk path of %chunk% using rules %pathcostrules%'.")
 @Examples({
     "set {_rule} to a new path cost rule with cost 1",
@@ -44,7 +44,7 @@ public class PathCostRuleCreate extends SimpleExpression<PathCostRuleData> {
         int cost = 0;
         if (costExpr != null) {
             Number n = costExpr.getSingle(event);
-            if (n != null) cost = n.intValue();
+            if (n != null) cost = (int) Math.round(n.doubleValue());
         }
         return new PathCostRuleData[]{ new PathCostRuleData(cost) };
     }

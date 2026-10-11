@@ -25,8 +25,8 @@ import skwhy.data.DisplayData;
 @Description("Gets or sets the block data of block displays. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_group} to a new fake display group at player",
-    "set {_display} to [a new fake item display]:",
-    "    set item of display to dirt",
+    "set {_display} to a new fake item display:",
+    "    item: dirt",
     "",
     "# Read the block data",
     "set {_data} to fake display block data of {_display}",

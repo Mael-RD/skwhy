@@ -20,11 +20,11 @@ import skwhy.data.DisplayData;
 import skwhy.data.DisplayGroupData;
 
 @Name("Group Displays")
-@Description("Gets, adds, or removes the display entities contained in a display group. Supports ADD, REMOVE, and REMOVE_ALL change modes.")
+@Description("Gets, adds, or removes the display entities contained in a display group. Supports add, remove, remove all and delete/reset (clears the group).")
 @Examples({
     "set {_group} to a new fake display group at player",
-    "set {_display} to [a new fake item display]:",
-    "    set item of display to dirt",
+    "set {_display} to a new fake item display:",
+    "    item: dirt",
     "",
     "# Add a display to the group",
     "add {_display} to displays of {_group}",
@@ -32,8 +32,11 @@ import skwhy.data.DisplayGroupData;
     "# Remove a specific display from the group",
     "remove {_display} from displays of {_group}",
     "",
+    "# Remove every occurrence of some displays",
+    "remove all {_display} from displays of {_group}",
+    "",
     "# Clear all displays from the group",
-    "remove all from displays of {_group}",
+    "delete displays of {_group}",
     "",
     "# Read the current displays",
     "set {_displays::*} to displays of {_group}"
@@ -62,8 +65,8 @@ public class GroupDisplays extends SimpleExpression<DisplayData> {
     @Override
     public @Nullable Class<?>[] acceptChange(ChangeMode mode) {
         return switch (mode) {
-            case ADD, REMOVE -> new Class<?>[]{ DisplayData.class, DisplayData[].class };
-            case REMOVE_ALL  -> new Class<?>[0];
+            case ADD, REMOVE, REMOVE_ALL -> new Class<?>[]{ DisplayData.class, DisplayData[].class };
+            case DELETE, RESET -> new Class<?>[0];
             default          -> null;
         };
     }
@@ -80,13 +83,13 @@ public class GroupDisplays extends SimpleExpression<DisplayData> {
                     if (obj instanceof DisplayData display) group.addDisplay(display);
                 }
             }
-            case REMOVE -> {
+            case REMOVE, REMOVE_ALL -> {
                 if (delta == null) return;
                 for (Object obj : delta) {
                     if (obj instanceof DisplayData display) group.removeDisplay(display);
                 }
             }
-            case REMOVE_ALL -> group.clearDisplays();
+            case DELETE, RESET -> group.clearDisplays();
             default -> { }
         }
     }

@@ -23,7 +23,7 @@ import skwhy.pathfinder.Navigation;
 @Examples({
     "if {_navigation} has a real entity:",
     "\tsend \"This is a real entity!\"",
-    "if all {_fakes::*} don't have real entities:",
+    "if {_fakes::*} don't have real entities:",
     "\tsend \"None of the fake navigations are real entities.\""
 })
 @Since("1.2.0")
@@ -36,8 +36,9 @@ public class NavigationHasRealEntity extends Condition {
             SyntaxRegistry.CONDITION,
             SyntaxInfo.builder(NavigationHasRealEntity.class)
                 .origin(Origin.of(addon))
-                .addPattern("%navigations% (has|have) a real entity")
-                .addPattern("%navigations% (has|have)(n't| not) a real entity")
+                .addPattern("%navigations% (has|have) [a] real entit(y|ies)")
+                .addPattern("%navigations% (has|have)(n't| not) [a] real entit(y|ies)")
+                .addPattern("%navigations% (do|does)(n't| not) have [a] real entit(y|ies)")
                 .build()
         );
     }
@@ -52,7 +53,7 @@ public class NavigationHasRealEntity extends Condition {
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed, ParseResult parseResult) {
         this.pathsExpr = (Expression<Navigation>) exprs[0];
-        setNegated(matchedPattern == 1);
+        setNegated(matchedPattern >= 1);
         return true;
     }
 

@@ -46,8 +46,8 @@ import java.util.List;
 @Name("Create Display Group")
 @Description("Creates a new fake display group anchored at a location or attached to an entity. Optionally takes a list of display datas to populate the group with, and a list of players who will see it. Both are optional and can be combined freely.")
 @Examples({
-    "set {_display} to [a new fake item display]:",
-    "    set item of display to dirt",
+    "set {_display} to a new fake item display:",
+    "    item: dirt",
     "",
     "# Pattern: group at a location with no displays and no viewers",
     "set {_group} to a new fake display group at location of player",

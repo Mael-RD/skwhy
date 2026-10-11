@@ -29,8 +29,8 @@ import java.util.List;
 @Name("Tracked Entities")
 @Description("Gets a list of all entities currently being tracked (seen) by a specific player.")
 @Examples({
-    "set {_entities::*} to tracked entities of player",
-    "kill all tracked entities of target"
+    "set {_entities::*} to entities tracked by player",
+    "kill all entities tracked by {_player}"
 })
 @Since("1.0.0")
 public class TrackedEntities extends SimpleExpression<Entity> {

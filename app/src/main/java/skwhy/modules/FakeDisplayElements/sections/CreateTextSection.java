@@ -44,12 +44,11 @@ import java.util.Map;
     "glow (int RGB), brightness (integer from 0 to 15), shadow/shadowradius/radius, strength/shadowstrength, range/viewrange, " +
     "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay, teleportation/teleportationduration (Number).")
 @Examples({
-    "set {_display} to [a new fake text display]:",
+    "set {_display} to a new fake text display:",
     "    text: \"&aHello world!\"",
     "    seethrough: true",
     "    alignment: center",
-    "    background: white",
-    "    # Semi-transparent green (AARRGGBB)",
+    "    # a color (background: white) or a hex text: \"#RRGGBB\" / \"#AARRGGBB\" (semi-transparent green below)",
     "    background: \"#8000FF00\"",
     "    linewidth: 200",
     "    scale: vector(1, 1, 1)",
@@ -106,6 +105,18 @@ public class CreateTextSection extends Section {
 
     @Nullable
     private Expression<?> parseExpressionForKey(String key, String value) {
+        Expression<?> parsed = parseTypedExpressionForKey(key, value);
+        if (parsed == null && (java.util.Set.of("alignment", "align", "textalignment")).contains(key) && !value.isEmpty()) {
+            // Unquoted keyword such as "mode: head" or "alignment: center" : keep the raw text as a literal string
+            String raw = value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")
+                ? value.substring(1, value.length() - 1) : value;
+            return new ch.njol.skript.lang.util.SimpleLiteral<>(raw, false);
+        }
+        return parsed;
+    }
+
+    @Nullable
+    private Expression<?> parseTypedExpressionForKey(String key, String value) {
         int flags = SkriptParser.PARSE_EXPRESSIONS | SkriptParser.PARSE_LITERALS;
         SkriptParser parser = new SkriptParser(value, flags);
 

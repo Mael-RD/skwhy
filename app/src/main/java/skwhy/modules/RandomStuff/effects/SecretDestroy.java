@@ -51,7 +51,10 @@ public class SecretDestroy extends Effect {
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, ParseResult pr) {
 
-        this.targets = exprs[0];
+        // %objects% may contain raw literals (e.g. "145"): they must be converted before use
+        Expression<?> converted = ch.njol.skript.util.LiteralUtils.defendExpression(exprs[0]);
+        if (!ch.njol.skript.util.LiteralUtils.canInitSafely(converted)) return false;
+        this.targets = converted;
         //noinspection unchecked
         this.players = (Expression<Player>) exprs[1];
 

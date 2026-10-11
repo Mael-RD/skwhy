@@ -19,9 +19,8 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.chunkpath.longnav.LongNavigation;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Name("[Long Navigation] Viewers")
 @Description("Gets, adds, removes, or replaces the list of players who can see the (virtual) entity of a long " +
@@ -32,36 +31,25 @@ import java.util.stream.Collectors;
     "set {_players::*} to viewers of long navigation {_longnav}",
     "add player to viewers of long navigation {_longnav}",
     "remove player from viewers of long navigation {_longnav}",
-    "set viewers of long navigation {_longnav} to all players"
+    "set viewers of long navigation {_longnav} to all players",
+    "delete viewers of long navigation {_longnav}"
 })
 @Since("1.5.0")
 @RequiredPlugins("PacketEvents")
 public class LongNavigationPlayers extends SimpleExpression<Player> {
 
-    private int matchedPattern;
     private Expression<LongNavigation> navigationExpr;
-    private Expression<Player> playerExpr;
 
     @Override
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        this.matchedPattern = matchedPattern;
-        if (matchedPattern == 0) {
-            this.navigationExpr = (Expression<LongNavigation>) exprs[0];
-        } else if (matchedPattern == 1 || matchedPattern == 2) {
-            this.playerExpr = (Expression<Player>) exprs[0];
-            this.navigationExpr = (Expression<LongNavigation>) exprs[1];
-        } else {
-            this.navigationExpr = (Expression<LongNavigation>) exprs[0];
-            this.playerExpr = (Expression<Player>) exprs[1];
-        }
+        this.navigationExpr = (Expression<LongNavigation>) exprs[0];
         return true;
     }
 
     @Override
     protected @Nullable Player[] get(Event event) {
-        if (matchedPattern != 0) return null;
         LongNavigation navigation = navigationExpr.getSingle(event);
         if (navigation == null) return null;
         List<Player> players = navigation.getPlayers();
@@ -70,39 +58,34 @@ public class LongNavigationPlayers extends SimpleExpression<Player> {
 
     @Override
     public @Nullable Class<?>[] acceptChange(ChangeMode mode) {
-        if (mode == ChangeMode.SET || mode == ChangeMode.ADD || mode == ChangeMode.REMOVE) {
-            return new Class<?>[]{ Player.class };
-        }
-        return null;
+        return switch (mode) {
+            case SET, ADD, REMOVE, REMOVE_ALL -> new Class<?>[]{ Player.class, Player[].class };
+            case DELETE, RESET -> new Class<?>[0];
+            default -> null;
+        };
     }
 
     @Override
     public void change(Event event, Object @Nullable [] delta, ChangeMode mode) {
         LongNavigation navigation = navigationExpr.getSingle(event);
-        if (navigation == null || delta == null || delta.length == 0) return;
+        if (navigation == null) return;
 
-        if (mode == ChangeMode.ADD) {
-            Player player = playerExpr.getSingle(event);
-            if (player != null) navigation.addPlayer(player);
-            return;
-        }
-        if (mode == ChangeMode.REMOVE) {
-            Player player = playerExpr.getSingle(event);
-            if (player != null) navigation.removePlayer(player);
-            return;
-        }
-        if (mode == ChangeMode.SET) {
-            if (delta[0] instanceof Player[] players) {
-                navigation.setPlayers(Arrays.asList(players));
-            } else if (delta[0] instanceof Player player) {
-                navigation.setPlayers(List.of(player));
-            } else if (delta[0] instanceof List<?> list) {
-                List<Player> players = list.stream()
-                    .filter(obj -> obj instanceof Player)
-                    .map(obj -> (Player) obj)
-                    .collect(Collectors.toList());
-                navigation.setPlayers(players);
+        List<Player> players = new ArrayList<>();
+        if (delta != null) {
+            for (Object value : delta) {
+                if (value instanceof Player player) players.add(player);
+                else if (value instanceof Player[] array) {
+                    for (Player player : array) if (player != null) players.add(player);
+                }
             }
+        }
+
+        switch (mode) {
+            case SET -> navigation.setPlayers(players);
+            case ADD -> { for (Player player : players) navigation.addPlayer(player); }
+            case REMOVE, REMOVE_ALL -> { for (Player player : players) navigation.removePlayer(player); }
+            case DELETE, RESET -> navigation.setPlayers(new ArrayList<>());
+            default -> { }
         }
     }
 
@@ -114,12 +97,7 @@ public class LongNavigationPlayers extends SimpleExpression<Player> {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return switch (matchedPattern) {
-            case 0 -> "viewers of " + navigationExpr.toString(event, debug);
-            case 1 -> "add player " + playerExpr.toString(event, debug) + " to viewers of " + navigationExpr.toString(event, debug);
-            case 2 -> "remove player " + playerExpr.toString(event, debug) + " from viewers of " + navigationExpr.toString(event, debug);
-            default -> "set viewers of " + navigationExpr.toString(event, debug);
-        };
+        return "viewers of " + navigationExpr.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {

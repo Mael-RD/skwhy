@@ -21,8 +21,8 @@ import skwhy.data.DisplayData;
 @Description("Returns the numeric entity ID or the UUID string of fake display entities. The entity ID is used for packet operations; the UUID is used for persistent identification. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_group} to a new fake display group at player",
-    "set {_display} to [a new fake item display]:",
-    "    set item of display to dirt",
+    "set {_display} to a new fake item display:",
+    "    item: dirt",
     "",
     "# Get the numeric entity ID",
     "set {_id} to fake display entity id of {_display}",

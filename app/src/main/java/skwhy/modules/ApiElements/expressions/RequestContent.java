@@ -80,6 +80,8 @@ public class RequestContent extends SimpleExpression<String> {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(RequestContent.class, String.class)
+                // tried before other addons' 'path of %x%' / 'body of %x%' when the variable type is unknown at parse time
+                .priority(SyntaxInfo.SIMPLE)
                 .addPattern("method of %apirequest%")
                 .addPattern("path of %apirequest%")
                 .addPattern("query of %apirequest%")

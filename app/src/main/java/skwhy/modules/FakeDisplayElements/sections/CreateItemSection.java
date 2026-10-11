@@ -43,7 +43,7 @@ import java.util.Map;
     "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay, teleportation/teleportationduration (Number).")
 @Examples({
     "# Create a basic item display showing dirt",
-    "set {_display} to [a new fake item display]:",
+    "set {_display} to a new fake item display:",
     "    item: dirt",
     "    scale: vector(1, 1, 1)",
     "    translation: vector(0, 0.5, 0)",
@@ -58,7 +58,7 @@ import java.util.Map;
     "    mode: head",
     "",
     "# Create a player head display using a skin value",
-    "set {_display} to [a new fake item display]:",
+    "set {_display} to a new fake item display:",
     "    head: eyJ0ZXh0dXJlcy...",
     "    scale: vector(1, 1, 1)",
     "    mode: gui"
@@ -104,6 +104,18 @@ public class CreateItemSection extends Section {
 
     @Nullable
     private Expression<?> parseExpressionForKey(String key, String value) {
+        Expression<?> parsed = parseTypedExpressionForKey(key, value);
+        if (parsed == null && (java.util.Set.of("mode", "displaymode", "head")).contains(key) && !value.isEmpty()) {
+            // Unquoted keyword such as "mode: head" or "alignment: center" : keep the raw text as a literal string
+            String raw = value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")
+                ? value.substring(1, value.length() - 1) : value;
+            return new ch.njol.skript.lang.util.SimpleLiteral<>(raw, false);
+        }
+        return parsed;
+    }
+
+    @Nullable
+    private Expression<?> parseTypedExpressionForKey(String key, String value) {
         int flags = SkriptParser.PARSE_EXPRESSIONS | SkriptParser.PARSE_LITERALS;
         SkriptParser parser = new SkriptParser(value, flags);
 

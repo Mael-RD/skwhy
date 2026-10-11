@@ -23,8 +23,8 @@ import skwhy.data.TextDisplayData;
 @Description("Gets or sets the see-through property of text displays. When true, the text is visible through blocks. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_group} to a new fake display group at player",
-    "set {_display} to [a new fake item display]:",
-    "    set item of display to dirt",
+    "set {_display} to a new fake item display:",
+    "    item: dirt",
     "",
     "# Read the see-through state",
     "set {_visible} to fake display see through of {_display}",

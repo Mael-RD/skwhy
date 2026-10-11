@@ -20,6 +20,7 @@ import skwhy.modules.LongNavigationElements.types.PathCostRuleData;
 
 @Name("[ChunkPath] Path Cost Rule Cost")
 @Description("Gets or sets the movement cost applied by a path cost rule when one of its blocks/tags matches. " +
+    "The cost is a whole number: a decimal value is rounded to the nearest integer (2.5 gives 3). " +
     "Unlike the rule's blocks/tags lists, this does not support 'add', 'remove', 'delete', or 'reset' — only get and set.")
 @Examples({
     "set {_rule} to a new path cost rule",
@@ -58,7 +59,7 @@ public class PathCostRuleCost extends SimpleExpression<Number> {
         if (!(delta[0] instanceof Number n)) return;
         PathCostRuleData rule = ruleExpr.getSingle(event);
         if (rule == null) return;
-        rule.setCost(n.intValue());
+        rule.setCost((int) Math.round(n.doubleValue()));
     }
 
     @Override

@@ -36,7 +36,7 @@ import org.bukkit.util.Vector;
     "set {_child} to a new tailpart from {_group} with offset vector(0, 0.5, 0) connected to parent {_root}",
     "",
     "# Create a grandchild node",
-    "set {_grandchild} to new tail part from {_group} with offset vector(0, 0.3, 0), connected to parent {_child}"
+    "set {_grandchild} to a new tailpart from {_group} with offset vector(0, 0.3, 0) connected to parent {_child}"
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")

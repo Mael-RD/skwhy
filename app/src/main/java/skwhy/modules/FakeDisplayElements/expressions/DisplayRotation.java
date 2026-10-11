@@ -25,8 +25,8 @@ import skwhy.data.Quat4;
 @Description("Gets or sets the left or right rotation quaternion of fake display entities. Both rotations are represented as Quat4 objects and affect how the display is oriented in the world. Targets can be one or more displays or a display group.")
 @Examples({
     "set {_group} to a new fake display group at player",
-    "set {_display} to [a new fake item display]:",
-    "    set item of display to dirt",
+    "set {_display} to a new fake item display:",
+    "    item: dirt",
     "",
     "# Read the left rotation",
     "set {_leftRot} to fake display left rotation of {_display}",
@@ -42,7 +42,7 @@ import skwhy.data.Quat4;
 })
 @Since("1.0.0")
 @RequiredPlugins("PacketEvents")
-public class DisplayRotation extends SimpleExpression<Quat4> {
+public class DisplayRotation extends SimpleExpression<Quaternionf> {
 
     private int matchedPattern;
     private boolean pluralTargets;
@@ -58,7 +58,7 @@ public class DisplayRotation extends SimpleExpression<Quat4> {
     }
 
     @Override
-    protected @Nullable Quat4[] get(Event event) {
+    protected @Nullable Quaternionf[] get(Event event) {
         if (pluralTargets) return null;
         Object value = targets.getSingle(event);
         if (!(value instanceof DisplayData display)) return null;
@@ -67,19 +67,20 @@ public class DisplayRotation extends SimpleExpression<Quat4> {
             case 1 -> display.getRightRotation().toQuaternionf();
             default -> null;
         };
-        return rotation == null ? null : new Quat4[]{ new Quat4(rotation) };
+        return rotation == null ? null : new Quaternionf[]{ rotation };
     }
 
     @Override
     public @Nullable Class<?>[] acceptChange(ChangeMode mode) {
-        // Permet de faire : set left rotation of {_d} to new quat...
-        if (mode == ChangeMode.SET) return new Class<?>[]{ Quat4.class };
+        // set fake display left/right rotation of {_d} to quaternion(...)
+        if (mode == ChangeMode.SET) return new Class<?>[]{ Quaternionf.class };
         return null;
     }
 
     @Override
     public void change(Event event, Object @Nullable [] delta, ChangeMode mode) {
-        if (mode != ChangeMode.SET || delta == null || !(delta[0] instanceof Quat4 q)) return;
+        if (mode != ChangeMode.SET || delta == null || !(delta[0] instanceof Quaternionf quaternion)) return;
+        Quat4 q = new Quat4(quaternion);
         
         for (DisplayData display : DisplayExpressionTargets.resolveForChange(targets, event, pluralTargets)) {
             switch (matchedPattern) {
@@ -93,7 +94,7 @@ public class DisplayRotation extends SimpleExpression<Quat4> {
     public boolean isSingle() { return true; }
 
     @Override
-    public Class<? extends Quat4> getReturnType() { return Quat4.class; }
+    public Class<? extends Quaternionf> getReturnType() { return Quaternionf.class; }
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
@@ -104,7 +105,7 @@ public class DisplayRotation extends SimpleExpression<Quat4> {
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EXPRESSION,
-            SyntaxInfo.Expression.builder(DisplayRotation.class, Quat4.class)
+            SyntaxInfo.Expression.builder(DisplayRotation.class, Quaternionf.class)
                 .addPattern("[the] fake display left rotation of %displaydata/displaygroup%")    // 0
                 .addPattern("[the] fake display right rotation of %displaydata/displaygroup%")   // 1
                 .addPattern("[the] fake display left rotation of %displaydatas/displaygroups%")    // 2

@@ -21,9 +21,9 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.BodyTracker;
 
 @Name("Body Yaw")
-@Description("Gets the body yaw rotation of an entity.")
+@Description("Gets the body yaw rotation of a player (read-only).")
 @Examples({
-    "set the body yaw of target to 90",
+    "set {_yaw} to the body yaw of player",
     "broadcast \"Your body yaw is %body yaw of player%\""
 })
 @Since("1.0.0")

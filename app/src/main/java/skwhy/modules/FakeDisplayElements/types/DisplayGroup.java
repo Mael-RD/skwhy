@@ -28,7 +28,7 @@ public class DisplayGroup {
             .usage("Created via 'a new fake display group at %location/entity%', optionally with displays and players.")
             .user("display ?groups?")
             .examples(
-                "set {_display} to [a new fake item display]:",
+                "set {_display} to a new fake item display:",
                 "    item: dirt",
                 "set {_group} to a new fake display group at player from {_display} with all players",
                 "set group scale of {_group} to 2",
