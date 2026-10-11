@@ -45,7 +45,7 @@ import java.util.Map;
     "billboard (0–3), interpolation/interpolationduration, interpolationstart/interpolationdelay, teleportation/teleportationduration (Number).")
 @Examples({
     "set {_display} to a new fake text display:",
-    "    text: \"&aHello world!\"",
+    "    text: \"<green>Hello world!\"",
     "    seethrough: true",
     "    alignment: center",
     "    # a color (background: white) or a hex text: \"#RRGGBB\" / \"#AARRGGBB\" (semi-transparent green below)",

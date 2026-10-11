@@ -379,14 +379,14 @@ public class Display {
             .user("display ?text ?datas?")
             .examples(
                 "set {_display} to a new fake text display:",
-                "    text: \"&aHello world!\"",
+                "    text: \"<green>Hello world!\"",
                 "    seethrough: true",
                 "    alignment: center",
                 "    # background accepts a color (white) or a hex text: \"#RRGGBB\" or \"#AARRGGBB\" (semi-transparent green here)",
                 "    background: \"#8000FF00\"",
                 "    linewidth: 200",
                 "    brightness: 12",
-                "set fake display text of {_display} to \"&cUpdated!\"",
+                "set fake display text of {_display} to \"<red>Updated!\"",
                 "set fake display see through of {_display} to false",
                 "set fake display background color of {_display} to red"
             )

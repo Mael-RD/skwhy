@@ -37,7 +37,7 @@ import java.util.UUID;
         "The advancement is hidden from advancement tabs and never produces a chat message.")
 @Examples({
     "send task notification with item {_custom item} title \"A notification\" to all players",
-    "send challenge notification with item {_challenge icon} title \"Challenge complete!\" to player"
+    "send challenge notification with item {_challenge icon} title \"<gold>Challenge complete!\" to player"
 })
 @Since("1.4.0")
 @RequiredPlugins("PacketEvents")
@@ -79,7 +79,7 @@ public class SendAdvancementNotification extends Effect {
 
             ResourceLocation advancementId = new ResourceLocation("skwhy:" + UUID.randomUUID());
             AdvancementDisplay display = new AdvancementDisplay(
-                    Component.text(notificationTitle),
+                    skwhy.util.TextComponents.fromSkript(notificationTitle),
                     Component.empty(),
                     SpigotConversionUtil.fromBukkitItemStack(icon),
                     advancementType,

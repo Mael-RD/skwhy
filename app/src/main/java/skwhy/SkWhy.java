@@ -24,12 +24,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.skriptlang.skript.addon.SkriptAddon;
 
 import skwhy.pathfinder.Navigation;
-import skwhy.chunkpath.longnav.LongNavigation;
 import skwhy.modules.FakeDisplayModule;
 import skwhy.modules.NavigationModule;
 import skwhy.modules.RandomStuffModule;
 import skwhy.modules.APIModule;
-import skwhy.modules.ChunkPathModule;
 
 
 // import com.github.retrooper.packetevents.PacketEvents;
@@ -87,12 +85,6 @@ public class SkWhy extends JavaPlugin {
         } else {
             getLogger().info("Module API REST désactivé dans la config.");
         }
-        if (isModuleEnabled("modules.chunk_path")) {
-            skriptAddon.loadModules(new ChunkPathModule());
-            Bukkit.getScheduler().runTaskTimer(this, LongNavigation::tickAll, 0L, 1L);
-        } else {
-            getLogger().info("Module ChunkPath désactivé dans la config.");
-        }
         getServer().getPluginManager().registerEvents(new EntityRemove(), this);
         getServer().getPluginManager().registerEvents(new BodyTracker(), this);
         getServer().getPluginManager().registerEvents(new FutureRotationTracker(), this);
@@ -106,7 +98,6 @@ public class SkWhy extends JavaPlugin {
     @Override
     public void onDisable() {
         APIModule.shutdown();
-        ChunkPathModule.shutdown();
         getLogger().info("SkWhy désactivé.");
     }
 
