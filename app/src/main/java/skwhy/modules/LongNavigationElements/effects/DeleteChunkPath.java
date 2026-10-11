@@ -20,44 +20,46 @@ import skwhy.chunkpath.ChunkGateService;
 import skwhy.modules.LongNavigationElements.ChunkPathManager;
 
 @Name("[ChunkPath] Delete Chunk Path")
-@Description("Deletes the chunk path record of a chunk (from memory and from the world's chunk path database), " +
-    "if any. Does nothing if that chunk was never registered.")
+@Description("Deletes the chunk path record of one or more chunks (from memory and from the world's chunk path database), " +
+    "if any. Does nothing for chunks that were never registered.")
 @Examples({
     "delete chunk path of target block's chunk",
-    "delete chunk path record of player's chunk"
+    "delete chunk path record of player's chunk",
+    "# 'all chunks within ... and ...' comes from SkBee",
+    "delete chunk path of (all chunks within location(0, 0, 0, world \"world\") and location(100, 0, 100, world \"world\"))"
 })
 @Since("1.5.0")
 public class DeleteChunkPath extends Effect {
 
-    private Expression<Chunk> chunkExpr;
+    private Expression<Chunk> chunksExpr;
 
     @Override
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        this.chunkExpr = (Expression<Chunk>) exprs[0];
+        this.chunksExpr = (Expression<Chunk>) exprs[0];
         return true;
     }
 
     @Override
     protected void execute(Event event) {
-        Chunk chunk = chunkExpr.getSingle(event);
-        if (chunk == null) return;
-
-        ChunkGateService service = ChunkPathManager.serviceFor(chunk.getWorld());
-        service.delete(chunk.getX(), chunk.getZ());
+        for (Chunk chunk : chunksExpr.getArray(event)) {
+            if (chunk == null) continue;
+            ChunkGateService service = ChunkPathManager.serviceFor(chunk.getWorld());
+            service.delete(chunk.getX(), chunk.getZ());
+        }
     }
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return "delete chunk path of " + chunkExpr.toString(event, debug);
+        return "delete chunk path of " + chunksExpr.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EFFECT,
             SyntaxInfo.builder(DeleteChunkPath.class)
-                .addPattern("delete [the] chunk path [record] of %chunk%")
+                .addPattern("delete [the] chunk path [record] of %chunks%")
                 .build()
         );
     }

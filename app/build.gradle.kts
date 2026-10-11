@@ -23,6 +23,9 @@ dependencies {
     // API REST (certificat)
     implementation("org.bouncycastle:bcpkix-jdk18on:1.78")
     implementation("org.bouncycastle:bcprov-jdk18on:1.78")
+    testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.register<Copy>("copyJarToPlugins") {
@@ -39,6 +42,10 @@ java {
 }
 
 
+
+tasks.test {
+    useJUnitPlatform()
+}
 
 tasks.jar {
     archiveBaseName.set("skwhy")

@@ -28,9 +28,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Name("[ChunkPath] Register Chunk Path")
-@Description("Analyzes a chunk and (re)registers its chunk path record (its gates to neighboring chunks) in the " +
+@Description("Analyzes one or more chunks and (re)registers their chunk path records (their gates to neighboring chunks) in the " +
     "world's chunk path database. Unlike a normal lookup, this always re-runs the analysis and overwrites any " +
-    "record already saved for that chunk. The chunk must already be generated on disk (never generates it). " +
+    "record already saved for those chunks. The chunk must already be generated on disk (never generates it). " +
     "Optionally accepts one or more custom path cost rules (built via 'a new path cost rule') to use for this " +
     "analysis instead of the world's default cost rules. " +
     "This can be a heavy operation on the calling thread — avoid registering many chunks at once from the main thread.")
@@ -45,31 +45,31 @@ import java.util.List;
 @Since("1.5.0")
 public class RegisterChunkPath extends Effect {
 
-    private Expression<Chunk> chunkExpr;
+    private Expression<Chunk> chunksExpr;
     private Expression<PathCostRuleData> rulesExpr;
 
     @Override
     @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern,
                         Kleenean isDelayed, SkriptParser.ParseResult pr) {
-        this.chunkExpr = (Expression<Chunk>) exprs[0];
+        this.chunksExpr = (Expression<Chunk>) exprs[0];
         this.rulesExpr = exprs.length > 1 ? (Expression<PathCostRuleData>) exprs[1] : null;
         return true;
     }
 
     @Override
     protected void execute(Event event) {
-        Chunk chunk = chunkExpr.getSingle(event);
-        if (chunk == null) return;
-
-        ChunkGateService service = ChunkPathManager.serviceFor(chunk.getWorld());
         PathCostRules customRules = buildCustomRules(event);
-        try {
-            service.reanalyze(chunk.getX(), chunk.getZ(), customRules);
-        } catch (ChunkNotGeneratedException | RegionReadException e) {
-            SkWhy.getInstance().getLogger().warning(
-                    "[ChunkPath] Impossible d'enregistrer le chunk (" + chunk.getX() + "," + chunk.getZ()
-                            + ") du monde " + chunk.getWorld().getName() + " : " + e.getMessage());
+        for (Chunk chunk : chunksExpr.getArray(event)) {
+            if (chunk == null) continue;
+            ChunkGateService service = ChunkPathManager.serviceFor(chunk.getWorld());
+            try {
+                service.reanalyze(chunk.getX(), chunk.getZ(), customRules);
+            } catch (ChunkNotGeneratedException | RegionReadException e) {
+                SkWhy.getInstance().getLogger().warning(
+                        "[ChunkPath] Impossible d'enregistrer le chunk (" + chunk.getX() + "," + chunk.getZ()
+                                + ") du monde " + chunk.getWorld().getName() + " : " + e.getMessage());
+            }
         }
     }
 
@@ -88,7 +88,7 @@ public class RegisterChunkPath extends Effect {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        String base = "register chunk path of " + chunkExpr.toString(event, debug);
+        String base = "register chunk path of " + chunksExpr.toString(event, debug);
         return rulesExpr != null ? base + " using rules " + rulesExpr.toString(event, debug) : base;
     }
 
@@ -96,7 +96,7 @@ public class RegisterChunkPath extends Effect {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EFFECT,
             SyntaxInfo.builder(RegisterChunkPath.class)
-                .addPattern("register [the] chunk path [record] of %chunk% [using rules %-pathcostrules%]")
+                .addPattern("register [the] chunk path [record] of %chunks% [using rules %-pathcostrules%]")
                 .build()
         );
     }
