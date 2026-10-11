@@ -20,3 +20,5 @@ types:
   #others
   navigation: navigation@navigations
   apirequest: api request@api requests
+  chunkpathrecord: chunk path record@chunk path records
+  pathcostrules: path cost rule@path cost rules
