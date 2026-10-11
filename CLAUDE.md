@@ -59,8 +59,10 @@ Les tests de SkWhy sont dans `C:\Users\orimi\Desktop\proxti\serveur vide\plugins
 ## Branches et release
 - `main` contient tout, y compris le **long pathfinding** (package `skwhy.chunkpath`, `ChunkPathModule`, `modules/LongNavigationElements`, syntaxes
   chunk path / long navigation, `since` 1.4.0 et 1.5.0) qui n'est pas termine.
-- `release/1.4.0` (publiee sur `origin`) = `main` **sans** le long pathfinding. Les corrections destinees a la 1.4.0 se font **sur cette branche
-  uniquement** ; on merge les deux branches quand la release est propre (attention aux conflits : `SkWhy.java`, `config.yml`, `lang/default.lang`).
+- `release/1.4.0` (publiee sur `origin`, release GitHub `1.4.0` faite) = `main` **sans** le long pathfinding. Elle a ete **mergee dans `main`** puis le commit
+  qui retirait le long pathfinding a ete **revert** : `main` = toutes les corrections de la 1.4.0 + le long pathfinding. Pour une future release sans
+  fonctionnalite inachevee, recommencer : branche `release/x.y.z` depuis `main`, retirer les modules inacheves (commit dedie), corriger sur cette branche,
+  merger dans `main` puis `git revert` du commit de retrait.
 - Ne pas pousser ni creer de release/tag sans que l'utilisateur le demande. `gh` n'est pas installe. Fins de messages de commit :
   `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 - `app/bin/main/**` (classes compilees par l'IDE) est suivi par git : ne pas les commiter dans mes commits (n'ajouter que `app/src`, `CLAUDE.md`, etc.),
