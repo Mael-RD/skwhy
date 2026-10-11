@@ -1,14 +1,13 @@
 package skwhy.util;
 
-import ch.njol.skript.util.chat.ChatMessages;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import org.skriptlang.skript.bukkit.text.TextComponentParser;
 
 /**
- * Converts the text Skript gives us to an Adventure component, with exactly the same chat-style filter Skript applies
- * to {@code send}, item names, etc.: color tags ({@code <red>}, {@code <#ff8800>}, {@code <bold>}, {@code <reset>}...),
- * the legacy {@code &a} / {@code §a} codes, links, and so on.
+ * Converts the text Skript gives us to an Adventure component with the same MiniMessage-based parser Skript uses for
+ * {@code send}, item names, etc. (color tags {@code <red>}, {@code <#ff8800>}, {@code <bold>}, legacy {@code &a} codes,
+ * links...), so formatting is applied automatically without the script having to write {@code formatted}.
  */
 public final class TextComponents {
 
@@ -20,13 +19,12 @@ public final class TextComponents {
 
     private TextComponents() {}
 
-    @SuppressWarnings("removal")
     public static Component fromSkript(String text) {
         if (text == null || text.isEmpty()) return Component.empty();
         try {
-            // Skript's own parser (ChatMessages) -> JSON -> Adventure
-            return GsonComponentSerializer.gson().deserialize(ChatMessages.toJson(text));
+            return TextComponentParser.instance().parse(text);
         } catch (RuntimeException | LinkageError e) {
+            // Skript without its text parser: legacy codes only
             return LEGACY.deserialize(text.replace('§', '&'));
         }
     }
