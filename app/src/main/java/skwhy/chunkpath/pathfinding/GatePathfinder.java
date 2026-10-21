@@ -152,15 +152,33 @@ public final class GatePathfinder {
         return costs;
     }
 
-    /** Cherche le noeud praticable exact à la position, sinon regarde 1-2 blocs au-dessus/en-dessous. */
+    /**
+     * Cherche le noeud praticable exact à la position, sinon le plus proche : d'abord sur la même
+     * colonne (jusqu'à 3 blocs au-dessus/en-dessous), puis dans les colonnes voisines (rayon 2) du
+     * même chunk. Un point posé sur une feuille, une fleur ou un bloc non plein reste ainsi utilisable.
+     */
     private static int nearestWalkableNode(ChunkNavMesh mesh, int x, int y, int z) {
-        int direct = mesh.nodeAt(x, y, z);
-        if (direct >= 0) return direct;
-        for (int dy = 1; dy <= 2; dy++) {
-            int up = mesh.nodeAt(x, y + dy, z);
-            if (up >= 0) return up;
-            int down = mesh.nodeAt(x, y - dy, z);
-            if (down >= 0) return down;
+        for (int radius = 0; radius <= 2; radius++) {
+            int best = -1;
+            int bestScore = Integer.MAX_VALUE;
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue; // couronne seulement
+                    for (int dy = 0; dy <= 3; dy++) {
+                        for (int sign = -1; sign <= 1; sign += 2) {
+                            if (dy == 0 && sign == 1) continue;
+                            int node = mesh.nodeAt(x + dx, y + sign * dy, z + dz);
+                            if (node < 0) continue;
+                            int score = dy * 4 + Math.abs(dx) + Math.abs(dz);
+                            if (score < bestScore) {
+                                bestScore = score;
+                                best = node;
+                            }
+                        }
+                    }
+                }
+            }
+            if (best >= 0) return best;
         }
         return -1;
     }

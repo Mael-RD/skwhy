@@ -51,6 +51,11 @@ public abstract class PathNavigation {
 
    protected abstract LongPathFinder createPathFinder();
 
+   /** True when the last path search was cut short by a chunk that is not loaded. */
+   public boolean lastSearchHitUnloadedChunk() {
+      return this.pathFinder != null && this.pathFinder.hitUnloadedChunk();
+   }
+
    private LongPathFinder pathFinder() {
       if (this.pathFinder == null) {
          this.pathFinder = this.createPathFinder();
@@ -59,11 +64,11 @@ public abstract class PathNavigation {
    }
 
    public void recomputePath() {
-      if (this.mob.getWorld().getFullTime() - this.timeLastRecompute < MAX_TIME_RECOMPUTE || !this.canUpdatePath()) {
+      if (this.mob.getWorld().getGameTime() - this.timeLastRecompute < MAX_TIME_RECOMPUTE || !this.canUpdatePath()) {
          this.hasDelayedRecomputation = true;
       } else if (this.targetPos != null) {
          this.path = this.createPath(this.targetPos, 50);
-         this.timeLastRecompute = this.mob.getWorld().getFullTime();
+         this.timeLastRecompute = this.mob.getWorld().getGameTime();
          this.hasDelayedRecomputation = false;
       }
    }
@@ -217,7 +222,7 @@ public abstract class PathNavigation {
 
       if (this.path != null && !this.path.isDone()) {
          Vector pos = this.path.getNextNodePos();
-         long time = this.mob.getWorld().getFullTime();
+         long time = this.mob.getWorld().getGameTime();
          if (pos.equals(this.timeoutCachedNode)) {
             this.timeoutTimer = this.timeoutTimer + (time - this.lastTimeoutCheck);
          } else {

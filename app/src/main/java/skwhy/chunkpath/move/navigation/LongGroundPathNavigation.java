@@ -74,8 +74,13 @@ public class LongGroundPathNavigation extends PathNavigation {
          }
 
          Path result = super.createPath(location, reachRange);
-         if (result == null) {
-            this.lastFailureReason = FailureReason.OTHER;
+         if (result == null || !result.canReach()) {
+            // a search that could not get through because the terrain ahead is not loaded is not a
+            // dead end: the owner waits for the chunks instead of treating the leg as impossible
+            this.lastFailureReason = this.lastSearchHitUnloadedChunk() ? FailureReason.UNLOADED_CHUNK : FailureReason.OTHER;
+            if (this.lastFailureReason == FailureReason.UNLOADED_CHUNK) {
+               return null;
+            }
          }
          return result;
       }

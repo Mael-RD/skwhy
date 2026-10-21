@@ -7,7 +7,9 @@ import org.bukkit.entity.Entity;
 import org.bukkit.util.Vector;
 
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityRelativeMove;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityRotation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 
 import ch.njol.skript.Skript;
@@ -84,6 +86,7 @@ public class LongNavigation {
     private static final float MAX_LEG_PATH_LENGTH = 48F;
     private static final long WAIT_RECHECK_INTERVAL_TICKS = 20L; // "revérifier régulièrement"
     private static final long STUCK_RETRY_INTERVAL_TICKS = 20L;
+    private static final long ABSOLUTE_SYNC_INTERVAL_TICKS = 100L;
     private static final double REACHED_DISTANCE = 1.0; // blocks, horizontally, around a waypoint's block centre
 
     // =========================================================================
@@ -96,7 +99,14 @@ public class LongNavigation {
 
     @SuppressWarnings("null")
     public static void tickAll() {
-        REGISTRY.removeIf(nav -> nav.isRealEntity() && !nav.getEntity().isValid());
+        REGISTRY.removeIf(nav -> {
+            boolean gone = nav.isRealEntity() && !nav.getEntity().isValid();
+            if (gone) {
+                nav.debug("entity no longer valid (dead, removed or its chunk unloaded): navigation dropped");
+                nav.releaseEntity();
+            }
+            return gone;
+        });
         for (LongNavigation nav : new ArrayList<>(REGISTRY)) {
             try {
                 nav.tick();
@@ -106,7 +116,7 @@ public class LongNavigation {
                         "[ChunkPath] Erreur pendant le tick d'une long navigation (id " + nav.getEntityId() + ") : "
                                 + e, e);
                 nav.status = Status.STUCK;
-                nav.lastStuckRetryTick = nav.world.getFullTime();
+                nav.lastStuckRetryTick = nav.world.getGameTime();
             }
         }
     }
@@ -116,6 +126,7 @@ public class LongNavigation {
      * the vanilla AI and gravity would fight it, so both are switched off while this navigation lives.
      */
     private void takeOverEntity(Entity entity) {
+        if (previousGravity != null) return; // already controlled
         previousGravity = entity.hasGravity();
         entity.setGravity(false);
         if (entity instanceof org.bukkit.entity.Mob living) {
@@ -141,6 +152,14 @@ public class LongNavigation {
     }
 
     private void setStatus(Status newStatus, String why) {
+        if (mob.isRealEntity()) {
+            // vanilla behaviour only while the navigation is not actively driving the entity
+            if (newStatus == Status.IDLE || newStatus == Status.ARRIVED || newStatus == Status.FAILED_NO_PATH) {
+                releaseEntity();
+            } else {
+                takeOverEntity(mob.getEntity());
+            }
+        }
         if (newStatus != status) {
             debug(status + " -> " + newStatus + " (" + why + ") pos=" + fmt(mob.getLocation())
                     + " waypoint#" + waypointIndex + "=" + fmt(currentWaypointLocation()));
@@ -178,6 +197,8 @@ public class LongNavigation {
     private Status status = Status.IDLE;
     private List<Gate> route;
     private int waypointIndex;
+    private float lastSentYaw = Float.NaN;
+    private long lastAbsoluteSyncTick;
     private Boolean previousGravity;
     private Boolean previousAware;
     private int legWaypoint = -1; // waypoint for which the mob's current leg path was computed
@@ -208,7 +229,6 @@ public class LongNavigation {
         this.mob = new LongMob(this, entity, speed, costRules);
         this.startLocation = entity.getLocation();
         this.players = new ArrayList<>();
-        takeOverEntity(entity);
         register();
     }
 
@@ -228,8 +248,9 @@ public class LongNavigation {
         }
 
         mob.tick();
+        syncVirtualEntity();
 
-        if (verbose && world.getFullTime() % 20 == 0) {
+        if (verbose && world.getGameTime() % 20 == 0) {
             Vector d = mob.getDeltaMovement();
             debug(String.format(java.util.Locale.ROOT, "tick %s pos=%s delta=%.3f,%.3f,%.3f ground=%b hcol=%b %s legWp=%d wp=%d",
                     status, fmt(mob.getLocation()), d.getX(), d.getY(), d.getZ(), mob.onGround(),
@@ -237,8 +258,34 @@ public class LongNavigation {
         }
     }
 
+    /**
+     * Virtual entities only exist on the viewers' clients: besides the relative move packets sent by
+     * the mob, the body/head rotation is pushed when it changes, and an absolute position every few
+     * seconds so rounding of the relative packets never lets the client drift.
+     */
+    private void syncVirtualEntity() {
+        if (mob.isRealEntity() || players.isEmpty()) return;
+        Location loc = mob.getLocation();
+        long now = world.getGameTime();
+        boolean rotated = Float.isNaN(lastSentYaw) || Math.abs(loc.getYaw() - lastSentYaw) >= 1.0F;
+        if (rotated) {
+            lastSentYaw = loc.getYaw();
+            WrapperPlayServerEntityRotation rotation = new WrapperPlayServerEntityRotation(
+                    mob.getId(), loc.getYaw(), loc.getPitch(), mob.onGround());
+            WrapperPlayServerEntityHeadLook head = new WrapperPlayServerEntityHeadLook(mob.getId(), loc.getYaw());
+            for (Player p : players) {
+                PacketEvents.getAPI().getPlayerManager().sendPacket(p, rotation);
+                PacketEvents.getAPI().getPlayerManager().sendPacket(p, head);
+            }
+        }
+        if (now - lastAbsoluteSyncTick >= ABSOLUTE_SYNC_INTERVAL_TICKS) {
+            lastAbsoluteSyncTick = now;
+            sendTeleportPacket(loc);
+        }
+    }
+
     private void tickFollowing() {
-        long now = world.getFullTime();
+        long now = world.getGameTime();
         if (status == Status.STUCK && now - lastStuckRetryTick < STUCK_RETRY_INTERVAL_TICKS) {
             return; // avoid hammering the A* search every tick against an unreachable target
         }
@@ -292,21 +339,24 @@ public class LongNavigation {
     // =========================================================================
 
     private void enterWaitingState() {
-        setStatus(Status.WAITING_FOR_CHUNK, "state machine");
-        waitStartTick = world.getFullTime();
+        setStatus(Status.WAITING_FOR_CHUNK, "chunks around the next waypoint are not loaded");
+        mob.getNavigation().stop(); // stand still, never walk on into unloaded terrain
+        waitStartTick = world.getGameTime();
         lastWaitCheckTick = waitStartTick;
         expectedWaitTicks = estimatedTicksForCurrentLeg();
     }
 
     private void tickWaiting() {
-        long now = world.getFullTime();
+        long now = world.getGameTime();
         if (now - lastWaitCheckTick < WAIT_RECHECK_INTERVAL_TICKS) return;
         lastWaitCheckTick = now;
 
         Location immediateTarget = currentWaypointLocation();
-        if (immediateTarget != null && isChunkLoaded(immediateTarget)) {
+        if (immediateTarget != null && isChunkLoaded(immediateTarget)
+                && mob.getNavigation().moveTo(immediateTarget, MAX_LEG_PATH_LENGTH)) {
             // The direct continuation loaded during the wait: resume as if nothing happened.
-            setStatus(Status.FOLLOWING, "state machine");
+            legWaypoint = waypointIndex;
+            setStatus(Status.FOLLOWING, "chunks loaded, leg path found");
             return;
         }
 
@@ -544,7 +594,7 @@ public class LongNavigation {
 
         if (status == Status.WAITING_FOR_CHUNK) {
             sb.append("║\n║ [Attente chunk non chargé]\n");
-            long now = world.getFullTime();
+            long now = world.getGameTime();
             sb.append("║ Attente depuis: ").append(now - waitStartTick).append(" / ").append(expectedWaitTicks).append(" ticks\n");
         }
 

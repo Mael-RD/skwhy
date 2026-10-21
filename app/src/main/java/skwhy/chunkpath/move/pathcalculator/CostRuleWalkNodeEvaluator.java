@@ -331,6 +331,9 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
             final int dirDx, final int dirDy, final int dirDz,
             final PathType blockPathTypeCurrent
     ) {
+        if (!this.isColumnLoaded(x, z)) {
+            return null; // never read a block of an unloaded chunk (it would be loaded synchronously)
+        }
         Node best = null;
         double maxYTarget = this.getFloorLevel(x, y, z);
         if (maxYTarget - nodeHeight > this.getMobJumpHeight()) {

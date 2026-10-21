@@ -40,6 +40,11 @@ public class LongPathFinder {
         return this.nodeEvaluator;
     }
 
+    /** True when the last search was cut short by a chunk that is not loaded. */
+    public boolean hitUnloadedChunk() {
+        return this.nodeEvaluator.hitUnloadedChunk();
+    }
+
     public @Nullable Path getPath() {
         return this.path;
     }

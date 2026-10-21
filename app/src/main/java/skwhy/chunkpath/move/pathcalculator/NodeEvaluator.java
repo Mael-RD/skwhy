@@ -40,6 +40,9 @@ public abstract class NodeEvaluator {
     protected boolean canOpenDoors;
     protected boolean canFloat;
     protected boolean canWalkOverFences;
+    /** Set when the search met a chunk that is not loaded (never read: that would load it synchronously). */
+    protected boolean hitUnloadedChunk;
+    private final it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap loadedChunks = new it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap();
 
     /**
      * Per-entity overrides for path-type traversal cost.
@@ -52,6 +55,8 @@ public abstract class NodeEvaluator {
         this.currentContext = new PathfindingContext(mob);
         this.mob = mob;
         this.nodes.clear();
+        this.hitUnloadedChunk = false;
+        this.loadedChunks.clear();
         Vector hitbox = mob.getHitbox();
         this.entityWidth  = (int) Math.floor(hitbox.getX() + 1.0);
         this.entityHeight = (int) Math.floor(hitbox.getY() + 1.0);
@@ -77,6 +82,28 @@ public abstract class NodeEvaluator {
 
     public void resetPathfindingMalus(final PathType type) {
         pathfindingMalusMap.remove(type);
+    }
+
+    /** True when the chunk holding block column (x, z) is loaded; records the first unloaded one met. */
+    protected boolean isColumnLoaded(final int x, final int z) {
+        final int cx = x >> 4;
+        final int cz = z >> 4;
+        final long key = ((long) cx << 32) ^ (cz & 0xFFFFFFFFL);
+        boolean loaded;
+        if (this.loadedChunks.containsKey(key)) {
+            loaded = this.loadedChunks.get(key);
+        } else {
+            loaded = this.currentContext.world().isChunkLoaded(cx, cz);
+            this.loadedChunks.put(key, loaded);
+        }
+        if (!loaded) {
+            this.hitUnloadedChunk = true;
+        }
+        return loaded;
+    }
+
+    public boolean hitUnloadedChunk() {
+        return this.hitUnloadedChunk;
     }
 
     // ------------------------------------------------------------------

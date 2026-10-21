@@ -187,8 +187,10 @@ public class LongMob {
     private void moveTo(final Vector movement) {
         if (isRealEntity())
             entity.teleport(entity.getLocation().add(movement));
-        else
+        else {
+            this.position = this.position.clone().add(movement);
             navigation.sendMovePacket(movement);
+        }
     }
 
     public Vector position() {
@@ -219,6 +221,7 @@ public class LongMob {
         else {
             this.position = new Vector(location.getX(), location.getY(), location.getZ());
             this.world = location.getWorld();
+            navigation.sendTeleportPacket(location);
         }
     }
 
