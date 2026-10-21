@@ -34,15 +34,15 @@ public abstract class PathNavigation {
    protected float maxDistanceToWaypoint = 0.5F;
    protected boolean hasDelayedRecomputation;
    protected long timeLastRecompute;
-   protected NodeEvaluator nodeEvaluator;
    private @Nullable Location targetPos;
-   private final LongPathFinder pathFinder;
+   // créé à la première utilisation : createPathFinder() dépend de champs de la sous-classe,
+   // pas encore initialisés quand ce constructeur s'exécute
+   private LongPathFinder pathFinder;
    private boolean isStuck;
    private int stuckCount;
 
    public PathNavigation(final LongMob mob) {
       this.mob = mob;
-      this.pathFinder = this.createPathFinder();
    }
 
    public @Nullable Location getTargetPos() {
@@ -50,6 +50,13 @@ public abstract class PathNavigation {
    }
 
    protected abstract LongPathFinder createPathFinder();
+
+   private LongPathFinder pathFinder() {
+      if (this.pathFinder == null) {
+         this.pathFinder = this.createPathFinder();
+      }
+      return this.pathFinder;
+   }
 
    public void recomputePath() {
       if (this.mob.getWorld().getFullTime() - this.timeLastRecompute < MAX_TIME_RECOMPUTE || !this.canUpdatePath()) {
@@ -68,7 +75,7 @@ public abstract class PathNavigation {
          return this.path;
       } else {
          // Block fromPos = this.mob.getLocation().getBlock();
-         Path path = this.pathFinder.findPath(this.mob, location, maxPathLength);
+         Path path = this.pathFinder().findPath(this.mob, location, maxPathLength);
 
          if (path != null && path.getTarget() != null) {
             this.targetPos = new Location(mob.getWorld(), path.getTargetX(), path.getTargetY(), path.getTargetZ());
@@ -306,15 +313,15 @@ public abstract class PathNavigation {
    }
 
    public NodeEvaluator getNodeEvaluator() {
-      return this.nodeEvaluator;
+      return this.pathFinder().getNodeEvaluator();
    }
 
    public void setCanFloat(final boolean canFloat) {
-      this.nodeEvaluator.setCanFloat(canFloat);
+      this.getNodeEvaluator().setCanFloat(canFloat);
    }
 
    public boolean canFloat() {
-      return this.nodeEvaluator.canFloat();
+      return this.getNodeEvaluator().canFloat();
    }
 
    public boolean shouldRecomputePath(final Block pos) {
@@ -346,7 +353,7 @@ public abstract class PathNavigation {
    public abstract boolean canNavigateGround();
 
    public void setCanOpenDoors(final boolean canOpenDoors) {
-      this.nodeEvaluator.setCanOpenDoors(canOpenDoors);
+      this.getNodeEvaluator().setCanOpenDoors(canOpenDoors);
    }
 
    // ════════════════════════════════════════════════════════════════════════

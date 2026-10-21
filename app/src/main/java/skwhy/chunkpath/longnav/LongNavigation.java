@@ -12,6 +12,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 
 import ch.njol.skript.Skript;
 
+import skwhy.SkWhy;
 import skwhy.chunkpath.ChunkGateService;
 import skwhy.chunkpath.block.PathCostRules;
 import skwhy.chunkpath.gate.Gate;
@@ -76,9 +77,14 @@ public class LongNavigation {
     // =========================================================================
 
     public static final int PAUSED_INDEFINITELY = -1;
+
+    /** Journalise (console) chaque changement d'état et chaque échec de tronçon ; activé par {@code /cpdebug verbose}. */
+    public static volatile boolean verbose = false;
+
     private static final float MAX_LEG_PATH_LENGTH = 48F;
     private static final long WAIT_RECHECK_INTERVAL_TICKS = 20L; // "revérifier régulièrement"
     private static final long STUCK_RETRY_INTERVAL_TICKS = 20L;
+    private static final double REACHED_DISTANCE = 1.0; // blocks, horizontally, around a waypoint's block centre
 
     // =========================================================================
     // Registre statique
@@ -91,11 +97,71 @@ public class LongNavigation {
     @SuppressWarnings("null")
     public static void tickAll() {
         REGISTRY.removeIf(nav -> nav.isRealEntity() && !nav.getEntity().isValid());
-        new ArrayList<>(REGISTRY).forEach(LongNavigation::tick);
+        for (LongNavigation nav : new ArrayList<>(REGISTRY)) {
+            try {
+                nav.tick();
+            } catch (RuntimeException e) {
+                // une navigation défaillante ne doit ni bloquer les autres ni se relancer à l'infini
+                SkWhy.getInstance().getLogger().log(java.util.logging.Level.WARNING,
+                        "[ChunkPath] Erreur pendant le tick d'une long navigation (id " + nav.getEntityId() + ") : "
+                                + e, e);
+                nav.status = Status.STUCK;
+                nav.lastStuckRetryTick = nav.world.getFullTime();
+            }
+        }
+    }
+
+    /**
+     * The mob moves the real entity itself (position written every tick, own gravity and collisions):
+     * the vanilla AI and gravity would fight it, so both are switched off while this navigation lives.
+     */
+    private void takeOverEntity(Entity entity) {
+        previousGravity = entity.hasGravity();
+        entity.setGravity(false);
+        if (entity instanceof org.bukkit.entity.Mob living) {
+            previousAware = living.isAware();
+            living.setAware(false);
+        }
+    }
+
+    private void releaseEntity() {
+        Entity entity = mob.getEntity();
+        if (entity == null || !entity.isValid() || previousGravity == null) return;
+        entity.setGravity(previousGravity);
+        if (entity instanceof org.bukkit.entity.Mob living && previousAware != null) {
+            living.setAware(previousAware);
+        }
+        previousGravity = null;
+    }
+
+    private void debug(String message) {
+        if (verbose) {
+            SkWhy.getInstance().getLogger().info("[ChunkPath/debug] nav#" + mob.getId() + " " + message);
+        }
+    }
+
+    private void setStatus(Status newStatus, String why) {
+        if (newStatus != status) {
+            debug(status + " -> " + newStatus + " (" + why + ") pos=" + fmt(mob.getLocation())
+                    + " waypoint#" + waypointIndex + "=" + fmt(currentWaypointLocation()));
+        }
+        status = newStatus;
+    }
+
+    private static String fmt(Location l) {
+        return l == null ? "null" : String.format(java.util.Locale.ROOT, "%.1f,%.1f,%.1f", l.getX(), l.getY(), l.getZ());
+    }
+
+    /** Restitue toutes les entités réelles (arrêt du plugin) et vide le registre. */
+    public static void shutdownAll() {
+        for (LongNavigation nav : new ArrayList<>(REGISTRY)) nav.unregister();
     }
 
     private void register()        { REGISTRY.add(this); }
-    public  void unregister()      { REGISTRY.remove(this); }
+    public  void unregister() {
+        REGISTRY.remove(this);
+        releaseEntity();
+    }
     public  boolean isRegistered() { return REGISTRY.contains(this); }
 
     // =========================================================================
@@ -112,6 +178,9 @@ public class LongNavigation {
     private Status status = Status.IDLE;
     private List<Gate> route;
     private int waypointIndex;
+    private Boolean previousGravity;
+    private Boolean previousAware;
+    private int legWaypoint = -1; // waypoint for which the mob's current leg path was computed
 
     private long waitStartTick;
     private long lastWaitCheckTick;
@@ -139,6 +208,7 @@ public class LongNavigation {
         this.mob = new LongMob(this, entity, speed, costRules);
         this.startLocation = entity.getLocation();
         this.players = new ArrayList<>();
+        takeOverEntity(entity);
         register();
     }
 
@@ -158,6 +228,13 @@ public class LongNavigation {
         }
 
         mob.tick();
+
+        if (verbose && world.getFullTime() % 20 == 0) {
+            Vector d = mob.getDeltaMovement();
+            debug(String.format(java.util.Locale.ROOT, "tick %s pos=%s delta=%.3f,%.3f,%.3f ground=%b hcol=%b %s legWp=%d wp=%d",
+                    status, fmt(mob.getLocation()), d.getX(), d.getY(), d.getZ(), mob.onGround(),
+                    mob.horizontalCollision, mob.getMoveControl().debugState(), legWaypoint, waypointIndex));
+        }
     }
 
     private void tickFollowing() {
@@ -168,11 +245,21 @@ public class LongNavigation {
 
         Location waypoint = currentWaypointLocation();
         if (waypoint == null) {
-            status = Status.ARRIVED;
+            setStatus(Status.ARRIVED, "no more waypoint");
+            mob.getNavigation().stop();
+            return;
+        }
+        if (hasReached(waypoint)) {
+            advanceWaypoint();
             return;
         }
 
         PathNavigation nav = mob.getNavigation();
+        if (legWaypoint == waypointIndex && !nav.isDone()) {
+            setStatus(Status.FOLLOWING, "leg in progress");
+            return; // the leg path is being walked by the mob (ticked right after)
+        }
+
         boolean moving = nav.moveTo(waypoint, MAX_LEG_PATH_LENGTH);
         if (!moving) {
             LongGroundPathNavigation.FailureReason reason =
@@ -180,16 +267,24 @@ public class LongNavigation {
             if (reason == LongGroundPathNavigation.FailureReason.UNLOADED_CHUNK) {
                 enterWaitingState();
             } else {
-                status = Status.STUCK;
+                if (verbose) debug("leg failed, path=" + nav.getPath() + " target=" + nav.getTargetPos());
+                setStatus(Status.STUCK, "leg path failed: " + reason);
                 lastStuckRetryTick = now;
             }
             return;
         }
 
-        status = Status.FOLLOWING;
-        if (nav.isDone()) {
-            advanceWaypoint();
-        }
+        legWaypoint = waypointIndex;
+        setStatus(Status.FOLLOWING, "leg path found (" + nav.getPath().getNodeCount() + " nodes)");
+    }
+
+    /** Close enough to a waypoint (gate block or destination) to consider it reached. */
+    private boolean hasReached(Location waypoint) {
+        Location current = mob.getLocation();
+        double dx = current.getX() - (waypoint.getBlockX() + 0.5);
+        double dz = current.getZ() - (waypoint.getBlockZ() + 0.5);
+        double dy = current.getY() - waypoint.getBlockY();
+        return dx * dx + dz * dz < REACHED_DISTANCE * REACHED_DISTANCE && dy > -1.5 && dy < 2.0;
     }
 
     // =========================================================================
@@ -197,7 +292,7 @@ public class LongNavigation {
     // =========================================================================
 
     private void enterWaitingState() {
-        status = Status.WAITING_FOR_CHUNK;
+        setStatus(Status.WAITING_FOR_CHUNK, "state machine");
         waitStartTick = world.getFullTime();
         lastWaitCheckTick = waitStartTick;
         expectedWaitTicks = estimatedTicksForCurrentLeg();
@@ -211,7 +306,7 @@ public class LongNavigation {
         Location immediateTarget = currentWaypointLocation();
         if (immediateTarget != null && isChunkLoaded(immediateTarget)) {
             // The direct continuation loaded during the wait: resume as if nothing happened.
-            status = Status.FOLLOWING;
+            setStatus(Status.FOLLOWING, "state machine");
             return;
         }
 
@@ -224,7 +319,8 @@ public class LongNavigation {
                 if (world.isChunkLoaded(gate.chunkX, gate.chunkZ)) {
                     teleportMob(gateLocation(gate));
                     waypointIndex = i;
-                    status = Status.FOLLOWING;
+                    legWaypoint = -1;
+                    setStatus(Status.FOLLOWING, "state machine");
                     return;
                 }
             }
@@ -232,7 +328,7 @@ public class LongNavigation {
 
         // Nothing loaded anywhere ahead: give up on a realistic walk and arrive directly.
         teleportMob(endLocation);
-        status = Status.ARRIVED;
+        setStatus(Status.ARRIVED, "state machine");
     }
 
     private boolean isChunkLoaded(Location loc) {
@@ -285,13 +381,13 @@ public class LongNavigation {
 
     private void recomputeRoute() {
         if (startLocation == null || endLocation == null) {
-            status = Status.IDLE;
+            setStatus(Status.IDLE, "state machine");
             route = null;
             return;
         }
         if (startLocation.getWorld() == null || !startLocation.getWorld().equals(endLocation.getWorld())) {
             Skript.warning("[ChunkPath] La position de départ et d'arrivée d'une long navigation doivent être dans le même monde.");
-            status = Status.FAILED_NO_PATH;
+            setStatus(Status.FAILED_NO_PATH, "state machine");
             route = null;
             return;
         }
@@ -302,19 +398,22 @@ public class LongNavigation {
                 endLocation.getBlockX(), endLocation.getBlockY(), endLocation.getBlockZ());
 
         if (route == null) {
-            status = Status.FAILED_NO_PATH;
+            setStatus(Status.FAILED_NO_PATH, "state machine");
             return;
         }
 
         waypointIndex = 0;
-        status = Status.FOLLOWING;
+        legWaypoint = -1;
+        setStatus(Status.FOLLOWING, "state machine");
     }
 
     private void advanceWaypoint() {
         if (route == null || waypointIndex >= route.size()) {
-            status = Status.ARRIVED;
+            setStatus(Status.ARRIVED, "final destination reached");
+            mob.getNavigation().stop();
         } else {
             waypointIndex++;
+            legWaypoint = -1;
         }
     }
 
@@ -337,6 +436,8 @@ public class LongNavigation {
     // =========================================================================
     // Getters / Setters publics
     // =========================================================================
+
+    public LongMob getMob() { return mob; }
 
     public int getEntityId() { return mob.getId(); }
 
@@ -452,6 +553,7 @@ public class LongNavigation {
 
         sb.append("║\n");
         sb.append(mob.toString());
+        sb.append(mob.getNavigation().toString());
 
         return sb.toString();
     }

@@ -2,10 +2,8 @@ package skwhy.modules.LongNavigationElements.types;
 
 import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.classes.Parser;
-import ch.njol.skript.classes.Serializer;
 import ch.njol.skript.lang.ParseContext;
 import ch.njol.skript.registrations.Classes;
-import ch.njol.yggdrasil.Fields;
 import skwhy.chunkpath.longnav.LongNavigation;
 
 public class LongNavigationSkriptType {
@@ -49,32 +47,6 @@ public class LongNavigationSkriptType {
                 @Override
                 public String toVariableNameString(LongNavigation o) {
                     return null;
-                }
-            })
-            .serializer(new Serializer<LongNavigation>() {
-                @Override
-                public Fields serialize(LongNavigation data) {
-                    throw new UnsupportedOperationException();
-                }
-
-                @Override
-                public void deserialize(LongNavigation o, Fields f) {
-                    throw new UnsupportedOperationException();
-                }
-
-                @Override
-                public LongNavigation deserialize(Fields fields) {
-                    throw new UnsupportedOperationException();
-                }
-
-                @Override
-                public boolean mustSyncDeserialization() {
-                    return false;
-                }
-
-                @Override
-                protected boolean canBeInstantiated() {
-                    return false;
                 }
             })
         );

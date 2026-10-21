@@ -32,6 +32,10 @@ public class MoveControl implements Control {
 
     // ─── API publique ────────────────────────────────────────────────────────
 
+    public String debugState() {
+        return String.format(java.util.Locale.ROOT, "op=%s wanted=%.2f,%.2f,%.2f", operation, wantedX, wantedY, wantedZ);
+    }
+
     public boolean hasWanted() {
         return this.operation == Operation.MOVE_TO;
     }
@@ -135,8 +139,11 @@ public class MoveControl implements Control {
 
         // Vélocité horizontale vers la cible
         double horiz = Math.sqrt(xd * xd + zd * zd);
-        double vx = (xd / horiz) * mob.getSpeed();
-        double vz = (zd / horiz) * mob.getSpeed();
+        // never step further than the remaining distance: a fixed step larger than the arrival
+        // tolerance makes the mob oscillate around the node instead of settling on it
+        double step = Math.min(mob.getSpeed(), horiz);
+        double vx = horiz > 1.0E-6 ? (xd / horiz) * step : 0.0;
+        double vz = horiz > 1.0E-6 ? (zd / horiz) * step : 0.0;
 
         Vector currentVel = mob.getDeltaMovement();
 
@@ -177,8 +184,9 @@ public class MoveControl implements Control {
         double horiz = Math.sqrt(xd * xd + zd * zd);
 
         if (horiz > 1e-5) {
-            double vx = (xd / horiz) * mob.getSpeed();
-            double vz = (zd / horiz) * mob.getSpeed();
+            double step = Math.min(mob.getSpeed(), horiz);
+            double vx = (xd / horiz) * step;
+            double vz = (zd / horiz) * step;
             Vector vel = mob.getDeltaMovement();
             mob.setDeltaMovement(new Vector(vx, vel.getY(), vz));
         }

@@ -31,6 +31,7 @@ public class ChunkPathModule implements AddonModule {
     @Override
     public void load(SkriptAddon addon) {
         ChunkPathManager.init(SkWhy.getInstance());
+        skwhy.chunkpath.debug.ChunkPathDebugCommand.register();
 
         RegisterChunkPath.register(addon);
         DeleteChunkPath.register(addon);
@@ -68,6 +69,7 @@ public class ChunkPathModule implements AddonModule {
      * À appeler depuis onDisable() du plugin principal.
      */
     public static void shutdown() {
+        skwhy.chunkpath.longnav.LongNavigation.shutdownAll();
         ChunkPathManager.shutdown();
     }
 }

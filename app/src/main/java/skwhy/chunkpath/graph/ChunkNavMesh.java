@@ -95,44 +95,15 @@ public final class ChunkNavMesh {
             paletteFlags[i] = BlockClassifier.classify(name);
         }
 
-        boolean hasAnyAirLike = false;
-        for (byte f : paletteFlags) {
-            if (BlockClassifier.isOccupiable(f)) {
-                hasAnyAirLike = true;
-                break;
-            }
-        }
-
-        // Fast-path : palette à une seule entrée (aucune donnée à dépaqueter), OU palette
-        // ne contenant AUCUN bloc de type air/cave_air (section pleinement "solide" :
-        // aucune case ne pourra jamais être praticable en tant que position, seul son
-        // usage comme sol pour la couche du dessus compte, donc on peut se permettre
-        // d'approximer toute la section par son bloc dominant plutôt que de dépaqueter
-        // les 4096 entrées). Ce sont les deux cas visés par l'optimisation demandée.
-        if (palette.size() == 1 || !hasAnyAirLike) {
-            byte flag;
-            String name;
-            if (palette.size() == 1) {
-                flag = paletteFlags[0];
-                name = paletteNames[0];
-            } else {
-                // Choisit comme représentant le premier bloc "sol valide" de la palette ;
-                // à défaut (que des murs/liquides sans aucun bloc plein classique, cas très
-                // rare sans air), on retombe sur STANDABLE, l'hypothèse par défaut la plus sûre.
-                int repIndex = -1;
-                for (int i = 0; i < paletteFlags.length; i++) {
-                    if (paletteFlags[i] == BlockClassifier.STANDABLE) {
-                        repIndex = i;
-                        break;
-                    }
-                }
-                flag = BlockClassifier.STANDABLE;
-                name = repIndex >= 0 ? paletteNames[repIndex] : paletteNames[0];
-            }
+        // Fast-path : palette à une seule entrée (aucune donnée à dépaqueter) -> remplissage uniforme.
+        // Toute autre section est décodée exactement (une approximation « section pleine » fausserait
+        // l'eau, les noms de sol donc les coûts, et les blocs mélangés).
+        if (palette.size() == 1) {
+            byte flag = paletteFlags[0];
+            String name = paletteNames[0];
             if (flag == BlockClassifier.OCCUPIABLE) {
                 return; // identique au défaut "air" déjà en place : rien à faire
             }
-            // Remplissage uniforme rapide, pas de dépaquetage de bits nécessaire.
             for (int ly = 0; ly < 16; ly++) {
                 for (int lz = 0; lz < 16; lz++) {
                     for (int lx = 0; lx < 16; lx++) {
@@ -154,19 +125,15 @@ public final class ChunkNavMesh {
 
         int bitsPerEntry = Math.max(4, 32 - Integer.numberOfLeadingZeros(palette.size() - 1));
         long mask = (1L << bitsPerEntry) - 1;
+        int entriesPerLong = 64 / bitsPerEntry;
 
         for (int i = 0; i < 4096; i++) {
-            // Format post-1.16 (20w17a+) : les entrées sont packées de façon dense et
-            // peuvent chevaucher deux longs consécutifs (pas de padding en fin de long,
-            // contrairement au format pré-1.16). Il faut donc composer la valeur à partir
-            // d'un éventuel second long dès que l'entrée déborde du premier.
-            long bitIndex = (long) i * bitsPerEntry;
-            int longIndex = (int) (bitIndex >>> 6);
-            int bitOffset = (int) (bitIndex & 63);
+            // Format >= 1.16 (20w17a) : une entrée n'est JAMAIS à cheval sur deux longs
+            // (chaque long contient floor(64 / bits) entrées, le reste est du padding).
+            int longIndex = i / entriesPerLong;
+            int bitOffset = (i % entriesPerLong) * bitsPerEntry;
+            if (longIndex >= data.length) break; // données tronquées : le reste garde la valeur "air"
             long value = data[longIndex] >>> bitOffset;
-            if (bitOffset + bitsPerEntry > 64) {
-                value |= data[longIndex + 1] << (64 - bitOffset);
-            }
             int paletteIndex = (int) (value & mask);
             if (paletteIndex >= palette.size()) continue; // sécurité, ne devrait pas arriver
 
@@ -319,6 +286,24 @@ public final class ChunkNavMesh {
     }
 
     // ---- accès public ----
+
+    /** Description texte d'une colonne (debug) : pour chaque Y, drapeaux O(ccupiable)/S(tandable)/C(limbable), nom du sol et noeud. */
+    private static final char NL = (char) 10;
+
+    public String debugColumn(int x, int z, int fromY, int toY) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("mesh y[").append(minY).append("..").append(maxY).append("] nodes=").append(nodeCount).append(NL);
+        for (int y = Math.min(toY, maxY); y >= Math.max(fromY, minY); y--) {
+            byte f = flags[cellIndex(x, y, z)];
+            sb.append(" y=").append(y).append(' ')
+                    .append(BlockClassifier.isOccupiable(f) ? 'O' : '-')
+                    .append(BlockClassifier.isStandable(f) ? 'S' : '-')
+                    .append(BlockClassifier.isClimbable(f) ? 'C' : '-')
+                    .append(" name=").append(names[cellIndex(x, y, z)])
+                    .append(" node=").append(nodeIndexGrid[cellIndex(x, y, z)]).append(NL);
+        }
+        return sb.toString();
+    }
 
     public int nodeCount() {
         return nodeCount;

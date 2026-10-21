@@ -92,7 +92,8 @@ public class LongGroundPathNavigation extends PathNavigation {
          }
 
          if (pos.getY() >= world.getMinHeight()) {
-            return pos;
+            // pos is the first non-air block under the target: the target is the air cell on top of it
+            return pos.add(0, 1, 0);
          }
 
          pos.setY(location.getY()+1);
@@ -180,7 +181,7 @@ public class LongGroundPathNavigation extends PathNavigation {
    }
 
    public void setCanWalkOverFences(final boolean canWalkOverFences) {
-      this.nodeEvaluator.setCanWalkOverFences(canWalkOverFences);
+      this.getNodeEvaluator().setCanWalkOverFences(canWalkOverFences);
    }
 
    public void setCanPathToTargetsBelowSurface(final boolean canPathToTargetsBelowSurface) {

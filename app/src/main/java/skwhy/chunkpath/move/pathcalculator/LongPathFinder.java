@@ -36,6 +36,10 @@ public class LongPathFinder {
         this.nodeEvaluator = new CostRuleWalkNodeEvaluator(costRules);
     }
 
+    public NodeEvaluator getNodeEvaluator() {
+        return this.nodeEvaluator;
+    }
+
     public @Nullable Path getPath() {
         return this.path;
     }

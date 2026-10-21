@@ -1000,8 +1000,10 @@ public class LongMob {
 
     public void tick() {
         serverAiStep();
-        
-        this.travel(getDeltaMovement());
+
+        // MoveControl writes the wanted horizontal velocity straight into deltaMovement (world
+        // space): there is no extra local-space input to rotate by yaw and add on top of it.
+        this.travel(new Vector(0, 0, 0));
     }
 
     // ── Bulle (bubble column) ─────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import skwhy.chunkpath.ChunkPathAnalyzer;
 import skwhy.chunkpath.block.PathCostRules;
 import skwhy.chunkpath.gate.ChunkGateStore;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,7 +57,17 @@ public final class ChunkPathManager {
         });
     }
 
-    private static Path regionFolderOf(World world) {
+    /**
+     * Dossier {@code region} du monde. Plusieurs mondes peuvent partager la même dimension
+     * (ex: {@code villes}, {@code event}... tous en overworld) : on cherche d'abord le dossier
+     * propre au monde (Bukkit, puis {@code <world_folder>/<nom du monde>}), et seulement en dernier
+     * recours le dossier de la dimension vanilla.
+     */
+    public static Path regionFolderOf(World world) {
+        Path viaBukkit = world.getWorldFolder().toPath().resolve("region");
+        if (Files.isDirectory(viaBukkit)) return viaBukkit;
+        Path viaName = worldFolder.resolve(world.getName()).resolve("region");
+        if (Files.isDirectory(viaName)) return viaName;
         String dimension = switch (world.getEnvironment()) {
             case NETHER -> "the_nether";
             case THE_END -> "the_end";
