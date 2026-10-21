@@ -18,7 +18,8 @@ import skwhy.chunkpath.longnav.LongNavigation;
 
 @Name("[Long Navigation] Destroy Navigation")
 @Description("Destroys one or more long navigation instances, removing them from the global tick registry. " +
-    "Once destroyed, the navigating object stops moving and its tick() method will no longer be called. " +
+    "Once destroyed, the navigating object stops moving, a real entity gets its AI and gravity back, and the " +
+    "navigation will no longer be ticked. " +
     "Always destroy long navigation instances when they are no longer needed to avoid memory leaks.")
 @Examples({
     "set {_longnav} to a new long navigation with entity target entity speed 0.2",

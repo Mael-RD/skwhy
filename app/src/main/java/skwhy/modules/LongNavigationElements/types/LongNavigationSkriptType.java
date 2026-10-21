@@ -15,7 +15,10 @@ public class LongNavigationSkriptType {
                 "to the 'navigation' type. Computes a coarse chunk-gate route between a start and an end " +
                 "location (using registered chunk path records and the world's path cost rules), then walks " +
                 "the real terrain toward that route waypoint by waypoint, recalculating short segments as " +
-                "needed instead of precomputing the whole distant path at once. " +
+                "needed instead of precomputing the whole distant path at once. Chunks that are not loaded are " +
+                "never loaded by the search: the entity waits for them, then jumps ahead to the first loaded " +
+                "part of the route. A real entity is removed from its navigation when it dies or its chunk unloads; " +
+                "a navigation is not saved in variables across restarts. " +
                 "Like a normal navigation, it can be created from a numeric ID (virtual entity, requires " +
                 "PacketEvents to send movement packets to viewers) or a real entity (moved via teleport).")
             .usage("Created via 'a new long fake navigation with id %number% ...' or 'a new long navigation with entity %entity% ...'.")

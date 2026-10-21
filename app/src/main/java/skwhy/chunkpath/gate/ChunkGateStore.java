@@ -117,7 +117,10 @@ public final class ChunkGateStore implements Closeable {
     private static final class WorldDatabase {
 
         private static final int MAGIC = 0x43504442; // "CPDB"
-        private static final int FORMAT_VERSION = 1;
+        // 2 : les données de la version 1 viennent d'un décodage NBT des chunks erroné (blocs faux) ;
+        // elles sont sauvegardées à côté (.v1.bak) puis la base repart vide, à ré-enregistrer.
+        private static final int FORMAT_VERSION = 2;
+        private static final int LEGACY_BAD_ANALYSIS_VERSION = 1;
         private static final int HEADER_SIZE = 4 + 4 + 4 + 4; // magic, version, capacity, used
         private static final int SLOT_SIZE = 1 + 8 + 8 + 4; // occupied, key, offset, length
         private static final int INITIAL_CAPACITY = 256;
@@ -266,6 +269,17 @@ public final class ChunkGateStore implements Closeable {
                 throw new IOException("Base de données invalide (magic incorrect) : " + file);
             }
             int version = raf.readInt();
+            if (version == LEGACY_BAD_ANALYSIS_VERSION) {
+                Path backup = file.resolveSibling(file.getFileName() + ".v" + version + ".bak");
+                raf.close();
+                Files.copy(file, backup, StandardCopyOption.REPLACE_EXISTING);
+                java.util.logging.Logger.getLogger("SkWhy").warning("[ChunkPath] Base " + file.getFileName()
+                        + " issue d'une ancienne analyse erronée : sauvegardée dans " + backup.getFileName()
+                        + ", les chunks sont à ré-enregistrer.");
+                raf = new RandomAccessFile(file.toFile(), "rw");
+                initEmpty(INITIAL_CAPACITY);
+                return;
+            }
             if (version != FORMAT_VERSION) {
                 throw new IOException("Version de format non supportée (" + version + ") : " + file);
             }

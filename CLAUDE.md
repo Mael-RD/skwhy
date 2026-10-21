@@ -56,6 +56,17 @@ Les tests de SkWhy sont dans `C:\Users\orimi\Desktop\proxti\serveur vide\plugins
 - `split %string% at regex %string%` **conserve les separateurs** (liste `[texte, separateur, texte, ...]`, 2n+1 elements) : comportement voulu, documente.
 - Les events : `BukkitSyntaxInfos.Event` + doc (voir plus haut), event-values citees dans la description, pas de `[on]` dans le pattern.
 
+## Long pathfinding (regles apprises)
+- Les chunks sont lus **depuis les fichiers region sur disque** (`ChunkNavMesh`) : format NBT >= 1.16 = les entrees ne chevauchent jamais deux longs.
+  Les bases `*.db` de format 1 (ancien decodage faux) sont sauvegardees en `.v1.bak` et repartent vides (a ré-enregistrer).
+- Dossier region = `world.getWorldFolder()/region` (un monde par dossier : `villes`, `event`...), pas seulement `overworld`.
+- Une `LongNavigation` est **en pause par defaut** : `set pause ticks ... to 0` pour qu'elle marche. `speed` = blocs par tick.
+- Ne jamais lire un bloc d'un chunk non charge pendant la recherche A* (`NodeEvaluator.isColumnLoaded`) : Paper le charge/genere en synchrone.
+- Dans une fonction Skript un `wait` ne retarde pas l'appelant : les tests de marche sont dans le trigger (`walk.sk`).
+- Une entite reelle pilotee perd son IA/gravite vanilla (rendues a l'arrivee, a l'echec ou au `destroy`). `world.getGameTime()` (pas `getFullTime()`) pour les delais.
+- Debug : commande `/cpdebug` (console) `cell|path|navs|dump|shape|collide|folder|verbose [off]`. `verbose` journalise chaque transition d'etat.
+- Serveur full (`full copy`, monde `villes`) : demarrage ~5 min ; ne pas le redemarrer sans necessite. Sondes de test dans `plugins/Skript/scripts/lp-debug/`.
+
 ## Branches et release
 - `main` contient tout, y compris le **long pathfinding** (package `skwhy.chunkpath`, `ChunkPathModule`, `modules/LongNavigationElements`, syntaxes
   chunk path / long navigation, `since` 1.4.0 et 1.5.0) qui n'est pas termine.

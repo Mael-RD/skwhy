@@ -86,6 +86,10 @@ public class LongNavigation {
     private static final float MAX_LEG_PATH_LENGTH = 48F;
     private static final long WAIT_RECHECK_INTERVAL_TICKS = 20L; // "revérifier régulièrement"
     private static final long STUCK_RETRY_INTERVAL_TICKS = 20L;
+    private static final long NO_PROGRESS_TICKS = 100L; // 5 s without getting closer to the waypoint
+    private static final double PROGRESS_EPSILON = 0.3; // blocks
+    private static final double ARRIVAL_TOLERANCE = 3.0; // blocks, accepted as 'arrived' when the last steps cannot be walked
+    private static final int MAX_LEG_SEARCHES_PER_TICK = 3; // A* budget shared by all navigations
     private static final long ABSOLUTE_SYNC_INTERVAL_TICKS = 100L;
     private static final double REACHED_DISTANCE = 1.0; // blocks, horizontally, around a waypoint's block centre
 
@@ -93,6 +97,8 @@ public class LongNavigation {
     // Registre statique
     // =========================================================================
 
+    private static int legSearchBudget;
+    private static long tickCounter;
     private static final List<LongNavigation> REGISTRY = Collections.synchronizedList(new ArrayList<>());
 
     public static List<LongNavigation> getRegistry() { return Collections.unmodifiableList(REGISTRY); }
@@ -107,7 +113,12 @@ public class LongNavigation {
             }
             return gone;
         });
-        for (LongNavigation nav : new ArrayList<>(REGISTRY)) {
+        legSearchBudget = MAX_LEG_SEARCHES_PER_TICK;
+        List<LongNavigation> navs = new ArrayList<>(REGISTRY);
+        // start from a different navigation each tick so the search budget never starves the last ones
+        int offset = navs.isEmpty() ? 0 : (int) (tickCounter++ % navs.size());
+        for (int i = 0; i < navs.size(); i++) {
+            LongNavigation nav = navs.get((i + offset) % navs.size());
             try {
                 nav.tick();
             } catch (RuntimeException e) {
@@ -197,6 +208,10 @@ public class LongNavigation {
     private Status status = Status.IDLE;
     private List<Gate> route;
     private int waypointIndex;
+    private int progressWaypoint = -1;
+    private double bestDistance;
+    private long lastProgressTick;
+    private int stuckLevel;
     private float lastSentYaw = Float.NaN;
     private long lastAbsoluteSyncTick;
     private Boolean previousGravity;
@@ -301,12 +316,20 @@ public class LongNavigation {
             return;
         }
 
+        if (noProgressFor(waypoint, now)) {
+            return;
+        }
+
         PathNavigation nav = mob.getNavigation();
         if (legWaypoint == waypointIndex && !nav.isDone()) {
             setStatus(Status.FOLLOWING, "leg in progress");
             return; // the leg path is being walked by the mob (ticked right after)
         }
 
+        if (legSearchBudget <= 0) {
+            return; // too many A* searches this tick already, this navigation gets its turn on a later one
+        }
+        legSearchBudget--;
         boolean moving = nav.moveTo(waypoint, MAX_LEG_PATH_LENGTH);
         if (!moving) {
             LongGroundPathNavigation.FailureReason reason =
@@ -323,6 +346,51 @@ public class LongNavigation {
 
         legWaypoint = waypointIndex;
         setStatus(Status.FOLLOWING, "leg path found (" + nav.getPath().getNodeCount() + " nodes)");
+    }
+
+    /**
+     * Watches the distance to the current waypoint. The coarse route (chunk block model) and the live
+     * collisions can disagree (an open trapdoor, a fence post...), leaving the mob pushing against an
+     * obstacle forever. No progress for {@link #NO_PROGRESS_TICKS}: first the leg path is recomputed
+     * from where the mob stands; if that does not help either, it is moved on to the waypoint, which
+     * the chunk analysis knows to be standable.
+     *
+     * @return true when the tick has been consumed by a recovery
+     */
+    private boolean noProgressFor(Location waypoint, long now) {
+        if (progressWaypoint != waypointIndex) {
+            progressWaypoint = waypointIndex;
+            bestDistance = Double.MAX_VALUE;
+            lastProgressTick = now;
+            stuckLevel = 0;
+        }
+        double distance = mob.getLocation().distance(waypoint);
+        if (distance < bestDistance - PROGRESS_EPSILON) {
+            bestDistance = distance;
+            lastProgressTick = now;
+            return false;
+        }
+        if (now - lastProgressTick < NO_PROGRESS_TICKS) return false;
+
+        lastProgressTick = now;
+        stuckLevel++;
+        if (stuckLevel == 1) {
+            debug("no progress toward waypoint#" + waypointIndex + " for " + NO_PROGRESS_TICKS + " ticks: recomputing the leg");
+            mob.getNavigation().stop();
+            legWaypoint = -1;
+            return false;
+        }
+        if (route != null && waypointIndex >= route.size() && mob.getLocation().distance(waypoint) <= ARRIVAL_TOLERANCE) {
+            debug("no progress but within " + ARRIVAL_TOLERANCE + " blocks of the destination: arrived");
+            advanceWaypoint();
+            return true;
+        }
+        debug("still no progress toward waypoint#" + waypointIndex + ": moving the mob to the waypoint");
+        teleportMob(waypoint.clone().add(0.5, 0.0, 0.5));
+        mob.getNavigation().stop();
+        stuckLevel = 0;
+        advanceWaypoint();
+        return true;
     }
 
     /** Close enough to a waypoint (gate block or destination) to consider it reached. */
@@ -442,9 +510,16 @@ public class LongNavigation {
             return;
         }
 
+        // the route starts where the mob really is (retargeting a moving navigation must not send it
+        // back to its original start); the start location only matters until the mob has left it
+        Location from = startLocation;
+        Location here = mob.getLocation();
+        if (here.getWorld() != null && here.getWorld().equals(world) && here.distanceSquared(startLocation) > 4.0) {
+            from = here;
+        }
         ChunkGateService service = ChunkPathManager.serviceFor(world);
         route = GatePathfinder.findPath(service,
-                startLocation.getBlockX(), startLocation.getBlockY(), startLocation.getBlockZ(),
+                from.getBlockX(), from.getBlockY(), from.getBlockZ(),
                 endLocation.getBlockX(), endLocation.getBlockY(), endLocation.getBlockZ());
 
         if (route == null) {

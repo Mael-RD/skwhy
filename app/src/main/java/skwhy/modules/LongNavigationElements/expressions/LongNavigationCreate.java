@@ -28,7 +28,10 @@ import java.util.List;
 @Description("Creates a new long-distance navigation object. Can be created from a numeric entity ID or a real " +
     "entity. Requires a hitbox vector (width/height) and a starting location for the virtual pattern; only a " +
     "speed is optional. Unlike a normal navigation, there is no movement type: long navigations are always " +
-    "ground-based. It will not start moving until an end location is set (see 'end location of').")
+    "ground-based. A new long navigation is paused: it only starts walking once an end location is set AND " +
+    "its pause ticks are set to 0 (see 'end location of' and 'pause ticks of'). The speed is the distance walked " +
+    "per tick in blocks (default 0.1, so 2 blocks per second). While a real entity is being driven, its AI and gravity " +
+    "are switched off; they are given back when it arrives, when no route exists, or when the navigation is destroyed.")
 @Examples({
     "# Pattern 0: create from a numeric ID",
     "set {_longnav} to a new long navigation with id 12345 hitbox vector(0.6, 1.8, 0.6) location location of player",

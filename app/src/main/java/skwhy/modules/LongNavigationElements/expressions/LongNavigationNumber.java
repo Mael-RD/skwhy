@@ -18,8 +18,10 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import skwhy.chunkpath.longnav.LongNavigation;
 
 @Name("[Long Navigation] Numeric Properties")
-@Description("Gets or sets numeric properties of a long navigation object: movement speed, pause duration in " +
-    "ticks, or the numeric entity ID (read-only).")
+@Description("Gets or sets numeric properties of a long navigation object: movement speed (blocks walked per tick), " +
+    "pause duration in ticks, or the numeric entity ID (read-only). Pause ticks is -1 on a new navigation, which " +
+    "means paused indefinitely: set it to 0 to make the navigation walk, or to a positive number to wait that " +
+    "many ticks first.")
 @Examples({
     "set {_longnav} to a new long navigation with entity target entity speed 0.2",
     "",

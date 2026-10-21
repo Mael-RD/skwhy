@@ -19,9 +19,11 @@ import skwhy.chunkpath.longnav.LongNavigation;
 @Name("[Long Navigation] Status")
 @Description("Returns the current status of a long navigation, as lowercase text: \"idle\" (no route yet), " +
     "\"following\" (walking toward the current waypoint), \"stuck\" (local pathfinding failed, retrying " +
-    "periodically), \"waiting_for_chunk\" (next waypoint's chunk isn't loaded, waiting per the catch-up " +
-    "strategy), \"arrived\", or \"failed_no_path\" (the chunk-gate route couldn't be computed — see the console " +
-    "for why). Read-only.")
+    "periodically), \"waiting_for_chunk\" (the terrain toward the next waypoint isn't loaded: it never gets loaded " +
+    "by the search, the entity waits and then jumps ahead to the first loaded part of the route), \"arrived\", or " +
+    "\"failed_no_path\" (the chunk-gate route couldn't be computed: a chunk of the way is not registered, or the " +
+    "start or end isn't walkable — see the console for why). A navigation that gets no closer to its current " +
+    "waypoint for 5 seconds recomputes the way, then moves on to the waypoint. Read-only.")
 @Examples({
     "if status of long navigation {_longnav} is \"arrived\":",
     "\tbroadcast \"reached the destination!\"",

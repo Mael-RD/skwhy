@@ -32,7 +32,8 @@ import java.util.List;
     "world's chunk path database. Unlike a normal lookup, this always re-runs the analysis and overwrites any " +
     "record already saved for those chunks. The chunk must already be generated on disk (never generates it). " +
     "Optionally accepts one or more custom path cost rules (built via 'a new path cost rule') to use for this " +
-    "analysis instead of the world's default cost rules. " +
+    "analysis instead of the world's default cost rules. The terrain is read from the world's region files on disk, " +
+    "not from the loaded chunks: blocks changed since the chunk was last saved are not seen until the world is saved. " +
     "This can be a heavy operation on the calling thread — avoid registering many chunks at once from the main thread.")
 @Examples({
     "register chunk path of target block's chunk",
