@@ -54,6 +54,7 @@ public abstract class NodeEvaluator {
     public void prepare(final LongMob mob) {
         this.currentContext = new PathfindingContext(mob);
         this.mob = mob;
+        this.canOpenDoors = mob.canOpenDoors();
         this.nodes.clear();
         this.hitUnloadedChunk = false;
         this.loadedChunks.clear();

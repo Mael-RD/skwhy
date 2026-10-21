@@ -31,6 +31,7 @@ public class ChunkPathModule implements AddonModule {
     @Override
     public void load(SkriptAddon addon) {
         ChunkPathManager.init(SkWhy.getInstance());
+        org.bukkit.Bukkit.getScheduler().runTask(SkWhy.getInstance(), skwhy.chunkpath.block.BlockClassifier::initCollisionData);
         skwhy.chunkpath.debug.ChunkPathDebugCommand.register();
 
         RegisterChunkPath.register(addon);
@@ -54,6 +55,7 @@ public class ChunkPathModule implements AddonModule {
         LongNavigationCreate.register(addon);
         LongNavigationEntity.register(addon);
         LongNavigationLocation.register(addon);
+        LongNavigationDoors.register(addon);
         LongNavigationNumber.register(addon);
         LongNavigationStatus.register(addon);
 

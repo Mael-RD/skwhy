@@ -3,6 +3,7 @@ package skwhy.chunkpath;
 import skwhy.chunkpath.block.PathCostRules;
 import skwhy.chunkpath.gate.ChunkGateData;
 import skwhy.chunkpath.gate.ChunkGateLinker;
+import skwhy.chunkpath.gate.Gate;
 import skwhy.chunkpath.gate.ChunkGateStore;
 
 import java.util.List;
@@ -105,9 +106,15 @@ public final class ChunkGateService {
         ChunkGateData data = effectiveAnalyzer.analyze(chunkX, chunkZ);
         cache.put(key, data);
 
+        String replacedPrefix = chunkX + "," + chunkZ + ",";
         for (Direction dir : Direction.values()) {
             ChunkGateData neighbor = getIfKnown(chunkX + dir.dx, chunkZ + dir.dz);
             if (neighbor != null) {
+                // the gate ids of the previous analysis of this chunk are meaningless now (they are renumbered):
+                // links kept by the neighbor would silently point to other gates and create impossible routes
+                for (Gate gate : neighbor.gates()) {
+                    gate.neighborLinks.removeIf(id -> id.startsWith(replacedPrefix));
+                }
                 ChunkGateLinker.link(data, neighbor, dir);
                 // le voisin peut avoir perdu des portes (élagage) : on ré-enregistre son état à jour
                 store.save(worldName, neighbor);

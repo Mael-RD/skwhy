@@ -99,11 +99,15 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
     @Override
     public void prepare(final LongMob mob) {
         super.prepare(mob);
+        this.cellBoxes.clear();
+        this.standLevels.clear();
         // NMS calls navigation.onPathfindingStart() here – not available in Bukkit
     }
 
     @Override
     public void done() {
+        this.cellBoxes.clear();
+        this.standLevels.clear();
         // NMS calls navigation.onPathfindingDone() here – not available in Bukkit
         this.pathTypesByPosCacheByMob.clear();
         this.collisionCache.clear();
@@ -228,6 +232,9 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
                     jumpSize, posHeight,
                     dir.dx, 0, dir.dz,
                     blockPathTypeCurrent);
+            if (node != null && !node.closed && !this.stepClear(pos, node)) {
+                node = null;
+            }
             this.reusableNeighbors[dir.idx2d] = node;
             if (this.isNeighborValid(node, pos)) {
                 neighbors[p++] = node;
@@ -243,7 +250,7 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
                         jumpSize, posHeight,
                         dir.dx, 0, dir.dz,
                         blockPathTypeCurrent);
-                if (this.isDiagonalValid(diagonalNode)) {
+                if (this.isDiagonalValid(diagonalNode) && this.stepClear(pos, diagonalNode)) {
                     neighbors[p++] = diagonalNode;
                 }
             }
@@ -298,18 +305,19 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
     }
 
     /**
-     * Returns the Y-coordinate of the top surface of the block below (x, y, z).
-     * Uses {@link Block#getBoundingBox()} to get the collision height.
+     * Returns the Y-coordinate of the top surface of the block below (x, y, z), from its
+     * <em>collision</em> shape: a pressure plate, a flower or a tuft of grass has a selection box
+     * ({@link Block#getBoundingBox()}) but nothing to stand on, and using that box made the search
+     * believe a mob could stand a block higher than the real floor.
      */
     public static double getFloorLevel(final World world, final int x, final int y, final int z) {
         int belowY = y - 1;
         Block below = world.getBlockAt(x, belowY, z);
-        BoundingBox shape = below.getBoundingBox();
-        // If the block has no collision box (e.g. air, flowers), height = 0
-        double topY = shape.getMaxY();
-        // getBoundingBox returns coords in world space; we want the fractional height
-        double fractionalTop = topY - belowY;
-        return belowY + Math.min(1.0, Math.max(0.0, fractionalTop));
+        double top = 0.0;
+        for (BoundingBox box : below.getCollisionShape().getBoundingBoxes()) {
+            top = Math.max(top, box.getMaxY());
+        }
+        return belowY + top; // a fence or a wall is 1.5 high: the cell above it is no floor a mob can step onto
     }
 
     protected boolean isAmphibious() {
@@ -326,6 +334,168 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
      * @param dirDx / dirDy / dirDz  travel direction unit vector (replaces NMS Direction)
      */
     protected @Nullable Node findAcceptedNode(
+            final int x, final int y, final int z,
+            final int jumpSize, final double nodeHeight,
+            final int dirDx, final int dirDy, final int dirDz,
+            final PathType blockPathTypeCurrent
+    ) {
+        Node found = this.findAcceptedNodeUnchecked(x, y, z, jumpSize, nodeHeight, dirDx, dirDy, dirDz, blockPathTypeCurrent);
+        if (geometryChecks && found != null && !found.closed && found.costMalus >= 0.0F && isStandingType(found.type)
+                && !this.hasRoomToStand(found.x, found.y, found.z)) {
+            return null; // a trapdoor, a shelf, a low ceiling over a carpet... fills the space the mob needs
+        }
+        return found;
+    }
+
+    private static boolean isStandingType(final PathType type) {
+        return switch (type) {
+            case WALKABLE, WALKABLE_DOOR, DOOR_OPEN, TRAPDOOR, ON_TOP_OF_TRAPDOOR, RAIL,
+                 FIRE_IN_NEIGHBOR, DAMAGING_IN_NEIGHBOR, DAMAGE_CAUTIOUS, STICKY_HONEY, COCOA -> true;
+            default -> false;
+        };
+    }
+
+    /** Switch for the body-volume checks ({@link #hasRoomToStand}, {@link #stepClear}); {@code /cpdebug geometry on|off}. */
+    public static volatile boolean geometryChecks = true;
+
+    /** Highest obstacle (above the floor) a mob walks onto without jumping. */
+    private static final double STEP_HEIGHT = 0.6;
+    private static final double BODY_EPSILON = 1.0E-3;
+    /** The body is a little narrower than its hitbox when squeezing past: 0.0125 of play is enough in vanilla too. */
+    private static final double BODY_MARGIN = 0.02;
+    private static final BoundingBox[] NO_BOXES = new BoundingBox[0];
+
+    // per search caches: collision boxes of a cell (world coordinates) and the height a mob stands at in a node
+    private final Long2ObjectMap<BoundingBox[]> cellBoxes = new Long2ObjectOpenHashMap<>();
+    private final it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap standLevels = new it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap();
+
+    /**
+     * Collision boxes of a cell, in world coordinates. Hand-openable doors count for nothing when the mob can open
+     * them (the door opens in front of it).
+     */
+    private BoundingBox[] boxesOf(final int x, final int y, final int z) {
+        final long key = PathTypeCache.asLong(x, y, z);
+        BoundingBox[] cached = this.cellBoxes.get(key);
+        if (cached != null) return cached;
+        final Block block = this.currentContext.world().getBlockAt(x, y, z);
+        final Material mat = block.getType();
+        BoundingBox[] result = NO_BOXES;
+        if (!mat.isAir() && !(this.canOpenDoors && Tag.DOORS.isTagged(mat) && mat != Material.IRON_DOOR)) {
+            final java.util.Collection<BoundingBox> local = block.getCollisionShape().getBoundingBoxes();
+            if (!local.isEmpty()) {
+                result = new BoundingBox[local.size()];
+                int i = 0;
+                for (BoundingBox box : local) result[i++] = box.clone().shift(x, y, z);
+            }
+        }
+        this.cellBoxes.put(key, result);
+        return result;
+    }
+
+    private boolean overlapsColumn(final BoundingBox box, final double minX, final double maxX, final double minZ, final double maxZ) {
+        return box.getMaxX() > minX && box.getMinX() < maxX && box.getMaxZ() > minZ && box.getMinZ() < maxZ;
+    }
+
+    /**
+     * True when a mob of this evaluator's size can stand at the node: its body volume, standing on the floor
+     * (raised by a low step in the cell itself: carpet, snow layer, trapdoor lying flat...), is free of any collision
+     * shape. The cell-based path type classification cannot see partial blocks (a trapdoor used as a chair, a shelf at
+     * head height, a lintel too low for a mob standing on a carpet), and the mob would then push against them forever.
+     */
+    private boolean hasRoomToStand(final int x, final int y, final int z) {
+        return !Double.isNaN(this.standLevel(x, y, z));
+    }
+
+    /** Height the mob stands at in the node's cell, or NaN when its body does not fit there. */
+    private double standLevel(final int x, final int y, final int z) {
+        final long key = PathTypeCache.asLong(x, y, z);
+        if (this.standLevels.containsKey(key)) return this.standLevels.get(key);
+        final double result = this.computeStandLevel(x, y, z);
+        this.standLevels.put(key, result);
+        return result;
+    }
+
+    private double computeStandLevel(final int x, final int y, final int z) {
+        final double width = this.mob.getHitbox().getX();
+        final double height = this.mob.getHitbox().getY();
+        final double minX = x + 0.5 - width / 2.0 + BODY_MARGIN;
+        final double maxX = x + 0.5 + width / 2.0 - BODY_MARGIN;
+        final double minZ = z + 0.5 - width / 2.0 + BODY_MARGIN;
+        final double maxZ = z + 0.5 + width / 2.0 - BODY_MARGIN;
+        final double floor = getFloorLevel(this.currentContext.world(), x, y, z);
+
+        // collision boxes of the column over the footprint, from the node's cell up to the head (and a step more)
+        final java.util.List<BoundingBox> boxes = new java.util.ArrayList<>();
+        final int topCell = (int) Math.ceil(floor + STEP_HEIGHT + height) + 1;
+        for (int cellY = y; cellY <= topCell; cellY++) {
+            for (BoundingBox box : this.boxesOf(x, cellY, z)) {
+                if (this.overlapsColumn(box, minX, maxX, minZ, maxZ)) boxes.add(box);
+            }
+        }
+        if (boxes.isEmpty()) return floor;
+
+        // low boxes resting on the floor are stepped onto, raising the body
+        double stand = floor;
+        boolean raised = true;
+        while (raised) {
+            raised = false;
+            for (BoundingBox box : boxes) {
+                if (box.getMinY() <= stand + BODY_EPSILON && box.getMaxY() > stand + BODY_EPSILON) {
+                    if (box.getMaxY() - floor > STEP_HEIGHT + BODY_EPSILON) return Double.NaN; // too tall to step onto
+                    stand = box.getMaxY();
+                    raised = true;
+                }
+            }
+        }
+        for (BoundingBox box : boxes) {
+            if (box.getMinY() > stand + BODY_EPSILON && box.getMinY() < stand + height - BODY_EPSILON) return Double.NaN;
+        }
+        return stand;
+    }
+
+    /**
+     * Whether the mob can actually move from one node to the next: the body, swept along the way, meets no
+     * collision shape that is not a low step. A node can be fine to stand on and still be closed off from one side
+     * (an open trapdoor or a door leaf along the cell's edge, a shelf sticking out...).
+     */
+    private boolean stepClear(final Node from, final Node to) {
+        if (!geometryChecks) return true;
+        double standFrom = this.standLevel(from.x, from.y, from.z);
+        if (Double.isNaN(standFrom)) {
+            standFrom = getFloorLevel(this.currentContext.world(), from.x, from.y, from.z); // e.g. the start node, wedged somewhere
+        }
+        final double standTo = this.standLevel(to.x, to.y, to.z);
+        if (Double.isNaN(standTo)) return true; // not a node the mob can stand in: findAcceptedNode dealt with it
+        final double width = this.mob.getHitbox().getX() - 2.0 * BODY_MARGIN;
+        final double height = this.mob.getHitbox().getY();
+        // going up, the body rises as soon as its front meets the step; going down, it keeps its height until it has
+        // fully left the ledge (a wide body is still above the edge, so it is not falling yet)
+        final boolean rising = standTo > standFrom;
+        for (double t : new double[] { 0.25, 0.5, 0.75, 1.0 }) {
+            final double cx = from.x + 0.5 + (to.x - from.x) * t;
+            final double cz = from.z + 0.5 + (to.z - from.z) * t;
+            final double feet = rising || t >= 1.0 ? standTo : standFrom;
+            final double minX = cx - width / 2.0;
+            final double maxX = cx + width / 2.0;
+            final double minZ = cz - width / 2.0;
+            final double maxZ = cz + width / 2.0;
+            for (int bx = (int) Math.floor(minX); bx <= (int) Math.floor(maxX); bx++) {
+                for (int bz = (int) Math.floor(minZ); bz <= (int) Math.floor(maxZ); bz++) {
+                    for (int by = (int) Math.floor(feet); by <= (int) Math.floor(feet + height); by++) {
+                        for (BoundingBox box : this.boxesOf(bx, by, bz)) {
+                            if (!this.overlapsColumn(box, minX, maxX, minZ, maxZ)) continue;
+                            if (box.getMaxY() <= feet + BODY_EPSILON || box.getMinY() >= feet + height - BODY_EPSILON) continue;
+                            if (box.getMinY() <= feet + BODY_EPSILON && box.getMaxY() - feet <= STEP_HEIGHT + BODY_EPSILON) continue;
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    protected @Nullable Node findAcceptedNodeUnchecked(
             final int x, final int y, final int z,
             final int jumpSize, final double nodeHeight,
             final int dirDx, final int dirDy, final int dirDz,
@@ -511,10 +681,10 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
                 for (int bz = z0; bz < z1; bz++) {
                     Block block = world.getBlockAt(bx, by, bz);
                     if (block.getType().isAir()) continue;
-                    BoundingBox blockBB = block.getBoundingBox();
-                    if (!blockBB.overlaps(bb)) continue;
-                    
-                    if (blockBB.getVolume() > 0) return true;
+                    for (BoundingBox local : block.getCollisionShape().getBoundingBoxes()) {
+                        BoundingBox blockBB = local.clone().shift(bx, by, bz);
+                        if (blockBB.overlaps(bb) && blockBB.getVolume() > 0) return true;
+                    }
                 }
             }
         }
@@ -835,6 +1005,8 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
     public static boolean isLandPathfindable(final Block block) {
         Material mat = block.getType();
         if (mat.isAir() || !mat.isSolid()) return true;
+        // solid on paper but nothing to collide with (pressure plate, button...): a mob walks over it
+        if (block.getCollisionShape().getBoundingBoxes().isEmpty()) return true;
         // Open doors and gates are passable
         BlockData data = block.getBlockData();
         if (data instanceof Openable openable && openable.isOpen()) return true;
@@ -864,29 +1036,10 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
     }
 
     /**
-     * Returns true if the given door material is a wooden (player-openable) door.
-     * Iron doors and other non-wood doors require redstone.
+     * Returns true if the given door material can be opened by hand (every door but the iron one,
+     * which needs redstone).
      */
     private static boolean isWoodenDoor(final Material mat) {
-        return mat == Material.OAK_DOOR
-                || mat == Material.SPRUCE_DOOR
-                || mat == Material.BIRCH_DOOR
-                || mat == Material.JUNGLE_DOOR
-                || mat == Material.ACACIA_DOOR
-                || mat == Material.DARK_OAK_DOOR
-                || mat == Material.MANGROVE_DOOR
-                || mat == Material.CHERRY_DOOR
-                || mat == Material.BAMBOO_DOOR
-                || mat == Material.CRIMSON_DOOR
-                || mat == Material.WARPED_DOOR
-                || mat == Material.COPPER_DOOR
-                || mat == Material.EXPOSED_COPPER_DOOR
-                || mat == Material.WEATHERED_COPPER_DOOR
-                || mat == Material.OXIDIZED_COPPER_DOOR
-                || mat == Material.WAXED_COPPER_DOOR
-                || mat == Material.WAXED_EXPOSED_COPPER_DOOR
-                || mat == Material.WAXED_WEATHERED_COPPER_DOOR
-                || mat == Material.WAXED_OXIDIZED_COPPER_DOOR;
-        // Iron door is the only non-openable-by-hand door in vanilla — all others above are wood/copper
+        return mat != Material.IRON_DOOR;
     }
 }

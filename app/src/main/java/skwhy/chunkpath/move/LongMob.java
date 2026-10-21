@@ -47,6 +47,8 @@ public class LongMob {
 
     private float speed;
     private float maxUpStep = 0.6F;
+    private boolean canOpenDoors = true;
+    private final DoorOpener doors = new DoorOpener(this);
 
     // ── Position ─────────────────────────────────────────────────────────────
 
@@ -765,6 +767,19 @@ public class LongMob {
         return maxUpStep;
     }
 
+    /** Whether hand-openable doors (not iron doors, gates or trapdoors) may be opened and walked through. */
+    public boolean canOpenDoors() {
+        return canOpenDoors;
+    }
+
+    public void setCanOpenDoors(boolean canOpenDoors) {
+        this.canOpenDoors = canOpenDoors;
+    }
+
+    public DoorOpener getDoors() {
+        return doors;
+    }
+
     public void setMaxUpStep(float maxUpStep) {
         this.maxUpStep = maxUpStep;
     }
@@ -1003,6 +1018,7 @@ public class LongMob {
 
     public void tick() {
         serverAiStep();
+        this.doors.tick(this.pathnavigation.getPath());
 
         // MoveControl writes the wanted horizontal velocity straight into deltaMovement (world
         // space): there is no extra local-space input to rotate by yaw and add on top of it.

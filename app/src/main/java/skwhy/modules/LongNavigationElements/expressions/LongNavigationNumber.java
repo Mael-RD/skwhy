@@ -19,9 +19,13 @@ import skwhy.chunkpath.longnav.LongNavigation;
 
 @Name("[Long Navigation] Numeric Properties")
 @Description("Gets or sets numeric properties of a long navigation object: movement speed (blocks walked per tick), " +
-    "pause duration in ticks, or the numeric entity ID (read-only). Pause ticks is -1 on a new navigation, which " +
-    "means paused indefinitely: set it to 0 to make the navigation walk, or to a positive number to wait that " +
-    "many ticks first.")
+    "pause duration in ticks, the numeric entity ID (read-only), or the number of forced teleports (read-only). " +
+    "Pause ticks is -1 on a new navigation, which means paused indefinitely: set it to 0 to make the navigation walk, " +
+    "or to a positive number to wait that many ticks first. While paused the entity is left alone (vanilla AI and " +
+    "gravity); when the navigation restarts, the position of the entity is checked again: if it left its path a little, " +
+    "it walks back onto it, and if it is far away the route is recomputed. The forced teleports counter is the number " +
+    "of times a walk had to be cut short by moving the entity (stuck without progress, or chunks that never loaded): " +
+    "it stays 0 on a healthy walk.")
 @Examples({
     "set {_longnav} to a new long navigation with entity target entity speed 0.2",
     "",
@@ -30,7 +34,9 @@ import skwhy.chunkpath.longnav.LongNavigation;
     "",
     "set pause ticks of long navigation {_longnav} to 0",
     "",
-    "set {_id} to entity id of long navigation {_longnav}"
+    "set {_id} to entity id of long navigation {_longnav}",
+    "",
+    "set {_teleports} to forced teleports of long navigation {_longnav}"
 })
 @Since("1.5.0")
 public class LongNavigationNumber extends SimpleExpression<Number> {
@@ -56,6 +62,7 @@ public class LongNavigationNumber extends SimpleExpression<Number> {
             case 0 -> navigation.getSpeed();
             case 1 -> navigation.getPauseTicks();
             case 2 -> navigation.getEntityId();
+            case 3 -> navigation.getForcedTeleports();
             default -> null;
         };
         return value != null ? new Number[]{ value } : null;
@@ -94,6 +101,7 @@ public class LongNavigationNumber extends SimpleExpression<Number> {
             case 0 -> "speed of " + navigationExpr.toString(event, debug);
             case 1 -> "pause ticks of " + navigationExpr.toString(event, debug);
             case 2 -> "entity id of " + navigationExpr.toString(event, debug);
+            case 3 -> "forced teleports of " + navigationExpr.toString(event, debug);
             default -> "long navigation number";
         };
     }
@@ -105,6 +113,7 @@ public class LongNavigationNumber extends SimpleExpression<Number> {
                 .addPattern("speed of long navigation %longnavigation%")
                 .addPattern("pause ticks of long navigation %longnavigation%")
                 .addPattern("entity id of long navigation %longnavigation%")
+                .addPattern("forced teleports of long navigation %longnavigation%")
                 .build()
         );
     }

@@ -21,6 +21,8 @@ import skwhy.chunkpath.gate.Gate;
 import skwhy.chunkpath.move.LongMob;
 import skwhy.chunkpath.move.navigation.LongGroundPathNavigation;
 import skwhy.chunkpath.move.navigation.PathNavigation;
+import skwhy.chunkpath.move.pathcalculator.Node;
+import skwhy.chunkpath.move.pathcalculator.Path;
 import skwhy.chunkpath.pathfinding.GatePathfinder;
 import skwhy.modules.LongNavigationElements.ChunkPathManager;
 
@@ -93,6 +95,12 @@ public class LongNavigation {
     private static final long ABSOLUTE_SYNC_INTERVAL_TICKS = 100L;
     private static final double REACHED_DISTANCE = 1.0; // blocks, horizontally, around a waypoint's block centre
 
+    // reprise après une pause : l'entité a pu être déplacée pendant ce temps
+    private static final double RESUME_SNAP_DISTANCE = 1.5;    // blocks: still on the path, just continue
+    private static final double RESUME_REJOIN_MAX = 16.0;      // blocks: short A* to the path, beyond that the route is recomputed
+    private static final double RESUME_FAR_FROM_WAYPOINT = MAX_LEG_PATH_LENGTH * 0.75; // blocks, when no leg path is being walked
+    private static final double REJOIN_ARRIVED_DISTANCE = 3.0; // blocks: rejoin path done close enough to resume the old one
+
     // =========================================================================
     // Registre statique
     // =========================================================================
@@ -164,10 +172,10 @@ public class LongNavigation {
 
     private void setStatus(Status newStatus, String why) {
         if (mob.isRealEntity()) {
-            // vanilla behaviour only while the navigation is not actively driving the entity
+            // vanilla behaviour only while the navigation is not actively driving the entity (a paused one is not)
             if (newStatus == Status.IDLE || newStatus == Status.ARRIVED || newStatus == Status.FAILED_NO_PATH) {
                 releaseEntity();
-            } else {
+            } else if (!paused) {
                 takeOverEntity(mob.getEntity());
             }
         }
@@ -176,6 +184,37 @@ public class LongNavigation {
                     + " waypoint#" + waypointIndex + "=" + fmt(currentWaypointLocation()));
         }
         status = newStatus;
+    }
+
+    /** Blocks at the mob's feet and around the node it is heading to (debug of a stalled walk). */
+    private String describeSurroundings() {
+        Location here = mob.getLocation();
+        StringBuilder sb = new StringBuilder("mob ").append(fmt(here)).append(" column[");
+        appendColumn(sb, here.getBlockX(), here.getBlockY(), here.getBlockZ());
+        Path path = mob.getNavigation().getPath();
+        if (path != null && !path.isDone()) {
+            Node next = path.getNextNode();
+            sb.append("] next-node ").append(next.x).append(',').append(next.y).append(',').append(next.z).append(':')
+                    .append(next.type).append(" column[");
+            appendColumn(sb, next.x, next.y, next.z);
+        }
+        return sb.append(']').toString();
+    }
+
+    private void appendColumn(StringBuilder sb, int x, int y, int z) {
+        for (int dy = -1; dy <= 2; dy++) {
+            sb.append(dy == -1 ? "" : " ").append(world.getBlockAt(x, y + dy, z).getType());
+        }
+    }
+
+    private static String describePath(Path path) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < path.getNodeCount() && i < 40; i++) {
+            Node n = path.getNode(i);
+            sb.append(i == path.getNextNodeIndex() ? " >" : " ").append(n.x).append(',').append(n.y).append(',').append(n.z)
+                    .append(':').append(n.type);
+        }
+        return sb.toString();
     }
 
     private static String fmt(Location l) {
@@ -190,6 +229,7 @@ public class LongNavigation {
     private void register()        { REGISTRY.add(this); }
     public  void unregister() {
         REGISTRY.remove(this);
+        mob.getDoors().closeAll();
         releaseEntity();
     }
     public  boolean isRegistered() { return REGISTRY.contains(this); }
@@ -207,6 +247,7 @@ public class LongNavigation {
 
     private Status status = Status.IDLE;
     private List<Gate> route;
+    private RouteWaypoints waypoints; // concrete cells to walk through, derived from the gates of the route
     private int waypointIndex;
     private int progressWaypoint = -1;
     private double bestDistance;
@@ -217,6 +258,12 @@ public class LongNavigation {
     private Boolean previousGravity;
     private Boolean previousAware;
     private int legWaypoint = -1; // waypoint for which the mob's current leg path was computed
+    private boolean skippedWaypoint; // the current stretch of the route already skipped a waypoint it could not reach
+    private boolean legPartial;   // that leg path only gets as close as it can to the waypoint
+    private boolean paused = true; // true while the navigation does not tick (pause), until the next active tick
+    private int forcedTeleports;
+    private Path rejoinResume; // leg path to walk again once the short detour back onto it is done
+    private int rejoinIndex;
 
     private long waitStartTick;
     private long lastWaitCheckTick;
@@ -252,9 +299,16 @@ public class LongNavigation {
     // =========================================================================
 
     public void tick() {
-        if (pauseTicks == PAUSED_INDEFINITELY) return;
-        if (pauseTicks > 0) { pauseTicks--; return; }
-        if (status == Status.IDLE || status == Status.ARRIVED || status == Status.FAILED_NO_PATH) return;
+        if (pauseTicks == PAUSED_INDEFINITELY) { paused = true; return; }
+        if (pauseTicks > 0) { pauseTicks--; paused = true; return; }
+        if (status == Status.IDLE || status == Status.ARRIVED || status == Status.FAILED_NO_PATH) {
+            mob.getDoors().tickIdle();
+            return;
+        }
+        if (paused) {
+            paused = false;
+            onResume();
+        }
 
         if (status == Status.WAITING_FOR_CHUNK) {
             tickWaiting();
@@ -316,14 +370,32 @@ public class LongNavigation {
             return;
         }
 
+        PathNavigation nav = mob.getNavigation();
+        if (rejoinResume != null) {
+            if (!nav.isDone()) {
+                // walking the short detour back onto the path: not a lack of progress
+                progressWaypoint = -1;
+                setStatus(Status.FOLLOWING, "rejoining the path");
+                return;
+            }
+            finishRejoin(nav);
+        }
+
         if (noProgressFor(waypoint, now)) {
             return;
         }
 
-        PathNavigation nav = mob.getNavigation();
         if (legWaypoint == waypointIndex && !nav.isDone()) {
             setStatus(Status.FOLLOWING, "leg in progress");
             return; // the leg path is being walked by the mob (ticked right after)
+        }
+        if (legWaypoint == waypointIndex && legPartial && isCloseTo(waypoint)) {
+            // the waypoint (a gate block recorded earlier) cannot be stood on any more — a wall or a door built
+            // since — and the closest reachable spot has been reached: carry on from here
+            debug("leg ended " + String.format(java.util.Locale.ROOT, "%.1f", mob.getLocation().distance(waypoint))
+                    + " blocks from waypoint#" + waypointIndex + " (not reachable): next waypoint");
+            advanceWaypoint();
+            return;
         }
 
         if (legSearchBudget <= 0) {
@@ -345,6 +417,8 @@ public class LongNavigation {
         }
 
         legWaypoint = waypointIndex;
+        legPartial = !nav.getPath().canReach();
+        if (verbose) debug("leg to waypoint#" + waypointIndex + " " + (legPartial ? "PARTIAL " : "") + describePath(nav.getPath()));
         setStatus(Status.FOLLOWING, "leg path found (" + nav.getPath().getNodeCount() + " nodes)");
     }
 
@@ -376,21 +450,42 @@ public class LongNavigation {
         stuckLevel++;
         if (stuckLevel == 1) {
             debug("no progress toward waypoint#" + waypointIndex + " for " + NO_PROGRESS_TICKS + " ticks: recomputing the leg");
+            if (verbose) debug("stuck surroundings: " + describeSurroundings());
             mob.getNavigation().stop();
             legWaypoint = -1;
             return false;
         }
-        if (route != null && waypointIndex >= route.size() && mob.getLocation().distance(waypoint) <= ARRIVAL_TOLERANCE) {
-            debug("no progress but within " + ARRIVAL_TOLERANCE + " blocks of the destination: arrived");
+        if (isCloseTo(waypoint)) {
+            debug("no progress but within " + ARRIVAL_TOLERANCE + " blocks of waypoint#" + waypointIndex + ": counted as reached");
             advanceWaypoint();
             return true;
         }
+        if (waypoints != null && waypointIndex < waypoints.size() && !skippedWaypoint) {
+            // maybe that gate block is the problem (blocked since it was recorded): try to walk to the next waypoint instead
+            debug("still no progress toward waypoint#" + waypointIndex + ": skipping it");
+            skippedWaypoint = true;
+            mob.getNavigation().stop();
+            waypointIndex++;
+            legWaypoint = -1;
+            rejoinResume = null;
+            skippedWaypoint = false;
+            return true;
+        }
         debug("still no progress toward waypoint#" + waypointIndex + ": moving the mob to the waypoint");
-        teleportMob(waypoint.clone().add(0.5, 0.0, 0.5));
+        teleportMob(waypoint.clone().add(0.5, 0.0, 0.5), "no progress toward waypoint#" + waypointIndex);
         mob.getNavigation().stop();
         stuckLevel = 0;
         advanceWaypoint();
         return true;
+    }
+
+    /** Within {@link #ARRIVAL_TOLERANCE} blocks of the waypoint, whatever stands between. */
+    private boolean isCloseTo(Location waypoint) {
+        Location current = mob.getLocation();
+        double dx = current.getX() - (waypoint.getBlockX() + 0.5);
+        double dz = current.getZ() - (waypoint.getBlockZ() + 0.5);
+        double dy = current.getY() - waypoint.getBlockY();
+        return dx * dx + dz * dz <= ARRIVAL_TOLERANCE * ARRIVAL_TOLERANCE && dy > -2.0 && dy < 2.5;
     }
 
     /** Close enough to a waypoint (gate block or destination) to consider it reached. */
@@ -424,6 +519,7 @@ public class LongNavigation {
                 && mob.getNavigation().moveTo(immediateTarget, MAX_LEG_PATH_LENGTH)) {
             // The direct continuation loaded during the wait: resume as if nothing happened.
             legWaypoint = waypointIndex;
+            legPartial = !mob.getNavigation().getPath().canReach();
             setStatus(Status.FOLLOWING, "chunks loaded, leg path found");
             return;
         }
@@ -431,11 +527,11 @@ public class LongNavigation {
         long elapsed = now - waitStartTick;
         if (elapsed <= expectedWaitTicks) return; // still within the estimated travel time, keep waiting
 
-        if (route != null) {
-            for (int i = waypointIndex; i < route.size(); i++) {
-                Gate gate = route.get(i);
-                if (world.isChunkLoaded(gate.chunkX, gate.chunkZ)) {
-                    teleportMob(gateLocation(gate));
+        if (waypoints != null) {
+            for (int i = waypointIndex; i < waypoints.size(); i++) {
+                int[] cell = waypoints.cell(i);
+                if (world.isChunkLoaded(cell[0] >> 4, cell[2] >> 4)) {
+                    teleportMob(waypointLocation(i), "waited " + elapsed + " ticks for the chunks (expected " + expectedWaitTicks + ")");
                     waypointIndex = i;
                     legWaypoint = -1;
                     setStatus(Status.FOLLOWING, "state machine");
@@ -445,7 +541,7 @@ public class LongNavigation {
         }
 
         // Nothing loaded anywhere ahead: give up on a realistic walk and arrive directly.
-        teleportMob(endLocation);
+        teleportMob(endLocation, "no loaded chunk ahead after " + elapsed + " ticks");
         setStatus(Status.ARRIVED, "state machine");
     }
 
@@ -453,8 +549,107 @@ public class LongNavigation {
         return world.isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4);
     }
 
-    private void teleportMob(Location location) {
+    /** Last-resort catch-up; counted in {@link #getForcedTeleports()} because a healthy walk never needs one. */
+    private void teleportMob(Location location, String reason) {
+        forcedTeleports++;
+        SkWhy.getInstance().getLogger().warning("[ChunkPath] nav#" + mob.getId() + " téléportation forcée vers " + fmt(location)
+                + " depuis " + fmt(mob.getLocation()) + " : " + reason);
         mob.setLocation(location);
+    }
+
+    // =========================================================================
+    // Reprise après pause
+    // =========================================================================
+
+    /**
+     * The navigation was paused (or has just been given its first route): the entity may have been
+     * moved meanwhile (vanilla AI, pushed, teleported by a script...). Where it stands is checked
+     * against the path it was following: still on it, it just carries on; a short way off, a small
+     * A* brings it back onto the path ({@link #rejoinLeg}); too far, the route is recomputed.
+     */
+    private void onResume() {
+        long now = world.getGameTime();
+        mob.setDeltaMovement(0.0, 0.0, 0.0);
+        if (mob.isRealEntity()) takeOverEntity(mob.getEntity());
+        progressWaypoint = -1;
+        lastStuckRetryTick = now - STUCK_RETRY_INTERVAL_TICKS;
+        if (status == Status.WAITING_FOR_CHUNK) { // the pause is not time spent waiting for the chunks
+            waitStartTick = now;
+            lastWaitCheckTick = now;
+        }
+        PathNavigation nav = mob.getNavigation();
+        nav.onResume();
+        rejoinResume = null;
+
+        Location waypoint = currentWaypointLocation();
+        if (waypoints == null || waypoint == null) return;
+        Location here = mob.getLocation();
+        Path leg = nav.getPath();
+        if (legWaypoint == waypointIndex && leg != null && !leg.isDone()) {
+            rejoinLeg(leg, here);
+        } else {
+            legWaypoint = -1; // the next tick computes a fresh leg from where the mob really is
+            if (here.getWorld() != world || here.distance(waypoint) > RESUME_FAR_FROM_WAYPOINT) {
+                debug("resumed " + fmt(here) + " is far from waypoint#" + waypointIndex + ": route recomputed");
+                recomputeRoute();
+            }
+        }
+    }
+
+    private void rejoinLeg(Path leg, Location here) {
+        PathNavigation nav = mob.getNavigation();
+        int best = -1;
+        double bestSquared = Double.MAX_VALUE;
+        for (int i = Math.max(0, leg.getNextNodeIndex() - 1); i < leg.getNodeCount(); i++) {
+            Node node = leg.getNode(i);
+            double dx = here.getX() - (node.x + 0.5);
+            double dy = here.getY() - node.y;
+            double dz = here.getZ() - (node.z + 0.5);
+            double squared = dx * dx + dy * dy + dz * dz;
+            if (squared < bestSquared) {
+                bestSquared = squared;
+                best = i;
+            }
+        }
+        double distance = Math.sqrt(bestSquared);
+        if (best < 0 || distance > RESUME_REJOIN_MAX) {
+            debug("resumed " + fmt(here) + " is " + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                    + " blocks from the leg path: route recomputed");
+            nav.stop();
+            recomputeRoute();
+            return;
+        }
+        if (distance <= RESUME_SNAP_DISTANCE) {
+            leg.setNextNodeIndex(distance > 0.7 ? best : best + 1);
+            return;
+        }
+        Node target = leg.getNode(best);
+        Location targetLocation = new Location(world, target.x, target.y, target.z);
+        if (nav.moveTo(targetLocation, (float) (distance * 2.0 + 8.0))) {
+            debug("resumed " + String.format(java.util.Locale.ROOT, "%.1f", distance) + " blocks off the leg path: rejoining at node#" + best);
+            rejoinResume = leg;
+            rejoinIndex = best;
+        } else {
+            debug("no short path back onto the leg path: leg recomputed");
+            nav.stop();
+            legWaypoint = -1;
+        }
+    }
+
+    private void finishRejoin(PathNavigation nav) {
+        Path resumed = rejoinResume;
+        rejoinResume = null;
+        Node node = resumed.getNode(rejoinIndex);
+        Location here = mob.getLocation();
+        double dx = here.getX() - (node.x + 0.5);
+        double dz = here.getZ() - (node.z + 0.5);
+        if (Math.sqrt(dx * dx + dz * dz) <= REJOIN_ARRIVED_DISTANCE && Math.abs(here.getY() - node.y) < 2.0) {
+            nav.resumePath(resumed, rejoinIndex + 1);
+            debug("back on the leg path at node#" + rejoinIndex);
+        } else {
+            debug("rejoin ended away from the leg path: leg recomputed");
+            legWaypoint = -1;
+        }
     }
 
     /**
@@ -471,8 +666,8 @@ public class LongNavigation {
         if (to == null) return 0L;
 
         PathCostRules costRules = ChunkPathManager.serviceFor(world).analyzer().costRules();
-        double weightedDistance = null != route && waypointIndex > 0 && waypointIndex < route.size()
-                ? sameChunkDistanceOrFallback(route.get(waypointIndex - 1), route.get(waypointIndex), costRules, from, to)
+        double weightedDistance = null != waypoints && waypointIndex > 0 && waypointIndex < waypoints.size()
+                ? sameChunkDistanceOrFallback(waypoints.owner(waypointIndex - 1), waypoints.owner(waypointIndex), costRules, from, to)
                 : straightLineWeightedDistance(from, to, costRules);
 
         float speed = mob.getSpeed();
@@ -483,7 +678,7 @@ public class LongNavigation {
     private double sameChunkDistanceOrFallback(Gate previous, Gate current, PathCostRules costRules,
                                                 Location from, Location to) {
         if (previous.chunkX == current.chunkX && previous.chunkZ == current.chunkZ) {
-            Integer known = previous.internalDistances.get(current.id);
+            Integer known = previous.id == current.id ? Integer.valueOf(0) : previous.internalDistances.get(current.id);
             if (known != null) return known;
         }
         return straightLineWeightedDistance(from, to, costRules);
@@ -501,12 +696,14 @@ public class LongNavigation {
         if (startLocation == null || endLocation == null) {
             setStatus(Status.IDLE, "state machine");
             route = null;
+            waypoints = null;
             return;
         }
         if (startLocation.getWorld() == null || !startLocation.getWorld().equals(endLocation.getWorld())) {
             Skript.warning("[ChunkPath] La position de départ et d'arrivée d'une long navigation doivent être dans le même monde.");
             setStatus(Status.FAILED_NO_PATH, "state machine");
             route = null;
+            waypoints = null;
             return;
         }
 
@@ -523,39 +720,52 @@ public class LongNavigation {
                 endLocation.getBlockX(), endLocation.getBlockY(), endLocation.getBlockZ());
 
         if (route == null) {
+            waypoints = null;
             setStatus(Status.FAILED_NO_PATH, "state machine");
             return;
+        }
+        waypoints = RouteWaypoints.build(route, from.getBlockX(), from.getBlockY(), from.getBlockZ());
+        if (verbose) {
+            StringBuilder sb = new StringBuilder("route of ").append(route.size()).append(" gates, waypoints:");
+            for (int i = 0; i < waypoints.size(); i++) {
+                int[] c = waypoints.cell(i);
+                sb.append(' ').append(c[0]).append(',').append(c[1]).append(',').append(c[2]);
+            }
+            debug(sb.toString());
         }
 
         waypointIndex = 0;
         legWaypoint = -1;
+        rejoinResume = null;
+        skippedWaypoint = false;
         setStatus(Status.FOLLOWING, "state machine");
     }
 
     private void advanceWaypoint() {
-        if (route == null || waypointIndex >= route.size()) {
+        if (waypoints == null || waypointIndex >= waypoints.size()) {
             setStatus(Status.ARRIVED, "final destination reached");
             mob.getNavigation().stop();
         } else {
             waypointIndex++;
             legWaypoint = -1;
+            rejoinResume = null;
         }
     }
 
     private Location currentWaypointLocation() {
-        if (route == null) return null;
-        if (waypointIndex < route.size()) {
-            return gateLocation(route.get(waypointIndex));
+        if (waypoints == null) return null;
+        if (waypointIndex < waypoints.size()) {
+            return waypointLocation(waypointIndex);
         }
-        if (waypointIndex == route.size()) {
+        if (waypointIndex == waypoints.size()) {
             return endLocation;
         }
         return null;
     }
 
-    private Location gateLocation(Gate gate) {
-        int[] r = gate.representativeWorld;
-        return new Location(world, r[0], r[1], r[2]);
+    private Location waypointLocation(int index) {
+        int[] cell = waypoints.cell(index);
+        return new Location(world, cell[0], cell[1], cell[2]);
     }
 
     // =========================================================================
@@ -595,7 +805,28 @@ public class LongNavigation {
     public void removePlayer(Player p)     { players.remove(p); }
 
     public int  getPauseTicks()      { return pauseTicks; }
-    public void setPauseTicks(int t) { this.pauseTicks = t; }
+
+    /** A paused navigation leaves its entity alone (vanilla AI and gravity back); {@link #onResume} takes it over again. */
+    public void setPauseTicks(int t) {
+        this.pauseTicks = t;
+        if (t != 0) {
+            releaseEntity();
+        }
+    }
+
+    public boolean canOpenDoors() { return mob.canOpenDoors(); }
+
+    /** Whether wooden doors on the way may be opened; off, the entity walks around them (the leg is recomputed). */
+    public void setCanOpenDoors(boolean canOpen) {
+        if (canOpen == mob.canOpenDoors()) return;
+        mob.setCanOpenDoors(canOpen);
+        rejoinResume = null;
+        legWaypoint = -1;
+        mob.getNavigation().stop();
+    }
+
+    /** Number of times the walk had to be cut short by moving the entity (should stay 0 on a healthy walk). */
+    public int getForcedTeleports() { return forcedTeleports; }
 
     public Entity  getEntity()    { return mob.getEntity(); }
     public boolean isRealEntity() { return mob.isRealEntity(); }
@@ -657,13 +888,16 @@ public class LongNavigation {
         if (route == null) {
             sb.append("║ Route: aucune (jamais calculée ou échec)\n");
         } else {
-            sb.append("║ Portes dans la route: ").append(route.size()).append("\n");
-            sb.append("║ Index de la porte visée: ").append(waypointIndex)
-                    .append(waypointIndex >= route.size() ? " (destination finale)\n" : "\n");
-            if (waypointIndex < route.size()) {
-                Gate g = route.get(waypointIndex);
-                sb.append("║ Porte visée: chunk(").append(g.chunkX).append(",").append(g.chunkZ)
-                        .append(") id=").append(g.id).append(" bord=").append(g.edge).append("\n");
+            sb.append("║ Portes dans la route: ").append(route.size()).append(" (").append(waypoints.size())
+                    .append(" points de passage)\n");
+            sb.append("║ Index du point visé: ").append(waypointIndex)
+                    .append(waypointIndex >= waypoints.size() ? " (destination finale)\n" : "\n");
+            if (waypointIndex < waypoints.size()) {
+                Gate g = waypoints.owner(waypointIndex);
+                int[] c = waypoints.cell(waypointIndex);
+                sb.append("║ Point visé: ").append(c[0]).append(",").append(c[1]).append(",").append(c[2])
+                        .append(" (porte chunk(").append(g.chunkX).append(",").append(g.chunkZ)
+                        .append(") id=").append(g.id).append(" bord=").append(g.edge).append(")\n");
             }
         }
 

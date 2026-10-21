@@ -26,6 +26,10 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    // Les classes du plugin utilisent Bukkit/PacketEvents ; MockBukkit fournit un serveur simule (Material, Tag...)
+    testImplementation("io.papermc.paper:paper-api:26.2.build.129-stable")
+    testImplementation("com.github.retrooper:packetevents-spigot:2.11.2")
+    testImplementation("org.mockbukkit.mockbukkit:mockbukkit-v26.2:4.117.0")
 }
 
 tasks.register<Copy>("copyJarToPlugins") {

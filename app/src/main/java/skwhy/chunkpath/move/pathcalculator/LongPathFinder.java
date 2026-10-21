@@ -99,6 +99,10 @@ public class LongPathFinder {
 
             if (!(current.distanceTo(from) >= maxPathLength)) {
                 int neighborCount = this.nodeEvaluator.getNeighbors(this.neighbors, current);
+                if (count == 1 && skwhy.chunkpath.longnav.LongNavigation.verbose) {
+                    skwhy.SkWhy.getInstance().getLogger().info("[ChunkPath/debug] A* start " + current.x + "," + current.y + "," + current.z
+                            + " type=" + current.type + " malus=" + current.costMalus + " neighbors=" + neighborCount);
+                }
 
                 for (int i = 0; i < neighborCount; i++) {
                     Node neighbor = this.neighbors[i];

@@ -358,7 +358,30 @@ public abstract class PathNavigation {
    public abstract boolean canNavigateGround();
 
    public void setCanOpenDoors(final boolean canOpenDoors) {
-      this.getNodeEvaluator().setCanOpenDoors(canOpenDoors);
+      this.mob.setCanOpenDoors(canOpenDoors);
+   }
+
+   /**
+    * Walks {@code resumed} again from node {@code nextNodeIndex} (after a detour to rejoin it), as if the
+    * mob had never left it.
+    */
+   public void resumePath(final Path resumed, final int nextNodeIndex) {
+      resumed.setNextNodeIndex(nextNodeIndex);
+      this.path = resumed;
+      this.targetPos = new Location(this.mob.getWorld(), resumed.getTargetX(), resumed.getTargetY(), resumed.getTargetZ());
+      this.onResume();
+   }
+
+   /**
+    * The owner was paused for a while: the stuck / timeout bookkeeping compares against game time and
+    * positions from before the pause, so it is restarted from the mob's current state.
+    */
+   public void onResume() {
+      this.resetStuckTimeout();
+      this.lastTimeoutCheck = this.mob.getWorld().getGameTime();
+      this.lastStuckCheck = this.tick;
+      this.lastStuckCheckPos = this.getTempMobPos();
+      this.hasDelayedRecomputation = false;
    }
 
    // ════════════════════════════════════════════════════════════════════════

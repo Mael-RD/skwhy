@@ -32,6 +32,12 @@ Les tests de SkWhy sont dans `C:\Users\orimi\Desktop\proxti\serveur vide\plugins
    Un bug connu reste dans les tests (commentaire `# BUG connu`) tant qu'il n'est pas corrige.
 5. Rapport des erreurs : `serveur vide\...\skwhy-tests\last-run.md`.
 
+## Tests JUnit (sans serveur)
+`./gradlew :app:test` (aucun serveur) : logique pure du plugin dans `app/src/test/java/skwhy` (`data` Vec3/Quat4/GlobalTransformation, `chunkpath` NBT, portes,
+`ChunkGateStore`, `RegionChunkLoader`, maillage `ChunkNavMesh`, A*/`BinaryHeap`/`Node`, `BlockClassifier`, `PathCostRules`, `quest`, `util`).
+`TestChunks` (`chunkpath/testsupport`) fabrique des chunks NBT en memoire et demarre MockBukkit (Material/Tag). Skript, lui, ne se charge pas dans MockBukkit
+(`Skript` est `final`) : les syntaxes restent testees par les `.sk` du serveur vide. Nouvelle logique pure => test JUnit en plus.
+
 ## Doc des addons (SkriptHubDocsTool)
 - Plugin installe : version 1.17 **patchee** (sources : `C:\Users\orimi\Desktop\proxti\SkriptHubDocsTool-src`). Le patch rattache
   aux addons les events enregistres via l'API moderne (`SimpleEvent`) en comparant le nom de l'addon ; sans lui les events
@@ -64,6 +70,28 @@ Les tests de SkWhy sont dans `C:\Users\orimi\Desktop\proxti\serveur vide\plugins
 - Ne jamais lire un bloc d'un chunk non charge pendant la recherche A* (`NodeEvaluator.isColumnLoaded`) : Paper le charge/genere en synchrone.
 - Dans une fonction Skript un `wait` ne retarde pas l'appelant : les tests de marche sont dans le trigger (`walk.sk`).
 - Une entite reelle pilotee perd son IA/gravite vanilla (rendues a l'arrivee, a l'echec ou au `destroy`). `world.getGameTime()` (pas `getFullTime()`) pour les delais.
+- **Portes** : `can open doors of long navigation` (booleen, vrai par defaut, `LongNavigationDoors`). `DoorOpener` (dans `LongMob`) ouvre une porte
+  (toutes sauf `iron_door`, les deux moities) quand elle est dans les 2 prochains noeuds du chemin a < 2 blocs, et la referme apres le passage / au `destroy`.
+  Portillons et trappes ne sont jamais ouverts (type de chemin bloque => detour). L'enregistreur (`BlockClassifier`) garde les portes traversables.
+- **Teleportations forcees** (`teleportMob`, log WARN `téléportation forcée`, compteur `forced teleports of long navigation`) = dernier recours : un trajet sain n'en
+  a jamais besoin, les tests (`terrain.sk`, `doors.sk`, `resume.sk`) verifient `0`. Causes trouvees : portes fermees, plaques de pression (`Material.isSolid()` vrai
+  alors que sans collision), `getFloorLevel` plafonne a 1.0 (barrieres/murets 1.5 vus comme marche) et `getBoundingBox()` au lieu de la forme de collision,
+  `Collide.collectColliders` sans marge d'1 bloc (barriere enracinee dans la cellule du dessous ignoree => mob bloque, pas de marche possible). Toujours
+  utiliser `getCollisionShape()` (jamais `getBoundingBox()`) pour le sol/les collisions.
+- **Pause** : `set pause ticks ... to -1`/`N` rend l'entite a son IA (gravite) ; a la reprise `LongNavigation.onResume` reverifie la position : sur le chemin => continue,
+  a moins de 16 blocs => petit A* pour rejoindre le noeud le plus proche puis reprend le chemin, plus loin => `recomputeRoute`.
+- Un waypoint (bloc de porte enregistre) devenu inaccessible (mur construit depuis) est saute : fin de jambe partielle a < 3 blocs, ou `no progress` => waypoint
+  suivant, la teleportation n'arrive qu'ensuite.
+- Tests : plateformes dans le ciel (y=199) construites par `execute in minecraft:overworld run fill ...` puis `save-all flush` AVANT `register chunk path` (le terrain est lu
+  sur disque). `fill` est limite a **32768 blocs** : au-dela la commande echoue en silence (murs/obstacles restes d'un test precedent).
+- **Waypoints** : `RouteWaypoints` remplace les representants de portes (une porte = un amas de blocs de bord, parfois a des hauteurs tres differentes) par des paires de
+  cellules **adjacentes de part et d'autre de la frontiere**, les plus proches de la position courante.
+- **Liens perimes** : `ChunkGateService.reanalyze` purge chez les voisins les `neighborLinks` vers le chunk re-analyse (ids renumerotes => routes impossibles, ex. descente a y=-62).
+  Test : `v1.5.0/chunk-path/relink.sk`. Apres mise a jour du jar, re-enregistrer les chunks deja enregistres.
+- **Geometrie du corps** (`CostRuleWalkNodeEvaluator.hasRoomToStand` / `stepClear`, interrupteur `/cpdebug geometry on|off`) : un noeud doit laisser la place au volume du mob
+  (trappes-meubles, etageres, tapis + linteau) et le deplacement entre deux noeuds ne doit rencontrer aucune forme de collision (hors marche <= 0.6). Descente : le corps garde sa hauteur
+  tant qu'il n'a pas quitte la corniche. Restent des cas decoratifs impossibles (villageois 1.95 sur un tapis devant une porte de 2) => teleportation de dernier recours.
+- Build : si un autre travail en cours (ex. `skwhy/quest`) casse la compilation, construire une copie sans ce dossier ; le serveur full utilise le jar copie a la main dans `plugins/skwhy-1.5.0.jar`.
 - Debug : commande `/cpdebug` (console) `cell|path|navs|dump|shape|collide|folder|verbose [off]`. `verbose` journalise chaque transition d'etat.
 - Serveur full (`full copy`, monde `villes`) : demarrage ~5 min ; ne pas le redemarrer sans necessite. Sondes (commandes lpgo/lpst...) dans `plugins/Skript/scripts/lp-debug/-probe.sk` (desactivees : retirer le `-` + `sk reload`).
 

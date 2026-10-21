@@ -149,12 +149,14 @@ public final class Collide {
          final double maxX, final double maxY, final double maxZ) {
       List<BoundingBox> colliders = new ArrayList<>();
 
-      int minBlockX = (int) Math.floor(minX);
-      int minBlockY = (int) Math.floor(minY);
-      int minBlockZ = (int) Math.floor(minZ);
-      int maxBlockX = (int) Math.floor(maxX);
-      int maxBlockY = (int) Math.floor(maxY);
-      int maxBlockZ = (int) Math.floor(maxZ);
+      // one block of margin on every side, like vanilla: a fence or a wall (1.5 high) is rooted in the
+      // cell below the box yet reaches into it, and its arms start in the cells next to it
+      int minBlockX = (int) Math.floor(minX - 1.0E-7) - 1;
+      int minBlockY = (int) Math.floor(minY - 1.0E-7) - 1;
+      int minBlockZ = (int) Math.floor(minZ - 1.0E-7) - 1;
+      int maxBlockX = (int) Math.floor(maxX + 1.0E-7) + 1;
+      int maxBlockY = (int) Math.floor(maxY + 1.0E-7) + 1;
+      int maxBlockZ = (int) Math.floor(maxZ + 1.0E-7) + 1;
 
       for (int x = minBlockX; x <= maxBlockX; x++) {
          for (int y = minBlockY; y <= maxBlockY; y++) {

@@ -57,6 +57,12 @@ public final class ChunkPathDebugCommand extends Command {
                                 + " box=" + m.getMinX() + "," + m.getMinY() + "," + m.getMinZ() + " / " + m.getMaxX() + "," + m.getMaxY() + "," + m.getMaxZ());
                     }
                 }
+                case "nocollision" -> sender.sendMessage(skwhy.chunkpath.block.BlockClassifier.noCollisionBlocks().size()
+                        + " solid blocks without collision: " + skwhy.chunkpath.block.BlockClassifier.noCollisionBlocks());
+                case "geometry" -> {
+                    skwhy.chunkpath.move.pathcalculator.CostRuleWalkNodeEvaluator.geometryChecks = args.length < 2 || !args[1].equals("off");
+                    sender.sendMessage("geometry checks=" + skwhy.chunkpath.move.pathcalculator.CostRuleWalkNodeEvaluator.geometryChecks);
+                }
                 case "dump" -> LongNavigation.getRegistry().forEach(n -> sender.sendMessage(n.toString()));
                 case "verbose" -> {
                     LongNavigation.verbose = args.length < 2 || !args[1].equals("off");
@@ -91,7 +97,9 @@ public final class ChunkPathDebugCommand extends Command {
         if (route != null) {
             for (Gate g : route) {
                 sender.sendMessage("  chunk(" + g.chunkX + "," + g.chunkZ + ") gate " + g.id + " " + g.edge
-                        + " rep=" + java.util.Arrays.toString(g.representativeWorld));
+                        + " rep=" + java.util.Arrays.toString(g.representativeWorld) + " members=" + g.memberBlocksWorld.size()
+                        + " y=" + g.memberBlocksWorld.stream().mapToInt(m -> m[1]).min().orElse(0) + ".."
+                        + g.memberBlocksWorld.stream().mapToInt(m -> m[1]).max().orElse(0));
             }
         }
     }
