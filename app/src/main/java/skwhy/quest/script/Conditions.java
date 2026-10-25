@@ -25,10 +25,28 @@ import skwhy.quest.model.ScriptNode;
 /** Évaluation des conditions des scripts : {@code compare}, {@code between}, {@code list} et les types de valeurs. */
 public final class Conditions {
 
+    private static final int MAX_DEPTH = 64;
+    /** Profondeur d'évaluation en cours (tout se passe sur le thread principal). */
+    private static int depth;
+
     private Conditions() {}
 
     /** Évalue le nœud de condition {@code id} (ou les littéraux {@code true} / {@code false}). */
     public static boolean eval(ScriptContext ctx, String id) {
+        if (depth >= MAX_DEPTH) {
+            skwhy.SkWhy.getInstance().getLogger().warning("[Quest] Conditions imbriquées sur plus de " + MAX_DEPTH
+                + " niveaux (boucle probable) autour de '" + id + "' : évaluée à faux.");
+            return false;
+        }
+        depth++;
+        try {
+            return evalNode(ctx, id);
+        } finally {
+            depth--;
+        }
+    }
+
+    private static boolean evalNode(ScriptContext ctx, String id) {
         if (id == null || id.equals("true")) return true;
         if (id.equals("false")) return false;
         // Une condition « inline » enregistrée dynamiquement par le staff / un script
@@ -99,6 +117,7 @@ public final class Conditions {
     }
 
     /** Valeur d'une opérande de condition ({@code value1}, {@code value2}, {@code value3}). */
+    @SuppressWarnings("deprecation") // metadata Paper, API volontairement utilisée
     public static Object value(ScriptContext ctx, Map<String, Object> v) {
         OfflinePlayer player = ctx.player();
         UUID uuid = player.getUniqueId();

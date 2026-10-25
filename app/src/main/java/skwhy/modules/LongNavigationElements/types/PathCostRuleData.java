@@ -107,7 +107,28 @@ public final class PathCostRuleData {
             Tag<Material> tag = resolveTag(tagName);
             if (tag != null) resolvedTags.add(tag);
         }
-        return new PathCostRules.CostRule(new ArrayList<>(blocks), resolvedTags, cost);
+        // règle par défaut = aucun bloc ni tag demandés (un tag inconnu ne la transforme pas en règle par défaut)
+        return new PathCostRules.CostRule(new ArrayList<>(blocks), resolvedTags, cost, blocks.isEmpty() && tags.isEmpty());
+    }
+
+    /** Copie modifiable d'une règle du moteur de coût (les tags sont retrouvés par leur nom). */
+    public static PathCostRuleData fromCostRule(PathCostRules.CostRule rule) {
+        PathCostRuleData data = new PathCostRuleData(rule.cost());
+        data.addBlocks(rule.materials());
+        List<String> tagNames = new ArrayList<>();
+        for (Tag<Material> tag : rule.tags()) tagNames.add(tag.getKey().toString());
+        data.addTags(tagNames);
+        return data;
+    }
+
+    /** @return les règles du moteur de coût assemblées depuis ces règles, ou {@code null} si la liste est vide. */
+    public static PathCostRules buildRules(PathCostRuleData[] datas) {
+        if (datas == null || datas.length == 0) return null;
+        List<PathCostRules.CostRule> rules = new ArrayList<>(datas.length);
+        for (PathCostRuleData data : datas) {
+            if (data != null) rules.add(data.toCostRule());
+        }
+        return rules.isEmpty() ? null : new PathCostRules(rules);
     }
 
     /** @return le tag de blocs correspondant à ce nom (espace de noms "minecraft" implicite), ou {@code null} si inconnu. */
@@ -133,7 +154,7 @@ public final class PathCostRuleData {
             .name("[ChunkPath] Path Cost Rule")
             .description(
                 "A single pathfinding cost rule: a set of blocks and/or block tags that, when matched, apply a " +
-                "given movement cost instead of the world's default cost. Used to build a custom rule set passed " +
+                "given movement cost. A rule without any block or tag is the default rule (blocks covered by no rule are not walkable without it). Used to build a custom rule set passed " +
                 "to 'register chunk path of %chunk%'."
             )
             .usage("Created via 'a new path cost rule [with cost %number%]', then populated via the blocks/tags list expressions.")

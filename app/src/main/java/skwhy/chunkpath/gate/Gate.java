@@ -9,9 +9,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Une porte = un groupe de blocs de bord (même bord de chunk) reliés entre eux par un
- * chemin interne pondéré de coût inférieur au seuil de fusion (par défaut 20), fusion
- * transitive incluse (A-C=15 et C-B=15 fusionnent A,B,C même si A-B direct vaut 30).
+ * Une porte = un groupe de blocs de bord (même bord de chunk) connectés directement entre
+ * eux (voisins d'un pas, de proche en proche) : un bord continu ne forme qu'une seule porte.
  */
 public final class Gate {
 

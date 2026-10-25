@@ -1,5 +1,6 @@
 plugins {
     java
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.23"
 }
 
 repositories {
@@ -14,7 +15,8 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:26.2.build.129-stable")
+    // Paper complet (NMS, noms Mojang) : l'IA des custom entities utilise les vrais mobs du serveur
+    paperweight.paperDevBundle("26.2.build.129-stable")
     
     compileOnly("com.github.SkriptLang:Skript:2.15.2")
 
@@ -49,6 +51,8 @@ java {
 
 tasks.test {
     useJUnitPlatform()
+    // paperweight ajoute le serveur Paper complet (NMS) au classpath d'execution : MockBukkit doit rester sur paper-api seul
+    classpath = classpath.filter { it.name != "mappedServerJar.jar" }
 }
 
 tasks.jar {

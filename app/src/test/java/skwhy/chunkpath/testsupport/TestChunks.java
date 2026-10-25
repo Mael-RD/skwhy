@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 
 import org.mockbukkit.mockbukkit.MockBukkit;
 
+import skwhy.chunkpath.block.PathCostRules;
 import skwhy.chunkpath.nbt.NbtReader;
 import skwhy.chunkpath.nbt.NbtTag;
 
@@ -27,6 +28,11 @@ public final class TestChunks {
     private static boolean mocked;
 
     private TestChunks() {
+    }
+
+    /** Une seule regle sans bloc ni tag (regle par defaut de la liste) : tout bloc marchable coute {@code cost}. */
+    public static PathCostRules uniformRules(int cost) {
+        return new PathCostRules(List.of(new PathCostRules.CostRule(List.of(), List.of(), cost)));
     }
 
     /** Demarre un serveur simule (Material, Tag...) pour les tests qui classent des blocs. A appeler une fois. */

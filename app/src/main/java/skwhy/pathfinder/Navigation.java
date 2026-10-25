@@ -50,7 +50,19 @@ public class Navigation {
     @SuppressWarnings("null")
     public static void tickAll() {
         REGISTRY.removeIf(nav -> nav.isRealEntity() && !nav.getEntity().isValid());
-        new ArrayList<>(REGISTRY).forEach(Navigation::tick);
+        for (Navigation nav : new ArrayList<>(REGISTRY)) {
+            try {
+                nav.tick();
+                nav.tickFailed = false;
+            } catch (RuntimeException e) {
+                // une navigation défaillante ne doit pas empêcher les autres d'avancer ; un seul message tant qu'elle échoue
+                if (!nav.tickFailed) {
+                    nav.tickFailed = true;
+                    skwhy.SkWhy.getInstance().getLogger().log(java.util.logging.Level.WARNING,
+                            "[Navigation] Erreur pendant le tick d'une navigation (les erreurs suivantes de cette navigation ne sont plus affichées) : " + e, e);
+                }
+            }
+        }
     }
 
     private void register()        { REGISTRY.add(this); }
@@ -65,6 +77,7 @@ public class Navigation {
     private List<Player>       players;
     private Location           destination;
     private int                pauseTicks = PAUSED_INDEFINITELY;
+    private boolean            tickFailed;
 
     // =========================================================================
     // Constructeurs

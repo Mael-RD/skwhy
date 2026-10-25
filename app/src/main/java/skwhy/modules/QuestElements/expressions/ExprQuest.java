@@ -61,6 +61,7 @@ public class ExprQuest extends SimpleExpression<Quest> {
             SyntaxInfo.Expression.builder(ExprQuest.class, Quest.class)
                 .addPattern("quest %string%")
                 .addPattern("[all] loaded quests")
+                .priority(SyntaxInfo.PATTERN_MATCHES_EVERYTHING)
                 .build()
         );
     }

@@ -144,7 +144,7 @@ class ConfigMergerTest {
         // supprimer au hasard chaque ligne de cle : une seule ligne ajoutee, en double jamais
         List<String> dl = l(d);
         for (int i = 0; i < dl.size(); i++) {
-            if (!dl.get(i).contains(": ")) continue;
+            if (!dl.get(i).contains(": ") || dl.get(i).strip().startsWith("#")) continue; // un commentaire n'est pas une cle
             List<String> cur = new java.util.ArrayList<>(dl);
             cur.remove(i);
             List<String> res = ConfigMerger.merge(cur, dl).lines();

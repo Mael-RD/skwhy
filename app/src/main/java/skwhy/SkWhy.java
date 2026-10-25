@@ -9,14 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.bukkit.Bukkit;
@@ -31,6 +24,8 @@ import skwhy.modules.NavigationModule;
 import skwhy.modules.RandomStuffModule;
 import skwhy.modules.APIModule;
 import skwhy.modules.ChunkPathModule;
+import skwhy.modules.QuestModule;
+import skwhy.modules.CustomEntityModule;
 
 
 // import com.github.retrooper.packetevents.PacketEvents;
@@ -94,12 +89,27 @@ public class SkWhy extends JavaPlugin {
         } else {
             getLogger().info("Module ChunkPath désactivé dans la config.");
         }
-        getServer().getPluginManager().registerEvents(new EntityRemove(), this);
-        getServer().getPluginManager().registerEvents(new BodyTracker(), this);
-        getServer().getPluginManager().registerEvents(new FutureRotationTracker(), this);
-        getServer().getPluginManager().registerEvents(new TrackedBy(), this);
-        FutureRotationTracker.startTracking(this);
-        TrackedBy.startTracking(this);
+        if (isModuleEnabled("modules.quest")) {
+            skriptAddon.loadModules(new QuestModule());
+        } else {
+            getLogger().info("Module Quest désactivé dans la config.");
+        }
+        if (isModuleEnabled("modules.custom_entity")) {
+            skriptAddon.loadModules(new CustomEntityModule());
+        } else {
+            getLogger().info("Module CustomEntity désactivé dans la config.");
+        }
+        // Écouteurs globaux : seulement si un module qui s'en sert est activé
+        boolean fakeDisplay = isModuleEnabled("modules.fake_display");
+        boolean randomStuff = isModuleEnabled("modules.random_stuff");
+        if (fakeDisplay) {
+            getServer().getPluginManager().registerEvents(new EntityRemove(), this);
+        }
+        if (fakeDisplay || randomStuff) { // cosmétiques (fake_display) et expressions body yaw / future direction (random_stuff)
+            getServer().getPluginManager().registerEvents(new BodyTracker(), this);
+            getServer().getPluginManager().registerEvents(new FutureRotationTracker(), this);
+            FutureRotationTracker.startTracking(this);
+        }
 
         getLogger().info("SkWhy activé avec succès !");
     }
@@ -108,6 +118,8 @@ public class SkWhy extends JavaPlugin {
     public void onDisable() {
         APIModule.shutdown();
         ChunkPathModule.shutdown();
+        QuestModule.shutdown();
+        CustomEntityModule.shutdown();
         getLogger().info("SkWhy désactivé.");
     }
 

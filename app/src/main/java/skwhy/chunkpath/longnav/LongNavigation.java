@@ -86,6 +86,7 @@ public class LongNavigation {
     public static volatile boolean verbose = false;
 
     private static final float MAX_LEG_PATH_LENGTH = 48F;
+    private static final int ESTIMATE_COST_PER_BLOCK = 5; // durée estimée seulement, sans règle par défaut
     private static final long WAIT_RECHECK_INTERVAL_TICKS = 20L; // "revérifier régulièrement"
     private static final long STUCK_RETRY_INTERVAL_TICKS = 20L;
     private static final long NO_PROGRESS_TICKS = 100L; // 5 s without getting closer to the waypoint
@@ -262,6 +263,7 @@ public class LongNavigation {
     private boolean legPartial;   // that leg path only gets as close as it can to the waypoint
     private boolean paused = true; // true while the navigation does not tick (pause), until the next active tick
     private int forcedTeleports;
+    private PathCostRules customCostRules; // null = aucune règle : pas de route, pas de marche
     private Path rejoinResume; // leg path to walk again once the short detour back onto it is done
     private int rejoinIndex;
 
@@ -274,24 +276,51 @@ public class LongNavigation {
     // Constructeurs
     // =========================================================================
 
-    /** Entité virtuelle (sans objet Bukkit Entity). */
+    /** Entité virtuelle (sans objet Bukkit Entity), sans règle de coût (elle ne marchera pas tant qu'on ne lui en donne pas). */
     public LongNavigation(int entityId, Vector hitbox, Location location, float speed, List<Player> players) {
+        this(entityId, hitbox, location, speed, players, null);
+    }
+
+    /** Entité virtuelle ; {@code customRules} {@code null} = aucune règle (pas de marche). */
+    public LongNavigation(int entityId, Vector hitbox, Location location, float speed, List<Player> players,
+                          PathCostRules customRules) {
         this.world = location.getWorld();
-        PathCostRules costRules = ChunkPathManager.serviceFor(world).analyzer().costRules();
-        this.mob = new LongMob(this, entityId, hitbox, location, speed, costRules);
+        this.customCostRules = customRules;
+        this.mob = new LongMob(this, entityId, hitbox, location, speed, customRules);
         this.startLocation = location.clone();
         this.players = new ArrayList<>(players);
         register();
     }
 
-    /** Entité Bukkit réelle. */
+    /** Entité Bukkit réelle, sans règle de coût (elle ne marchera pas tant qu'on ne lui en donne pas). */
     public LongNavigation(Entity entity, float speed) {
+        this(entity, speed, null);
+    }
+
+    /** Entité Bukkit réelle ; {@code customRules} {@code null} = aucune règle (pas de marche). */
+    public LongNavigation(Entity entity, float speed, PathCostRules customRules) {
         this.world = entity.getWorld();
-        PathCostRules costRules = ChunkPathManager.serviceFor(world).analyzer().costRules();
-        this.mob = new LongMob(this, entity, speed, costRules);
+        this.customCostRules = customRules;
+        this.mob = new LongMob(this, entity, speed, customRules);
         this.startLocation = entity.getLocation();
         this.players = new ArrayList<>();
         register();
+    }
+
+    /** Règles de coût utilisées par cette navigation, ou {@code null} si aucune n'a été donnée (pas de règle par défaut). */
+    public PathCostRules getCostRules() {
+        return mob.getCostRules();
+    }
+
+    /**
+     * Change les règles de coût de la marche ({@code null} = aucune règle : la navigation ne bouge plus tant
+     * qu'on ne lui en donne pas). Le chemin de la jambe en cours est recalculé au prochain tick.
+     */
+    public void setCostRules(PathCostRules rules) {
+        this.customCostRules = rules;
+        mob.setCostRules(rules);
+        legWaypoint = -1;
+        rejoinResume = null;
     }
 
     // =========================================================================
@@ -491,6 +520,25 @@ public class LongNavigation {
     /** Close enough to a waypoint (gate block or destination) to consider it reached. */
     private boolean hasReached(Location waypoint) {
         Location current = mob.getLocation();
+        double nearDx = current.getX() - (waypoint.getBlockX() + 0.5);
+        double nearDz = current.getZ() - (waypoint.getBlockZ() + 0.5);
+        double nearDy = current.getY() - waypoint.getBlockY();
+        if (nearDx * nearDx + nearDz * nearDz < REACHED_DISTANCE * REACHED_DISTANCE && nearDy > -1.5 && nearDy < 2.0) {
+            return true; // already standing on the gate block: no leg to walk (the A* has nothing to search)
+        }
+        if (waypoints != null && waypointIndex < waypoints.size()) {
+            // a gate is only a direction: the mob heads to the gate of its chunk that leads to the next chunk
+            // (the exit cell guides it around the obstacles inside the chunk) and switches to the following
+            // gate as soon as it stands in the next chunk, without touching the gate block. A gate followed
+            // by another one in the same chunk (entry -> exit) is done once the mob is in that chunk.
+            int[] cell = waypoints.cell(waypointIndex);
+            int[] ref = cell;
+            if (waypointIndex + 1 < waypoints.size()) {
+                int[] next = waypoints.cell(waypointIndex + 1);
+                if ((next[0] >> 4) != (cell[0] >> 4) || (next[2] >> 4) != (cell[2] >> 4)) ref = next;
+            }
+            return (current.getBlockX() >> 4) == (ref[0] >> 4) && (current.getBlockZ() >> 4) == (ref[2] >> 4);
+        }
         double dx = current.getX() - (waypoint.getBlockX() + 0.5);
         double dz = current.getZ() - (waypoint.getBlockZ() + 0.5);
         double dy = current.getY() - waypoint.getBlockY();
@@ -665,27 +713,28 @@ public class LongNavigation {
         Location to = currentWaypointLocation();
         if (to == null) return 0L;
 
-        PathCostRules costRules = ChunkPathManager.serviceFor(world).analyzer().costRules();
         double weightedDistance = null != waypoints && waypointIndex > 0 && waypointIndex < waypoints.size()
-                ? sameChunkDistanceOrFallback(waypoints.owner(waypointIndex - 1), waypoints.owner(waypointIndex), costRules, from, to)
-                : straightLineWeightedDistance(from, to, costRules);
+                ? sameChunkDistanceOrFallback(waypoints.owner(waypointIndex - 1), waypoints.owner(waypointIndex), from, to)
+                : straightLineWeightedDistance(from, to);
 
         float speed = mob.getSpeed();
         if (speed <= 0F) return 0L;
         return (long) Math.ceil(weightedDistance / speed);
     }
 
-    private double sameChunkDistanceOrFallback(Gate previous, Gate current, PathCostRules costRules,
-                                                Location from, Location to) {
+    private double sameChunkDistanceOrFallback(Gate previous, Gate current, Location from, Location to) {
         if (previous.chunkX == current.chunkX && previous.chunkZ == current.chunkZ) {
             Integer known = previous.id == current.id ? Integer.valueOf(0) : previous.internalDistances.get(current.id);
             if (known != null) return known;
         }
-        return straightLineWeightedDistance(from, to, costRules);
+        return straightLineWeightedDistance(from, to);
     }
 
-    private double straightLineWeightedDistance(Location from, Location to, PathCostRules costRules) {
-        return from.distance(to) * costRules.defaultCost();
+    private double straightLineWeightedDistance(Location from, Location to) {
+        // ce n'est qu'une estimation de durée : la règle par défaut des règles de la navigation, sinon un coût standard
+        PathCostRules costRules = mob.getCostRules();
+        int perBlock = costRules != null && costRules.defaultCost() >= 0 ? costRules.defaultCost() : ESTIMATE_COST_PER_BLOCK;
+        return from.distance(to) * perBlock;
     }
 
     // =========================================================================
@@ -695,6 +744,14 @@ public class LongNavigation {
     private void recomputeRoute() {
         if (startLocation == null || endLocation == null) {
             setStatus(Status.IDLE, "state machine");
+            route = null;
+            waypoints = null;
+            return;
+        }
+        if (mob.getCostRules() == null) {
+            Skript.warning("[ChunkPath] Aucune règle de coût sur cette long navigation (pas de règle par défaut) : "
+                    + "ajoutez-en avec 'using rules' ou 'path cost rules of long navigation'. La navigation ne fait rien.");
+            setStatus(Status.FAILED_NO_PATH, "state machine");
             route = null;
             waypoints = null;
             return;
@@ -715,7 +772,7 @@ public class LongNavigation {
             from = here;
         }
         ChunkGateService service = ChunkPathManager.serviceFor(world);
-        route = GatePathfinder.findPath(service,
+        route = GatePathfinder.findPath(service, mob.getCostRules(),
                 from.getBlockX(), from.getBlockY(), from.getBlockZ(),
                 endLocation.getBlockX(), endLocation.getBlockY(), endLocation.getBlockZ());
 

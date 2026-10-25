@@ -14,7 +14,7 @@ public class QuestStatusType {
             .description("The status of a quest for a player: unknown (never unlocked), available (unlocked, no progress yet), started or finished.")
             .usage("unknown, available, started, finished.")
             .user("quest ?status(es)?")
-            .examples("if quest status of quest \"chasseur\" for player is finished:")
+            .examples("if quest status of quest \"chasseur\" for player is finished:", "	send \"Quête terminée\" to player")
             .since("1.6.0")
             .parser(new Parser<QuestStatus>() {
                 @Override

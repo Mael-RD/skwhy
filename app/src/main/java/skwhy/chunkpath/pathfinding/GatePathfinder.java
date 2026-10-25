@@ -2,6 +2,7 @@ package skwhy.chunkpath.pathfinding;
 
 import skwhy.chunkpath.ChunkGateService;
 import skwhy.chunkpath.ChunkPathAnalyzer;
+import skwhy.chunkpath.block.PathCostRules;
 import skwhy.chunkpath.gate.ChunkGateData;
 import skwhy.chunkpath.gate.Gate;
 import skwhy.chunkpath.graph.ChunkNavMesh;
@@ -51,34 +52,48 @@ public final class GatePathfinder {
 
     private static final Logger LOGGER = Logger.getLogger(GatePathfinder.class.getName());
 
+    /** Coût par bloc utilisé si les règles ne donnent pas de coût pour la pierre (voir {@link #defaultBlockCost}). */
+    private static final int FALLBACK_BLOCK_COST = 5;
+
     private static final String START = "START";
     private static final String END = "END";
 
     private GatePathfinder() {
     }
 
-    /** Comme {@link #findPath(ChunkGateService, int, int, int, int, int, int, int)}, avec le coût de franchissement de frontière par défaut ({@link skwhy.chunkpath.block.PathCostRules#defaultCost()} des règles de coût du monde). */
-    public static List<Gate> findPath(ChunkGateService service,
+    /** Comme {@link #findPath(ChunkGateService, PathCostRules, int, int, int, int, int, int, int)}, avec le coût par bloc de la pierre. */
+    public static List<Gate> findPath(ChunkGateService service, PathCostRules costRules,
                                        int startX, int startY, int startZ,
                                        int endX, int endY, int endZ) {
-        return findPath(service, startX, startY, startZ, endX, endY, endZ,
-                service.analyzer().costRules().defaultCost());
+        return findPath(service, costRules, startX, startY, startZ, endX, endY, endZ, defaultBlockCost(costRules));
+    }
+
+    /** Coût d'un bloc de sol « standard » (pierre), utilisé pour chiffrer la traversée d'une frontière. */
+    static int defaultBlockCost(PathCostRules costRules) {
+        int cost = costRules == null ? -1 : costRules.costOf("minecraft:stone");
+        return cost > 0 ? cost : FALLBACK_BLOCK_COST;
     }
 
     /**
-     * @param borderCrossingCost coût constant appliqué à chaque franchissement d'une frontière
-     *                           de chunk (arc {@link Gate#neighborLinks}), aucun coût de sol
-     *                           réel n'étant connu pour cette traversée sans relire le chunk voisin
+     * @param borderCrossingCost coût par bloc appliqué à la traversée d'une frontière de chunk
+     *                           (arc {@link Gate#neighborLinks}) : le coût de l'arc vaut la distance
+     *                           de Manhattan entre les blocs centraux des deux portes liées (au moins
+     *                           1 bloc) multipliée par cette valeur. Aucun coût de sol réel n'est
+     *                           connu sans relire le chunk voisin, mais il n'est jamais nul.
      * @return la liste ordonnée des portes franchies (départ -> arrivée), une liste vide si les
      *         deux points sont déjà mutuellement atteignables sans franchir aucune porte
      *         (impossible en pratique tant que départ/arrivée sont dans des chunks différents,
      *         mais possible si les deux chunks n'en ont aucune en commun), ou {@code null} si
      *         aucun chemin n'a pu être trouvé ou calculé (voir les logs pour la raison)
      */
-    public static List<Gate> findPath(ChunkGateService service,
+    public static List<Gate> findPath(ChunkGateService service, PathCostRules costRules,
                                        int startX, int startY, int startZ,
                                        int endX, int endY, int endZ,
                                        int borderCrossingCost) {
+        if (costRules == null) {
+            LOGGER.warning("[ChunkPath] Calcul de chemin ignoré : aucune règle de coût fournie.");
+            return null;
+        }
         int startChunkX = Math.floorDiv(startX, 16);
         int startChunkZ = Math.floorDiv(startZ, 16);
         int endChunkX = Math.floorDiv(endX, 16);
@@ -87,8 +102,8 @@ public final class GatePathfinder {
         ChunkGateData startChunkData;
         ChunkGateData endChunkData;
         try {
-            startChunkData = service.getOrAnalyze(startChunkX, startChunkZ);
-            endChunkData = service.getOrAnalyze(endChunkX, endChunkZ);
+            startChunkData = service.getOrAnalyze(startChunkX, startChunkZ, costRules);
+            endChunkData = service.getOrAnalyze(endChunkX, endChunkZ, costRules);
         } catch (ChunkNotGeneratedException | RegionReadException e) {
             LOGGER.warning("[ChunkPath] Calcul de chemin impossible : " + e.getMessage());
             return null;
@@ -97,7 +112,7 @@ public final class GatePathfinder {
         ChunkPathAnalyzer analyzer = service.analyzer();
 
         Map<Integer, Integer> startGateCosts = costsFromPoint(
-                analyzer, startChunkData, startChunkX, startChunkZ, startX, startY, startZ);
+                analyzer, costRules, startChunkData, startChunkX, startChunkZ, startX, startY, startZ);
         if (startGateCosts == null) {
             LOGGER.warning("[ChunkPath] Position de départ (" + startX + "," + startY + "," + startZ
                     + ") non praticable, aucun chemin possible.");
@@ -105,7 +120,7 @@ public final class GatePathfinder {
         }
 
         Map<Integer, Integer> endGateCosts = costsFromPoint(
-                analyzer, endChunkData, endChunkX, endChunkZ, endX, endY, endZ);
+                analyzer, costRules, endChunkData, endChunkX, endChunkZ, endX, endY, endZ);
         if (endGateCosts == null) {
             LOGGER.warning("[ChunkPath] Position d'arrivée (" + endX + "," + endY + "," + endZ
                     + ") non praticable, aucun chemin possible.");
@@ -125,9 +140,10 @@ public final class GatePathfinder {
      * @return gateId -> coût depuis le point, ou {@code null} si le point n'est pas (ou pas
      *         près d'une position) praticable
      */
-    private static Map<Integer, Integer> costsFromPoint(ChunkPathAnalyzer analyzer, ChunkGateData chunkData,
+    private static Map<Integer, Integer> costsFromPoint(ChunkPathAnalyzer analyzer, PathCostRules costRules,
+                                                          ChunkGateData chunkData,
                                                           int chunkX, int chunkZ, int worldX, int worldY, int worldZ) {
-        ChunkNavMesh mesh = analyzer.buildMesh(chunkX, chunkZ);
+        ChunkNavMesh mesh = analyzer.buildMesh(chunkX, chunkZ, costRules);
 
         int localX = worldX - chunkX * 16;
         int localZ = worldZ - chunkZ * 16;
@@ -138,15 +154,11 @@ public final class GatePathfinder {
 
         Map<Integer, Integer> costs = new HashMap<>();
         for (Gate gate : chunkData.gates()) {
-            int min = Integer.MAX_VALUE;
-            for (int[] block : gate.memberBlocksWorld) {
-                int node = mesh.nodeAt(block[0] - chunkX * 16, block[1], block[2] - chunkZ * 16);
-                if (node >= 0 && dist[node] < min) {
-                    min = dist[node];
-                }
-            }
-            if (min != Integer.MAX_VALUE) {
-                costs.put(gate.id, min);
+            // bloc central de la porte, comme pour les distances porte-à-porte
+            int[] r = gate.representativeWorld;
+            int node = mesh.nodeAt(r[0] - chunkX * 16, r[1], r[2] - chunkZ * 16);
+            if (node >= 0 && dist[node] != Integer.MAX_VALUE) {
+                costs.put(gate.id, dist[node]);
             }
         }
         return costs;
@@ -245,7 +257,7 @@ public final class GatePathfinder {
                     if (other == null) continue; // chunk voisin jamais traité -> cul-de-sac ignoré
                     gateByKey.put(link, other);
                 }
-                relax(dist, prev, pq, u, link, borderCrossingCost);
+                relax(dist, prev, pq, u, link, crossingCost(gate, other, borderCrossingCost));
             }
         }
 
@@ -260,6 +272,13 @@ public final class GatePathfinder {
         }
         Collections.reverse(path);
         return path;
+    }
+
+    /** Distance (Manhattan, au moins 1 bloc) entre les blocs centraux de deux portes liées, fois le coût par bloc. */
+    private static int crossingCost(Gate from, Gate to, int blockCost) {
+        int[] a = from.representativeWorld, b = to.representativeWorld;
+        int blocks = Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+        return Math.max(1, blocks) * Math.max(1, blockCost);
     }
 
     /** Résout la porte d'un chunk voisin UNIQUEMENT si ce chunk est déjà connu (mémoire/disque déjà chargé) — ne lit jamais le fichier région. */

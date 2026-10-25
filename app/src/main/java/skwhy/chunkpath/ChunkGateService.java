@@ -49,21 +49,22 @@ public final class ChunkGateService {
         this.worldName = worldName;
     }
 
-    /** L'analyseur (donc les règles de coût et le dossier région) utilisé par cette instance. */
+    /** L'analyseur (donc le dossier région) utilisé par cette instance. */
     public ChunkPathAnalyzer analyzer() {
         return analyzer;
     }
 
     /**
      * Renvoie les données du chunk. Si déjà connu (mémoire ou disque), le relit tel
-     * quel. Sinon, l'analyse depuis le fichier région, le lie à tout voisin déjà connu
-     * (mémoire ou disque), sauvegarde le résultat (et tout voisin modifié par la
-     * liaison/élagage), puis le renvoie.
+     * quel. Sinon, l'analyse depuis le fichier région avec {@code costRules}, le lie à tout
+     * voisin déjà connu (mémoire ou disque), sauvegarde le résultat (et tout voisin modifié par la
+     * liaison/élagage), puis le renvoie. Il n'y a pas de règles par défaut : un chunk inconnu
+     * ne peut pas être analysé sans règles.
      *
      * @throws skwhy.chunkpath.region.ChunkNotGeneratedException si le chunk
      *         n'est pas généré sur disque
      */
-    public synchronized ChunkGateData getOrAnalyze(int chunkX, int chunkZ) {
+    public synchronized ChunkGateData getOrAnalyze(int chunkX, int chunkZ, PathCostRules costRules) {
         long key = pack(chunkX, chunkZ);
         ChunkGateData existing = cache.get(key);
         if (existing != null) return existing;
@@ -74,36 +75,23 @@ public final class ChunkGateService {
             return fromDisk;
         }
 
-        return reanalyze(chunkX, chunkZ);
+        return reanalyze(chunkX, chunkZ, costRules);
     }
 
     /**
-     * Force une nouvelle analyse du chunk depuis le fichier région, qu'il ait déjà été
-     * enregistré (mémoire ou disque) ou non, le lie aux voisins déjà connus, persiste le
-     * résultat (et tout voisin modifié par la liaison/élagage), et remplace la version en
-     * cache/sur disque le cas échéant. Utilise les règles de coût par défaut de cette instance.
+     * Force une nouvelle analyse du chunk depuis le fichier région avec {@code costRules}, qu'il
+     * ait déjà été enregistré (mémoire ou disque) ou non, le lie aux voisins déjà connus, persiste
+     * le résultat (et tout voisin modifié par la liaison/élagage), et remplace la version en
+     * cache/sur disque le cas échéant.
      *
+     * @throws IllegalArgumentException si {@code costRules} est {@code null} (aucune règle par défaut)
      * @throws skwhy.chunkpath.region.ChunkNotGeneratedException si le chunk
      *         n'est pas généré sur disque
      */
-    public synchronized ChunkGateData reanalyze(int chunkX, int chunkZ) {
-        return reanalyze(chunkX, chunkZ, null);
-    }
-
-    /**
-     * Comme {@link #reanalyze(int, int)}, mais avec des règles de coût ponctuelles pour cette
-     * seule analyse (ex: appelées explicitement depuis un script), au lieu des règles par défaut
-     * de cette instance. {@code customCostRules} peut être {@code null} pour revenir aux règles
-     * par défaut. Le reste du pipeline (liaison, persistance) est strictement identique à
-     * {@link #reanalyze(int, int)} : un seul système, seules les règles de coût changent.
-     *
-     * @throws skwhy.chunkpath.region.ChunkNotGeneratedException si le chunk
-     *         n'est pas généré sur disque
-     */
-    public synchronized ChunkGateData reanalyze(int chunkX, int chunkZ, PathCostRules customCostRules) {
-        ChunkPathAnalyzer effectiveAnalyzer = customCostRules != null ? analyzer.withCostRules(customCostRules) : analyzer;
+    public synchronized ChunkGateData reanalyze(int chunkX, int chunkZ, PathCostRules costRules) {
+        if (costRules == null) throw new IllegalArgumentException("aucune règle de coût fournie");
         long key = pack(chunkX, chunkZ);
-        ChunkGateData data = effectiveAnalyzer.analyze(chunkX, chunkZ);
+        ChunkGateData data = analyzer.analyze(chunkX, chunkZ, costRules);
         cache.put(key, data);
 
         String replacedPrefix = chunkX + "," + chunkZ + ",";

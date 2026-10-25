@@ -95,6 +95,25 @@ Les tests de SkWhy sont dans `C:\Users\orimi\Desktop\proxti\serveur vide\plugins
 - Debug : commande `/cpdebug` (console) `cell|path|navs|dump|shape|collide|folder|verbose [off]`. `verbose` journalise chaque transition d'etat.
 - Serveur full (`full copy`, monde `villes`) : demarrage ~5 min ; ne pas le redemarrer sans necessite. Sondes (commandes lpgo/lpst...) dans `plugins/Skript/scripts/lp-debug/-probe.sk` (desactivees : retirer le `-` + `sk reload`).
 
+## Custom entities (module `custom_entity`, `since` 1.6.0)
+- Definitions : dossier `plugins/SkWhy/custom-entities/*.yml` (config `custom_entity.folder`), une cle de premier niveau par id (`CustomEntityDef`, `CustomEntityRegistry`).
+  Un entite reelle = `Interaction` dont les NBT custom sont l'id (PDC `skwhy:custom_entity`) et ses surcharges eventuelles (PDC `skwhy:custom_entity_overrides`, JSON) ; une fausse = packets uniquement
+  (interaction + visuel), surcharges en memoire.
+  Le visuel (type, nom, equipement, scale, skin mannequin, metadata brute) est toujours envoye par packet depuis la definition (`CustomEntityPackets`).
+- Le visuel ne monte PAS sur l'interaction (un passager est place au sommet de la hitbox) : `CustomEntityManager.tick` le teleporte a chaque tick.
+  Les clics sur le visuel/la fausse interaction arrivent par packet (`INTERACT_ENTITY`, ids dans `byPacketId`) et declenchent `on custom entity interact`.
+- **Surcharges par entite** : `CustomEntityDef.withOverrides` (chemin YAML -> String/Double/Boolean, `kindOf`/`checkOverride` valident), `CustomEntity.effective(base)` (cache), `CustomEntityManager.defOf`
+  (toujours l'utiliser a la place de `registry.get` pour l'apparence/hitbox/IA). Syntaxes : section `set %~objects% to a new real|fake custom entity "id" at loc:` (cles = expressions Skript parsees ;
+  mot seul non quote accepte pour type/ai/equipment/metadata/skin), `custom entity parameter "x" of e`, `custom entity overrides of e`. Tests : `overrides.sk`, `overrides-errors.sk`.
+- **IA vanilla** (parametre `ai: <type de mob>`, `CustomEntityBrain`, seule classe NMS) : un vrai `Mob` NMS est cree (`EntityType.create(level, ...)`) mais **jamais ajoute au monde** (invisible, pas dans les listes
+  d'entites, les autres entites ne le voient pas), tick a la main (`mob.tick()`) a chaque tick par `CustomEntityManager.tickBrains` ; l'entite custom (fausse : position + packets ; reelle :
+  `snapTo` NMS sur l'interaction) prend sa position/rotation, la tete suit `getYHeadRot`. Une teleportation externe replace le mob. Chunk non charge = IA figee (aucun chargement). `make custom entity e walk to loc`
+  = navigation vanilla (`moveTo`) ; un mob neuf n'est « au sol » qu'apres `setOnGround` (sinon `moveTo` echoue). Les goals continuent (errance) : ne pas tester « ne marche plus » apres un delai.
+  Build : `paperweight-userdev 2.0.0-beta.23` (la .24 exige Gradle 9.7) + `paperDevBundle("26.2.build.129-stable")` (noms Mojang, pas de reobf). Test : `ai.sk` (plateforme y=199, `skt-wait: 45`).
+- Tests : fixture `plugins/SkWhy/custom-entities/skt_tests.yml` du serveur vide (`skt_wolf`, `skt_mannequin`), tests dans `v1.6.0/custom-entity/`.
+  Sans joueur a proximite le chunk de spawn n'est pas charge : `spawnReal` charge le chunk et retourne `null` si le serveur refuse l'entite.
+  Le rendu reel (packets vus par un client) n'est verifie que par `players.sk` (SKIP sans joueur) : a regarder en jeu.
+
 ## Branches et release
 - `main` contient tout, y compris le **long pathfinding** (package `skwhy.chunkpath`, `ChunkPathModule`, `modules/LongNavigationElements`, syntaxes
   chunk path / long navigation, `since` 1.4.0 et 1.5.0) qui n'est pas termine.

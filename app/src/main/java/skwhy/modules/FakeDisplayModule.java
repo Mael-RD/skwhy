@@ -3,7 +3,6 @@ package skwhy.modules;
 import org.skriptlang.skript.addon.AddonModule;
 import org.skriptlang.skript.addon.SkriptAddon;
 
-import com.github.retrooper.packetevents.PacketEvents;
 
 import skwhy.modules.FakeDisplayElements.types.*;
 
@@ -22,11 +21,7 @@ public class FakeDisplayModule implements AddonModule {
 
     @Override
     public boolean canLoad(SkriptAddon addon) {
-        
-        if (PacketEvents.getAPI() == null) {
-            return false;
-        }
-        return true;
+        return skwhy.util.PacketEventsSupport.available("FakeDisplayModule");
     }
 
     // init() : types en premier, avant toute syntaxe

@@ -40,9 +40,14 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
     public static final double SPACE_BETWEEN_WALL_POSTS = 0.5;
     private static final double DEFAULT_MOB_JUMP_HEIGHT = 1.125;
 
-    private final PathCostRules costRules;
+    private volatile PathCostRules costRules;
 
     public CostRuleWalkNodeEvaluator(final PathCostRules costRules) {
+        this.costRules = costRules;
+    }
+
+    /** Change les règles de coût pour les prochaines recherches (une recherche en cours garde celles qu'elle a lues). */
+    public void setCostRules(final PathCostRules costRules) {
         this.costRules = costRules;
     }
 
@@ -57,7 +62,8 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
             return vanillaMalus;
         }
         Block below = this.currentContext.world().getBlockAt(x, y - 1, z);
-        return this.costRules.costOf(below.getType().getKey().toString());
+        int cost = this.costRules.costOf(below.getType().getKey().toString());
+        return cost < 0 ? -1.0F : cost; // aucune règle ne couvre ce bloc : non marchable
     }
 
     // 4 horizontal directions as (dx, dz, 2D-index) – mirrors Direction.Plane.HORIZONTAL

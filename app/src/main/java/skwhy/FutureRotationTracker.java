@@ -32,6 +32,15 @@ public class FutureRotationTracker implements Listener {
         new BukkitRunnable() {
             @Override
             public void run() {
+                try {
+                    update();
+                } catch (RuntimeException e) {
+                    plugin.getLogger().log(java.util.logging.Level.WARNING,
+                            "[FutureRotationTracker] Erreur pendant la mise à jour des rotations : " + e, e);
+                }
+            }
+
+            private void update() {
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     RotState state = states.computeIfAbsent(player.getUniqueId(), k -> new RotState());
                     Location loc = player.getLocation();

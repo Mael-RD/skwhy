@@ -52,6 +52,11 @@ public class API_request {
     public void reply(int statusCode, String responseBody) {
         if (replied) return;
         replied = true;
+        if (statusCode < 100 || statusCode > 599) {
+            skwhy.SkWhy.getInstance().getLogger().warning("[ApiServer] Code HTTP invalide (" + statusCode
+                    + ") pour " + this + " : 500 envoyé à la place.");
+            statusCode = 500;
+        }
         try {
             byte[] bytes = responseBody.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");

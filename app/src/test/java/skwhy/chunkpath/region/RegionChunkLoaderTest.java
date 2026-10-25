@@ -16,7 +16,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import skwhy.chunkpath.block.PathCostRules;
 import skwhy.chunkpath.graph.ChunkNavMesh;
 import skwhy.chunkpath.nbt.NbtTag;
 import skwhy.chunkpath.testsupport.TestChunks;
@@ -73,7 +72,7 @@ class RegionChunkLoaderTest {
         writeRegion(0, 0, 3, 4, 2, flat("minecraft:full"));
         NbtTag root = RegionChunkLoader.loadChunkRoot(folder, 3, 4);
         assertEquals("minecraft:full", root.getString("Status", null));
-        assertEquals(256, new ChunkNavMesh(root, PathCostRules.defaults()).nodeCount());
+        assertEquals(256, new ChunkNavMesh(root, TestChunks.uniformRules(5)).nodeCount());
     }
 
     @Test

@@ -26,7 +26,11 @@ class GateExtractorTest {
     }
 
     private static List<Gate> extract(NbtTag chunk, int cx, int cz) {
-        return GateExtractor.extract(new ChunkNavMesh(chunk, PathCostRules.defaults()), cx, cz, GateExtractor.DEFAULT_MERGE_THRESHOLD);
+        return extract(chunk, cx, cz, TestChunks.uniformRules(5));
+    }
+
+    private static List<Gate> extract(NbtTag chunk, int cx, int cz, PathCostRules rules) {
+        return GateExtractor.extract(new ChunkNavMesh(chunk, rules), cx, cz);
     }
 
     private static List<Gate> onEdge(List<Gate> gates, Direction dir) {
@@ -83,8 +87,9 @@ class GateExtractorTest {
         Gate west = onEdge(gates, Direction.WEST).get(0);
         assertEquals(75, north.internalDistances.get(south.id));
         assertEquals(75, south.internalDistances.get(north.id));
-        // le coin (0,1,0) appartient a la fois a NORTH et WEST
-        assertEquals(0, north.internalDistances.get(west.id));
+        // le coin (0,1,0) appartient a la fois a NORTH et WEST, mais la distance va de bloc central a bloc central
+        assertTrue(north.internalDistances.get(west.id) > 0);
+        assertEquals(north.internalDistances.get(west.id), west.internalDistances.get(north.id));
     }
 
     @Test
@@ -106,24 +111,39 @@ class GateExtractorTest {
     }
 
     @Test
-    void mergeThresholdIsStrict() {
-        // un pilier sur le bord nord : le contournement coute 4 pas = 20, donc PAS fusionne sous le seuil 20
-        NbtTag chunk = TestChunks.chunk(b -> b.fill(4, 1, 0, 4, 3, 0, "minecraft:stone"));
-        ChunkNavMesh mesh = new ChunkNavMesh(chunk, PathCostRules.defaults());
-        // deux cotes du pilier + le dessus du pilier (noeud isole en y=4)
-        assertEquals(3, onEdge(GateExtractor.extract(mesh, 0, 0, 20), Direction.NORTH).size());
-        assertEquals(2, onEdge(GateExtractor.extract(mesh, 0, 0, 21), Direction.NORTH).size());
+    void edgeGatesDoNotDependOnTheCost() {
+        // quel que soit le cout du sol (meme tres eleve), un bord continu ne forme qu'une porte de 16 blocs
+        for (int cost : new int[]{0, 1, 5, 20, 21, 100, 5000}) {
+            List<Gate> gates = extract(TestChunks.flatChunk(), 0, 0, TestChunks.uniformRules(cost));
+            assertEquals(4, gates.size(), "cout " + cost);
+            for (Direction d : Direction.values()) {
+                assertEquals(1, onEdge(gates, d).size(), d.name() + " cout " + cost);
+                assertEquals(16, onEdge(gates, d).get(0).memberBlocksWorld.size(), d.name() + " cout " + cost);
+            }
+        }
     }
 
     @Test
-    void lowMergeThresholdSplitsAnEdge() {
-        ChunkNavMesh mesh = new ChunkNavMesh(TestChunks.flatChunk(), PathCostRules.defaults());
-        // seuil 6 : deux noeuds voisins (cout 5) fusionnent encore, mais le chain complet 15 pas aussi (transitif)
-        List<Gate> merged = GateExtractor.extract(mesh, 0, 0, 6);
-        assertEquals(4, merged.size());
-        // seuil 5 : plus rien ne fusionne (cout 5 n'est pas < 5) : une porte par bloc de bord
-        List<Gate> single = GateExtractor.extract(mesh, 0, 0, 5);
-        assertEquals(onEdge(single, Direction.NORTH).size(), 16);
+    void aPillarOnTheEdgeSplitsItInTwoPlusItsTopWhateverTheCost() {
+        // un pilier sur le bord nord n'est plus contourne par un seuil : les deux cotes restent deux portes
+        // (non connectees directement sur le bord), plus le dessus du pilier (noeud isole en y=4)
+        NbtTag chunk = TestChunks.chunk(b -> b.fill(4, 1, 0, 4, 3, 0, "minecraft:stone"));
+        for (int cost : new int[]{1, 5, 100}) {
+            List<Gate> north = onEdge(extract(chunk, 0, 0, TestChunks.uniformRules(cost)), Direction.NORTH);
+            assertEquals(3, north.size(), "cout " + cost);
+            assertEquals(1, north.stream().filter(g -> g.memberBlocksWorld.size() == 4).count());
+            assertEquals(1, north.stream().filter(g -> g.memberBlocksWorld.size() == 11).count());
+            assertEquals(1, north.stream().filter(g -> g.memberBlocksWorld.size() == 1).count());
+        }
+    }
+
+    @Test
+    void aStepAlongTheEdgeStaysOneGate() {
+        // marche d'un bloc sur le bord ouest (z 0..7 en hauteur) : les deux niveaux sont directement connectes
+        NbtTag chunk = TestChunks.chunk(b -> b.fill(0, 1, 0, 0, 1, 7, "minecraft:stone"));
+        List<Gate> west = onEdge(extract(chunk, 0, 0, TestChunks.uniformRules(100)), Direction.WEST);
+        assertEquals(1, west.size());
+        assertEquals(16, west.get(0).memberBlocksWorld.size());
     }
 
     @Test

@@ -14,10 +14,13 @@ import java.nio.file.Path;
  * Point d'entrée : analyse UN chunk (obligatoirement déjà généré sur disque, sinon
  * ChunkNotGeneratedException) et produit ses portes chunk-à-chunk.
  *
+ * Il n'existe aucune règle de coût par défaut : les {@link PathCostRules} sont toujours fournies
+ * par l'appelant à chaque analyse.
+ *
  * Usage :
  * <pre>
- *   ChunkPathAnalyzer analyzer = new ChunkPathAnalyzer(worldRegionFolder, PathCostRules.defaults());
- *   ChunkGateData data = analyzer.analyze(chunkX, chunkZ);
+ *   ChunkPathAnalyzer analyzer = new ChunkPathAnalyzer(worldRegionFolder);
+ *   ChunkGateData data = analyzer.analyze(chunkX, chunkZ, costRules);
  * </pre>
  *
  * Thread-safety : sans état partagé mutable entre chunks, une instance peut être
@@ -28,26 +31,18 @@ import java.nio.file.Path;
 public final class ChunkPathAnalyzer {
 
     private final Path regionFolder;
-    private final PathCostRules costRules;
-    private final int gateMergeThreshold;
 
-    public ChunkPathAnalyzer(Path regionFolder, PathCostRules costRules) {
-        this(regionFolder, costRules, GateExtractor.DEFAULT_MERGE_THRESHOLD);
-    }
-
-    public ChunkPathAnalyzer(Path regionFolder, PathCostRules costRules, int gateMergeThreshold) {
+    public ChunkPathAnalyzer(Path regionFolder) {
         this.regionFolder = regionFolder;
-        this.costRules = costRules;
-        this.gateMergeThreshold = gateMergeThreshold;
     }
 
     /**
      * @throws skwhy.chunkpath.region.ChunkNotGeneratedException si le chunk
      *         n'existe pas encore sur disque (ce système ne génère jamais de chunk lui-même)
      */
-    public ChunkGateData analyze(int chunkX, int chunkZ) {
-        ChunkNavMesh mesh = buildMesh(chunkX, chunkZ);
-        java.util.List<Gate> gates = GateExtractor.extract(mesh, chunkX, chunkZ, gateMergeThreshold);
+    public ChunkGateData analyze(int chunkX, int chunkZ, PathCostRules costRules) {
+        ChunkNavMesh mesh = buildMesh(chunkX, chunkZ, costRules);
+        java.util.List<Gate> gates = GateExtractor.extract(mesh, chunkX, chunkZ);
         return new ChunkGateData(chunkX, chunkZ, gates);
     }
 
@@ -62,18 +57,8 @@ public final class ChunkPathAnalyzer {
      * @throws skwhy.chunkpath.region.ChunkNotGeneratedException si le chunk
      *         n'existe pas encore sur disque
      */
-    public ChunkNavMesh buildMesh(int chunkX, int chunkZ) {
+    public ChunkNavMesh buildMesh(int chunkX, int chunkZ, PathCostRules costRules) {
         NbtTag root = RegionChunkLoader.loadChunkRoot(regionFolder, chunkX, chunkZ);
         return new ChunkNavMesh(root, costRules);
-    }
-
-    /** Les règles de coût utilisées par cette instance (mêmes règles pour toute analyse ou pathfinding sur ce monde). */
-    public PathCostRules costRules() {
-        return costRules;
-    }
-
-    /** Même dossier région et seuil de fusion, mais avec des règles de coût différentes (analyse ponctuelle). */
-    public ChunkPathAnalyzer withCostRules(PathCostRules otherCostRules) {
-        return new ChunkPathAnalyzer(regionFolder, otherCostRules, gateMergeThreshold);
     }
 }

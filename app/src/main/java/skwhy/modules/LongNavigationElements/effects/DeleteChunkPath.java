@@ -45,8 +45,13 @@ public class DeleteChunkPath extends Effect {
     protected void execute(Event event) {
         for (Chunk chunk : chunksExpr.getArray(event)) {
             if (chunk == null) continue;
-            ChunkGateService service = ChunkPathManager.serviceFor(chunk.getWorld());
-            service.delete(chunk.getX(), chunk.getZ());
+            try {
+                ChunkGateService service = ChunkPathManager.serviceFor(chunk.getWorld());
+                service.delete(chunk.getX(), chunk.getZ());
+            } catch (RuntimeException e) {
+                skwhy.SkWhy.getInstance().getLogger().warning("[ChunkPath] Impossible de supprimer le chunk ("
+                        + chunk.getX() + "," + chunk.getZ() + ") du monde " + chunk.getWorld().getName() + " : " + e);
+            }
         }
     }
 

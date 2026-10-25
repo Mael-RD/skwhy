@@ -194,7 +194,7 @@ public class QuestModule implements AddonModule {
             new String[]{"on quest dialogue answer:", "\tsend \"Tu as répondu %event-dialogue answer%\" to event-player"}, "quest", "dialogue", "answer");
         event(addon, "[Quest] Quest Indicator Update", QuestIndicatorUpdateEvent.class, "quest indicator update",
             "Fires when the marker above a quest NPC is about to change for a player. Cancelling keeps the previous marker." + player
-                + " 'event-questnpc' is the NPC, 'event-questindicator' the new marker and 'event-old indicator' the previous one; "
+                + " 'event-questnpc' is the NPC, 'event-new indicator' the new marker and 'event-old indicator' the previous one; "
                 + "'displayed quest indicator' can be set to show another marker.",
             new String[]{"on quest indicator update:", "\tif displayed quest indicator is new:", "\t\tset displayed quest indicator to main"}, "quest", "indicator", "marker");
 
@@ -234,7 +234,7 @@ public class QuestModule implements AddonModule {
         reg.register(EventValue.simple(QuestDialogueAnswerEvent.class, QuestNpc.class, QuestDialogueAnswerEvent::getNpc));
         reg.register(EventValue.builder(QuestDialogueAnswerEvent.class, String.class).patterns("dialogue answer").getter(QuestDialogueAnswerEvent::getAnswer).time(EventValue.Time.NOW).build());
         reg.register(EventValue.simple(QuestIndicatorUpdateEvent.class, QuestNpc.class, QuestIndicatorUpdateEvent::getNpc));
-        reg.register(EventValue.simple(QuestIndicatorUpdateEvent.class, QuestIndicator.class, QuestIndicatorUpdateEvent::getIndicator));
+        reg.register(EventValue.builder(QuestIndicatorUpdateEvent.class, QuestIndicator.class).patterns("new indicator").getter(QuestIndicatorUpdateEvent::getIndicator).time(EventValue.Time.NOW).build());
         reg.register(EventValue.builder(QuestIndicatorUpdateEvent.class, QuestIndicator.class).patterns("old indicator").getter(QuestIndicatorUpdateEvent::getPastIndicator).time(EventValue.Time.NOW).build());
 
         // Événement interne des sections « register quest action / condition »

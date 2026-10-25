@@ -49,8 +49,14 @@ public class ChunkPathOf extends SimpleExpression<ChunkPathRecord> {
         Chunk chunk = chunkExpr.getSingle(event);
         if (chunk == null) return null;
 
-        ChunkGateService service = ChunkPathManager.serviceFor(chunk.getWorld());
-        ChunkGateData data = service.getIfKnown(chunk.getX(), chunk.getZ());
+        ChunkGateData data;
+        try {
+            data = ChunkPathManager.serviceFor(chunk.getWorld()).getIfKnown(chunk.getX(), chunk.getZ());
+        } catch (RuntimeException e) {
+            skwhy.SkWhy.getInstance().getLogger().warning("[ChunkPath] Impossible de lire le chunk ("
+                    + chunk.getX() + "," + chunk.getZ() + ") du monde " + chunk.getWorld().getName() + " : " + e);
+            return null;
+        }
         if (data == null) return null;
 
         return new ChunkPathRecord[]{ new ChunkPathRecord(chunk.getWorld().getName(), data) };

@@ -10,14 +10,11 @@ import java.util.Map;
 
 public final class GateExtractor {
 
-    /** Seuil de fusion par défaut, en coût pondéré (pas en blocs bruts). */
-    public static final int DEFAULT_MERGE_THRESHOLD = 20;
-
     private GateExtractor() {
     }
 
     @SuppressWarnings("null")
-    public static List<Gate> extract(ChunkNavMesh mesh, int chunkX, int chunkZ, int mergeThreshold) {
+    public static List<Gate> extract(ChunkNavMesh mesh, int chunkX, int chunkZ) {
         int[] componentOf = mesh.labelComponents();
         List<Gate> gates = new ArrayList<>();
         int nextId = 0;
@@ -31,7 +28,7 @@ public final class GateExtractor {
             List<Integer> boundary = mesh.boundaryNodes(dir);
             if (boundary.isEmpty()) continue;
 
-            int[] clusterRoot = clusterBoundaryNodes(mesh, boundary, mergeThreshold);
+            int[] clusterRoot = clusterBoundaryNodes(mesh, boundary);
 
             Map<Integer, List<Integer>> byRoot = new HashMap<>();
             for (int i = 0; i < boundary.size(); i++) {
@@ -83,20 +80,23 @@ public final class GateExtractor {
             gates.get(i).deadEndCandidate = gatesPerComponent.get(gateComponentList.get(i)) == 1;
         }
 
-        // Distances porte-à-porte : Dijkstra multi-source depuis chaque porte, en prenant
-        // pour chaque autre porte la distance minimale parmi tous ses noeuds membres
-        // (distance "région à région", plus fidèle que représentant-à-représentant).
+        // Distances porte-à-porte : Dijkstra depuis le bloc central (représentant) de chaque porte,
+        // lu au bloc central de l'autre porte. Une distance "région à région" (minimum sur tous
+        // les blocs) valait 0 pour deux portes qui se touchent, même très larges.
+        int[] representativeNode = new int[gates.size()];
         for (int i = 0; i < gates.size(); i++) {
+            int[] r = gates.get(i).representativeWorld;
+            representativeNode[i] = mesh.nodeAt(r[0] - chunkX * 16, r[1], r[2] - chunkZ * 16);
+        }
+        for (int i = 0; i < gates.size(); i++) {
+            if (representativeNode[i] < 0) continue;
             Gate gate = gates.get(i);
-            int[] dist = mesh.dijkstraMultiSource(gateNodeIdsList.get(i), Integer.MAX_VALUE);
+            int[] dist = mesh.dijkstraMultiSource(new int[]{representativeNode[i]}, Integer.MAX_VALUE);
             for (int j = 0; j < gates.size(); j++) {
-                if (i == j) continue;
-                int min = Integer.MAX_VALUE;
-                for (int nodeId : gateNodeIdsList.get(j)) {
-                    if (dist[nodeId] < min) min = dist[nodeId];
-                }
-                if (min != Integer.MAX_VALUE) {
-                    gate.internalDistances.put(gates.get(j).id, min);
+                if (i == j || representativeNode[j] < 0) continue;
+                int d = dist[representativeNode[j]];
+                if (d != Integer.MAX_VALUE) {
+                    gate.internalDistances.put(gates.get(j).id, d);
                 }
             }
         }
@@ -105,25 +105,22 @@ public final class GateExtractor {
     }
 
     /**
-     * Union-Find sur les noeuds de bord d'UN SEUL bord : deux noeuds sont fusionnés dès
-     * qu'un Dijkstra borné (cutoff = mergeThreshold - 1, car "strictement inférieur à
-     * mergeThreshold") trouve une distance sous le seuil. La fusion est transitive : si
-     * A~C et C~B alors A,B,C finissent dans le même groupe même si dist(A,B) >= seuil.
+     * Union-Find sur les noeuds de bord d'UN SEUL bord : deux noeuds de bord directement reliés
+     * (voisins dans le maillage : même hauteur, marche ou échelle) sont fusionnés, quel que soit
+     * leur coût. La fusion est transitive : tout bord continu ne forme qu'une porte.
      */
-    private static int[] clusterBoundaryNodes(ChunkNavMesh mesh, List<Integer> boundary, int mergeThreshold) {
+    private static int[] clusterBoundaryNodes(ChunkNavMesh mesh, List<Integer> boundary) {
         int n = boundary.size();
         int[] parent = new int[n];
         for (int i = 0; i < n; i++) parent[i] = i;
 
-        int cutoff = mergeThreshold - 1;
+        Map<Integer, Integer> indexOf = new HashMap<>();
+        for (int i = 0; i < n; i++) indexOf.put(boundary.get(i), i);
+
         for (int i = 0; i < n; i++) {
-            int[] dist = mesh.dijkstraFrom(boundary.get(i), cutoff);
-            for (int j = 0; j < n; j++) {
-                if (i == j) continue;
-                int d = dist[boundary.get(j)];
-                if (d != Integer.MAX_VALUE && d <= cutoff) {
-                    union(parent, i, j);
-                }
+            for (int neighbor : mesh.neighborsOf(boundary.get(i))) {
+                Integer j = indexOf.get(neighbor);
+                if (j != null) union(parent, i, j);
             }
         }
 

@@ -105,9 +105,17 @@ public class BlockChangePacket extends Event implements Cancellable {
 
     /** @return true if a script cancelled the change */
     private static boolean call(Player player, int x, int y, int z, WrappedBlockState state) {
-        BlockData data = SpigotConversionUtil.toBukkitBlockData(state);
-        BlockChangePacket bukkitEvent = new BlockChangePacket(player, new Location(player.getWorld(), x, y, z), data);
-        Bukkit.getPluginManager().callEvent(bukkitEvent);
-        return bukkitEvent.isCancelled();
+        // Le paquet doit être accepté ou annulé tout de suite, depuis le thread qui l'envoie : une erreur dans un script
+        // ne doit pas faire échouer l'envoi (le bloc est alors envoyé normalement).
+        try {
+            BlockData data = SpigotConversionUtil.toBukkitBlockData(state);
+            BlockChangePacket bukkitEvent = new BlockChangePacket(player, new Location(player.getWorld(), x, y, z), data);
+            Bukkit.getPluginManager().callEvent(bukkitEvent);
+            return bukkitEvent.isCancelled();
+        } catch (RuntimeException e) {
+            Bukkit.getLogger().log(java.util.logging.Level.WARNING,
+                    "[SkWhy] Erreur dans 'on block change packet' (bloc envoyé sans filtrage) : " + e, e);
+            return false;
+        }
     }
 }

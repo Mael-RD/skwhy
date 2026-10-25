@@ -39,7 +39,7 @@ public class LongMob {
     private final Entity entity;
     private final Integer id;
     private final LongNavigation navigation;
-    private final PathCostRules costRules;
+    private PathCostRules costRules;
 
     private Vector hitbox;
     private Vector position;
@@ -132,6 +132,18 @@ public class LongMob {
     // ════════════════════════════════════════════════════════════════════════
     // ░░ CONSTRUCTEUR ░░
     // ════════════════════════════════════════════════════════════════════════
+
+    public PathCostRules getCostRules() {
+        return costRules;
+    }
+
+    /** Applique d'autres règles de coût aux prochaines recherches de chemin de ce mob. */
+    public void setCostRules(PathCostRules costRules) {
+        this.costRules = costRules;
+        if (this.pathnavigation.getNodeEvaluator() instanceof skwhy.chunkpath.move.pathcalculator.CostRuleWalkNodeEvaluator evaluator) {
+            evaluator.setCostRules(costRules);
+        }
+    }
 
     public LongMob(LongNavigation navigation, Entity entity, float speed, PathCostRules costRules) {
         this.id = null;

@@ -19,7 +19,8 @@ import skwhy.modules.LongNavigationElements.types.PathCostRuleData;
 
 @Name("[ChunkPath] Path Cost Rule Creation")
 @Description("Creates a new, empty path cost rule (no blocks/tags yet), optionally with an initial cost (0 if " +
-    "omitted; a whole number, decimals are rounded). Populate it with 'blocks of path cost rule %pathcostrules%' and 'tags of path cost rule " +
+    "omitted; a whole number, decimals are rounded). A rule left without any block or tag is the default rule: its " +
+    "cost applies to every block no other rule covers (without it, those blocks are not walkable). Populate it with 'blocks of path cost rule %pathcostrules%' and 'tags of path cost rule " +
     "%pathcostrules%', then pass one or more rules to 'register chunk path of %chunk% using rules %pathcostrules%'.")
 @Examples({
     "set {_rule} to a new path cost rule with cost 1",

@@ -335,7 +335,6 @@ public final class ScriptEngine {
      *
      * @param onStart {@code true} quand le joueur vient de cliquer sur le NPC (le texte de reprise peut alors servir)
      */
-    @SuppressWarnings("unchecked")
     public static void dialogue(ScriptContext ctx, String actionId, boolean onStart) {
         Player player = ctx.online();
         ScriptNode node = ctx.scripts().get(actionId);

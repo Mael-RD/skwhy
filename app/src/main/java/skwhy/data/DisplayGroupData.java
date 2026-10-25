@@ -415,7 +415,8 @@ public class DisplayGroupData {
     }
 
     private void addDisplayGroupMount(Integer entityId) {
-        entityGroupMount.computeIfAbsent(entityId, k -> new ArrayList<>()).add(this);
+        List<DisplayGroupData> groups = entityGroupMount.computeIfAbsent(entityId, k -> new ArrayList<>());
+        if (!groups.contains(this)) groups.add(this);
         finalMount(viewers, entityId);
     }
 
@@ -461,7 +462,6 @@ public class DisplayGroupData {
         this.attachedEntity = null;
         this.location = location.clone();
         setAttachedId(entityId);
-        addDisplayGroupMount(attachedId);
         sendMovePacket();
         finalMount(viewers, attachedId);
     }

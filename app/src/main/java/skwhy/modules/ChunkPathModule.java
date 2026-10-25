@@ -56,6 +56,7 @@ public class ChunkPathModule implements AddonModule {
         LongNavigationEntity.register(addon);
         LongNavigationLocation.register(addon);
         LongNavigationDoors.register(addon);
+        LongNavigationRules.register(addon);
         LongNavigationNumber.register(addon);
         LongNavigationStatus.register(addon);
 
@@ -71,6 +72,7 @@ public class ChunkPathModule implements AddonModule {
      * À appeler depuis onDisable() du plugin principal.
      */
     public static void shutdown() {
+        skwhy.chunkpath.debug.GateDebugOverlay.shutdown();
         skwhy.chunkpath.longnav.LongNavigation.shutdownAll();
         ChunkPathManager.shutdown();
     }

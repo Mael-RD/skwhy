@@ -3,7 +3,6 @@ package skwhy.modules;
 import org.skriptlang.skript.addon.AddonModule;
 import org.skriptlang.skript.addon.SkriptAddon;
 
-import com.github.retrooper.packetevents.PacketEvents;
 
 import skwhy.modules.NavigationElements.conditions.*;
 import skwhy.modules.NavigationElements.effects.*;
@@ -21,10 +20,7 @@ public class NavigationModule implements AddonModule {
 
     @Override
     public boolean canLoad(SkriptAddon addon) {
-        if (PacketEvents.getAPI() == null) {
-            return false;
-        }
-        return true;
+        return skwhy.util.PacketEventsSupport.available("FakePathFindingModule");
     }
 
     @Override

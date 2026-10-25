@@ -29,7 +29,7 @@ class ChunkNavMeshTest {
     }
 
     private static ChunkNavMesh mesh(NbtTag chunk) {
-        return new ChunkNavMesh(chunk, PathCostRules.defaults());
+        return new ChunkNavMesh(chunk, TestChunks.uniformRules(5));
     }
 
     @Test
@@ -199,9 +199,16 @@ class ChunkNavMeshTest {
 
     @Test
     void groundCostFollowsTheRules() {
-        PathCostRules rules = new PathCostRules(List.of(new PathCostRules.CostRule(List.of(org.bukkit.Material.STONE), List.of(), 2)), 5);
+        PathCostRules rules = new PathCostRules(List.of(new PathCostRules.CostRule(List.of(org.bukkit.Material.STONE), List.of(), 2)));
         ChunkNavMesh mesh = new ChunkNavMesh(TestChunks.flatChunk(), rules);
         assertEquals(2, mesh.cost(mesh.nodeAt(3, 1, 3)));
+    }
+
+    @Test
+    void blockCoveredByNoRuleIsNotWalkable() {
+        PathCostRules rules = new PathCostRules(List.of(new PathCostRules.CostRule(List.of(org.bukkit.Material.DIRT), List.of(), 2)));
+        ChunkNavMesh mesh = new ChunkNavMesh(TestChunks.flatChunk(), rules);
+        assertEquals(0, mesh.nodeCount()); // le sol plat est en pierre : aucune règle ne le couvre
     }
 
     @Test

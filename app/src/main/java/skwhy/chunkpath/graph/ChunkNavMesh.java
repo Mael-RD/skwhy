@@ -204,23 +204,27 @@ public final class ChunkNavMesh {
                 for (int x = 0; x < 16; x++) {
                     if (!isWalkable(x, y, z)) continue;
                     int idx = cellIndex(x, y, z);
-                    nodeIndexGrid[idx] = xs.size();
-                    xs.add(x);
-                    ys.add(y);
-                    zs.add(z);
 
                     // Coût du sol si un sol existe (cas normal, y compris à la base d'une
                     // échelle posée au sol) ; sinon, en pleine grimpe sans sol dessous, coût
                     // de l'échelle/liane elle-même — défini par les mêmes règles de coût
                     // (PathCostRules) que le reste, juste indexé par le nom du bloc grimpé
                     // plutôt que par le nom du bloc sous les pieds.
+                    int cost;
                     if (standableAt(x, y - 1, z)) {
                         String floorName = floorNameAt(x, y - 1, z);
-                        costs.add(floorName == null ? costRules.costOf("minecraft:stone") : costRules.costOf(floorName));
+                        cost = floorName == null ? costRules.costOf("minecraft:stone") : costRules.costOf(floorName);
                     } else {
                         String climbName = names[idx];
-                        costs.add(climbName == null ? costRules.costOf("minecraft:ladder") : costRules.costOf(climbName));
+                        cost = climbName == null ? costRules.costOf("minecraft:ladder") : costRules.costOf(climbName);
                     }
+                    if (cost < 0) continue; // aucune règle ne couvre ce bloc : non marchable
+
+                    nodeIndexGrid[idx] = xs.size();
+                    xs.add(x);
+                    ys.add(y);
+                    zs.add(z);
+                    costs.add(cost);
                 }
             }
         }
@@ -332,6 +336,11 @@ public final class ChunkNavMesh {
     public int nodeAt(int x, int y, int z) {
         if (x < 0 || x > 15 || z < 0 || z > 15 || y < minY || y > maxY) return -1;
         return nodeIndexGrid[cellIndex(x, y, z)];
+    }
+
+    /** Noeuds directement reliés à ce noeud (déplacement d'un pas, marche ou échelle), à l'intérieur du chunk. */
+    public int[] neighborsOf(int node) {
+        return neighborIds[node];
     }
 
     /** Noeuds praticables situés sur le bord donné du chunk. */

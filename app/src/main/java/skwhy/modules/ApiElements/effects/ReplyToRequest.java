@@ -81,6 +81,7 @@ public class ReplyToRequest extends Effect {
             + " with " + bodyExpr.toString(event, debug);
     }
 
+    @SuppressWarnings("null") // faux positif : le builder de SyntaxInfo renvoie un type capture jamais null
     public static void register(SkriptAddon addon) {
         addon.syntaxRegistry().register(
             SyntaxRegistry.EFFECT,

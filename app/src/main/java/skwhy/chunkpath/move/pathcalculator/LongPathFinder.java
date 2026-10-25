@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
  * <p>Simplified: computes a single path toward a single target location at construction time.
  *
  * <p>Ground-only, cost-rule aware copy of {@code skwhy.pathfinder.pathcalculator.PathFinder}: the
- * node evaluator is always a {@link CostRuleWalkNodeEvaluator} weighted by the world's
+ * node evaluator is always a {@link CostRuleWalkNodeEvaluator} weighted by the navigation's
  * {@link PathCostRules}, and the search additionally aborts once a wall-clock deadline is hit (on
  * top of the existing node-count cutoff) so a single call never risks exceeding the ~10ms/execution
  * budget this system is called under, however far the target waypoint is.

@@ -99,6 +99,7 @@ public class ExprQuestNpc extends SimpleExpression<QuestNpc> {
                 .addPattern("quest npc of %entity%")
                 .addPattern("quest npc %string%")
                 .addPattern("[all] loaded quest npcs")
+                .priority(SyntaxInfo.PATTERN_MATCHES_EVERYTHING)
                 .build()
         );
     }

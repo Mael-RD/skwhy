@@ -49,13 +49,14 @@ public class RequestContent extends SimpleExpression<String> {
         API_request req = requestExpr.getSingle(event);
         if (req == null) return null;
 
-        String value = switch (matchedPattern) {
-            case 0 -> req.getMethod();
-            case 1 -> req.getPath();
-            case 2 -> req.getQuery();
-            case 3 -> req.getBody();
-            default -> null;
-        };
+        String value;
+        switch (matchedPattern) {
+            case 0: value = req.getMethod(); break;
+            case 1: value = req.getPath(); break;
+            case 2: value = req.getQuery(); break;
+            case 3: value = req.getBody(); break;
+            default: value = null;
+        }
         return value != null ? new String[]{ value } : null;
     }
 
@@ -67,13 +68,9 @@ public class RequestContent extends SimpleExpression<String> {
 
     @Override
     public String toString(@Nullable Event event, boolean debug) {
-        return switch (matchedPattern) {
-            case 0 -> "method of " + requestExpr.toString(event, debug);
-            case 1 -> "path of "   + requestExpr.toString(event, debug);
-            case 2 -> "query of "  + requestExpr.toString(event, debug);
-            case 3 -> "body of "   + requestExpr.toString(event, debug);
-            default -> "api request content";
-        };
+        String[] names = { "method of ", "path of ", "query of ", "body of " };
+        if (matchedPattern < 0 || matchedPattern >= names.length) return "api request content";
+        return names[matchedPattern] + requestExpr.toString(event, debug);
     }
 
     public static void register(SkriptAddon addon) {

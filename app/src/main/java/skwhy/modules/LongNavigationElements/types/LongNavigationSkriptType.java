@@ -13,7 +13,7 @@ public class LongNavigationSkriptType {
             .name("[Long Navigation] Type")
             .description("A long-distance, cost-rule aware pathfinding session — the long-distance counterpart " +
                 "to the 'navigation' type. Computes a coarse chunk-gate route between a start and an end " +
-                "location (using registered chunk path records and the world's path cost rules), then walks " +
+                "location (using registered chunk path records and the path cost rules given to the navigation, which has no default rules), then walks " +
                 "the real terrain toward that route waypoint by waypoint, recalculating short segments as " +
                 "needed instead of precomputing the whole distant path at once. Chunks that are not loaded are " +
                 "never loaded by the search: the entity waits for them, then jumps ahead to the first loaded " +

@@ -10,7 +10,6 @@ import org.skriptlang.skript.bukkit.lang.eventvalue.EventValueRegistry;
 import org.skriptlang.skript.bukkit.registration.BukkitSyntaxInfos;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 
-import com.github.retrooper.packetevents.PacketEvents;
 
 import ch.njol.skript.lang.util.SimpleEvent;
 import skwhy.SkWhy;
@@ -33,11 +32,7 @@ public class RandomStuffModule implements AddonModule {
 
     @Override
     public boolean canLoad(SkriptAddon addon) {
-        
-        if (PacketEvents.getAPI() == null) {
-            return false;
-        }
-        return true;
+        return skwhy.util.PacketEventsSupport.available("RandomStuffModule");
     }
 
     // init() : types en premier, avant toute syntaxe
@@ -50,6 +45,7 @@ public class RandomStuffModule implements AddonModule {
     public void load(SkriptAddon addon) {
         BodyYaw.register(addon);
         EntityId.register(addon);
+        AnyBookContent.register(addon);
         EntityTrackers.register(addon);
         FutureDirection.register(addon);
         GenerateId.register(addon);

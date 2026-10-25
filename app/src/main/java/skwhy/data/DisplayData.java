@@ -86,9 +86,8 @@ public abstract class DisplayData {
     /**
      * Retourne le packet compilé de création de l'entité display.
      *
-     * @param location Si non-null, recrée entièrement le packet avec cette position.
-     *                 Si null, retourne le packet déjà en cache (doit avoir été construit au moins une fois).
-     * @return Le packet compilé, ou null si location est null et qu'aucun packet n'a encore été créé.
+     * @param location Position du spawn ; ne doit pas être null (le packet est toujours recréé, il n'y a pas de cache).
+     * @return Le packet compilé.
      */
     @Nullable
     public CompiledDisplayPacket getSpawnPacket(@Nullable Location location) {

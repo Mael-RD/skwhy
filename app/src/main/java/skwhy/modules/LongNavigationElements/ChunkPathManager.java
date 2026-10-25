@@ -6,7 +6,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import skwhy.chunkpath.ChunkGateService;
 import skwhy.chunkpath.ChunkPathAnalyzer;
-import skwhy.chunkpath.block.PathCostRules;
 import skwhy.chunkpath.gate.ChunkGateStore;
 
 import java.nio.file.Files;
@@ -52,7 +51,7 @@ public final class ChunkPathManager {
 
     public static ChunkGateService serviceFor(World world) {
         return services.computeIfAbsent(world.getName(), name -> {
-            ChunkPathAnalyzer analyzer = new ChunkPathAnalyzer(regionFolderOf(world), PathCostRules.defaults());
+            ChunkPathAnalyzer analyzer = new ChunkPathAnalyzer(regionFolderOf(world));
             return new ChunkGateService(analyzer, store, name);
         });
     }
