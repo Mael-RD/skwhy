@@ -40,7 +40,7 @@ import java.util.List;
     "\tbroadcast \"next cell: %loop-value%\"",
     "set {_all::*} to all blocks of long navigation {_longnav}"
 })
-@Since("1.6.0")
+@Since("1.5.0")
 public class LongNavigationBlocks extends SimpleExpression<Location> {
 
     private Expression<Number> countExpr; // null = all of them

@@ -42,7 +42,7 @@ import java.util.Set;
     "set {_rules::*} to path cost rules of long navigation {_longnav}",
     "delete path cost rules of long navigation {_longnav}"
 })
-@Since("1.6.0")
+@Since("1.5.0")
 public class LongNavigationRules extends SimpleExpression<PathCostRuleData> {
 
     private Expression<LongNavigation> navigationExpr;

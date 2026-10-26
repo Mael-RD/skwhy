@@ -30,7 +30,7 @@ import skwhy.chunkpath.longnav.LongNavigation;
     "set cost smoothing of long navigation {_longnav} to 0",
     "reset cost smoothing of long navigation {_longnav}"
 })
-@Since("1.6.0")
+@Since("1.5.0")
 public class LongNavigationCostSmoothing extends SimpleExpression<Number> {
 
     private static final int MAX_BLOCKS = 16;

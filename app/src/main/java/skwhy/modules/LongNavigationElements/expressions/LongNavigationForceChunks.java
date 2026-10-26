@@ -30,7 +30,7 @@ import skwhy.chunkpath.longnav.LongNavigation;
     "set {_forced} to force chunk loading of long navigation {_longnav}",
     "reset force chunk loading of long navigation {_longnav}"
 })
-@Since("1.6.0")
+@Since("1.5.0")
 public class LongNavigationForceChunks extends SimpleExpression<Boolean> {
 
     private Expression<LongNavigation> navigationExpr;
