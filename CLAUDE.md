@@ -31,7 +31,7 @@ Les tests de SkWhy sont dans `C:\Users\orimi\Desktop\proxti\serveur vide\plugins
 4. `python run_tests.py coverage` doit afficher 100 % des syntaxes referencees ; `python run_tests.py run` doit etre vert.
    Un bug connu reste dans les tests (commentaire `# BUG connu`) tant qu'il n'est pas corrige.
 5. Rapport des erreurs : `serveur vide\...\skwhy-tests\last-run.md`.
-6. **Vitesse** : le runner accelere l'horloge (`tick rate 100`, `SKT_TICK_RATE`) pendant les fichiers qui font des `wait` ; un fichier `# skt-wait: N` (N = secondes REELLES max) finit son `on load` par `skt_done()` (aussi avant un `stop` apres `skt_skip`) et le runner n'attend pas plus. Run complet apres demarrage ~3 min. Travaux asynchrones (region, A*, `save-all flush`) = temps reel : sonder plutot qu'un `wait` fixe. Les tests quetes / custom entity sont ranges dans `skwhy-tests\_desactive\` (non executes) pour la release 1.5.0.
+6. **Lancement / vitesse** : `python run_tests.py run [module,...]` n'envoie qu'UNE commande RCON (`skt run <filtre>`) ; `_main.sk` (serveur vide) recharge les tests sur le serveur, ceux de `skt_parallel()` en meme temps chacun dans son monde `skt_<fichier>`, horloge a 100 ticks/s pendant les attentes (`skt_async()`/`skt_done()` dans les fichiers qui font des `wait`). Sans filtre = tout (avant publication), sinon seulement le module modifie. Voir le README des tests. Tests quetes / custom entity ranges dans `skwhy-tests\_desactive\` (non executes) pour la release 1.5.0.
 
 ## Tests JUnit (sans serveur)
 `./gradlew :app:test` (aucun serveur) : logique pure du plugin dans `app/src/test/java/skwhy` (`data` Vec3/Quat4/GlobalTransformation, `chunkpath` NBT, portes,
