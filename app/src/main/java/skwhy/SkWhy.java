@@ -24,8 +24,6 @@ import skwhy.modules.NavigationModule;
 import skwhy.modules.RandomStuffModule;
 import skwhy.modules.APIModule;
 import skwhy.modules.ChunkPathModule;
-import skwhy.modules.QuestModule;
-import skwhy.modules.CustomEntityModule;
 
 
 // import com.github.retrooper.packetevents.PacketEvents;
@@ -89,16 +87,6 @@ public class SkWhy extends JavaPlugin {
         } else {
             getLogger().info("Module ChunkPath désactivé dans la config.");
         }
-        if (isModuleEnabled("modules.quest")) {
-            skriptAddon.loadModules(new QuestModule());
-        } else {
-            getLogger().info("Module Quest désactivé dans la config.");
-        }
-        if (isModuleEnabled("modules.custom_entity")) {
-            skriptAddon.loadModules(new CustomEntityModule());
-        } else {
-            getLogger().info("Module CustomEntity désactivé dans la config.");
-        }
         // Écouteurs globaux : seulement si un module qui s'en sert est activé
         boolean fakeDisplay = isModuleEnabled("modules.fake_display");
         boolean randomStuff = isModuleEnabled("modules.random_stuff");
@@ -118,8 +106,6 @@ public class SkWhy extends JavaPlugin {
     public void onDisable() {
         APIModule.shutdown();
         ChunkPathModule.shutdown();
-        QuestModule.shutdown();
-        CustomEntityModule.shutdown();
         getLogger().info("SkWhy désactivé.");
     }
 

@@ -6,8 +6,6 @@ modules:
   api: true
   request: true
   chunk_path: true
-  quest: true
-  custom_entity: true
 
 api_rest:
   # Port pour les requête
@@ -29,8 +27,3 @@ chunkpath:
   # Les fichiers région sont lus dans <world_folder>/<overworld|the_nether|the_end>/region
   world_folder: "world/dimensions/minecraft"
 
-custom_entity:
-  # Dossier (dans le dossier du plugin) des définitions d'entités custom : fichiers .yml, une clé de premier niveau par id
-  folder: "custom-entities"
-  # Distance (en blocs) à partir de laquelle une entité custom fausse est envoyée à un joueur
-  view_distance: 48
