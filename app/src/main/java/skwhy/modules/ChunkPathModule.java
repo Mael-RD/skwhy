@@ -56,6 +56,7 @@ public class ChunkPathModule implements AddonModule {
         LongNavigationEntity.register(addon);
         LongNavigationLocation.register(addon);
         LongNavigationDoors.register(addon);
+        LongNavigationCostSmoothing.register(addon);
         LongNavigationRules.register(addon);
         LongNavigationNumber.register(addon);
         LongNavigationStatus.register(addon);

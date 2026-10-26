@@ -147,6 +147,19 @@ class GateExtractorTest {
     }
 
     @Test
+    void edgeBlocksOfDifferentCostRulesAreNotMerged() {
+        // moitie du bord ouest en planches (cout 30), l'autre moitie en pierre (cout 5) : deux portes
+        PathCostRules rules = new PathCostRules(List.of(
+                new PathCostRules.CostRule(List.of(org.bukkit.Material.OAK_PLANKS), List.of(), 30),
+                new PathCostRules.CostRule(List.of(), List.of(), 5)));
+        NbtTag chunk = TestChunks.chunk(b -> b.fill(0, 0, 0, 0, 0, 7, "minecraft:oak_planks"));
+        List<Gate> west = onEdge(extract(chunk, 0, 0, rules), Direction.WEST);
+        assertEquals(2, west.size());
+        assertEquals(8, west.get(0).memberBlocksWorld.size());
+        assertEquals(8, west.get(1).memberBlocksWorld.size());
+    }
+
+    @Test
     void pocketOnTheEdgeIsADeadEndCandidate() {
         // case (0,1,5) emmuree par 3 blocs de haut sauf vers l'exterieur du chunk
         NbtTag chunk = TestChunks.chunk(b -> {

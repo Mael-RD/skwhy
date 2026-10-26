@@ -229,4 +229,39 @@ class ChunkNavMeshTest {
         assertTrue(text.contains("y=1 "));
         assertTrue(text.contains("name=minecraft:stone"));
     }
+
+    @Test
+    void trapdoorsOnTheFloorOrOpenDoNotBlockAndCostNothing() {
+        for (String state : new String[] {"half=bottom,open=false", "half=top,open=false", "half=bottom,open=true", "half=top,open=true"}) {
+            NbtTag chunk = TestChunks.builder(0).fill(0, 0, 0, 15, 0, 15, "minecraft:stone")
+                    .set(5, 1, 5, "minecraft:oak_trapdoor[" + state + "]").build();
+            ChunkNavMesh mesh = mesh(chunk);
+            int node = mesh.nodeAt(5, 1, 5);
+            assertNotEquals(-1, node, state);
+            assertEquals(5, mesh.cost(node), state); // le sol dessous, pas la trappe
+        }
+    }
+
+    @Test
+    void closedTopTrapdoorOverAHoleIsAFloorWithItsOwnCost() {
+        PathCostRules rules = new PathCostRules(java.util.List.of(
+                new PathCostRules.CostRule(java.util.List.of(org.bukkit.Material.OAK_TRAPDOOR), java.util.List.of(), 9),
+                new PathCostRules.CostRule(java.util.List.of(), java.util.List.of(), 5)));
+        NbtTag chunk = TestChunks.builder(0).fill(0, 0, 0, 15, 0, 15, "minecraft:stone")
+                .air(5, 0, 5, 5, 0, 5)
+                .set(5, 0, 5, "minecraft:oak_trapdoor[half=top,open=false]").build();
+        ChunkNavMesh mesh = new ChunkNavMesh(chunk, rules);
+        int above = mesh.nodeAt(5, 1, 5);
+        assertNotEquals(-1, above);
+        assertEquals(9, mesh.cost(above));
+    }
+
+    @Test
+    void openOrBottomTrapdoorOverAHoleIsNotAFloor() {
+        for (String state : new String[] {"half=bottom,open=false", "half=top,open=true", "half=bottom,open=true"}) {
+            NbtTag chunk = TestChunks.builder(0).fill(0, 0, 0, 15, 0, 15, "minecraft:stone")
+                    .set(5, 0, 5, "minecraft:oak_trapdoor[" + state + "]").build();
+            assertEquals(-1, mesh(chunk).nodeAt(5, 1, 5), state);
+        }
+    }
 }

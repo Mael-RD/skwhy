@@ -23,7 +23,7 @@ class BlockClassifierTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"minecraft:air", "minecraft:cave_air", "minecraft:void_air", "minecraft:short_grass", "minecraft:poppy",
-            "minecraft:torch", "minecraft:oak_door", "minecraft:iron_door"})
+            "minecraft:torch", "minecraft:white_carpet", "minecraft:moss_carpet", "minecraft:oak_trapdoor", "minecraft:iron_trapdoor", "minecraft:oak_door", "minecraft:iron_door"})
     void occupiableButNotStandable(String name) {
         byte flags = BlockClassifier.classify(name);
         assertTrue(BlockClassifier.isOccupiable(flags), name);
@@ -50,7 +50,7 @@ class BlockClassifierTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"minecraft:water", "minecraft:lava", "minecraft:oak_trapdoor", "minecraft:iron_trapdoor", "minecraft:oak_fence",
+    @ValueSource(strings = {"minecraft:water", "minecraft:lava", "minecraft:oak_fence",
             "minecraft:nether_brick_fence", "minecraft:cobblestone_wall", "minecraft:oak_fence_gate"})
     void blockedBlocksAreNeitherOccupiableNorStandable(String name) {
         assertEquals(0, BlockClassifier.classify(name), name);
@@ -78,5 +78,29 @@ class BlockClassifierTest {
         assertTrue(BlockClassifier.isClimbable((byte) (BlockClassifier.OCCUPIABLE | BlockClassifier.CLIMBABLE)));
         assertFalse(BlockClassifier.isStandable(BlockClassifier.OCCUPIABLE));
         assertFalse(BlockClassifier.isOccupiable((byte) 0));
+    }
+
+    @Test
+    void trapdoorsAreCrossableWhateverTheirState() {
+        for (String half : new String[] {"bottom", "top"}) {
+            for (String open : new String[] {"true", "false"}) {
+                byte flags = BlockClassifier.classify("minecraft:oak_trapdoor", half, open);
+                assertTrue(BlockClassifier.isOccupiable(flags), half + " " + open);
+            }
+        }
+    }
+
+    @Test
+    void onlyAClosedTopTrapdoorIsAlsoAFloor() {
+        assertTrue(BlockClassifier.isStandable(BlockClassifier.classify("minecraft:oak_trapdoor", "top", "false")));
+        assertFalse(BlockClassifier.isStandable(BlockClassifier.classify("minecraft:oak_trapdoor", "top", "true")));
+        assertFalse(BlockClassifier.isStandable(BlockClassifier.classify("minecraft:oak_trapdoor", "bottom", "false")));
+        assertFalse(BlockClassifier.isStandable(BlockClassifier.classify("minecraft:oak_trapdoor", "bottom", "true")));
+        assertFalse(BlockClassifier.isStandable(BlockClassifier.classify("minecraft:oak_trapdoor", null, null)));
+    }
+
+    @Test
+    void stateIsIgnoredForOtherBlocks() {
+        assertEquals(BlockClassifier.classify("minecraft:stone"), BlockClassifier.classify("minecraft:stone", "top", "false"));
     }
 }

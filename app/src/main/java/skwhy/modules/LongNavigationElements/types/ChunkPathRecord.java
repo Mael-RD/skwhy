@@ -69,7 +69,8 @@ public final class ChunkPathRecord {
               .append(" representative=(").append(g.representativeWorld[0]).append(',')
                   .append(g.representativeWorld[1]).append(',').append(g.representativeWorld[2]).append(')')
               .append(" internalDistances=").append(g.internalDistances)
-              .append(" neighborLinks=").append(g.neighborLinks);
+              .append(" neighborLinks=").append(g.neighborLinks)
+              .append(" neighborCosts=").append(g.neighborCosts);
         }
         sb.append(']');
         return sb.toString();

@@ -22,9 +22,8 @@ import org.jspecify.annotations.Nullable;
  * budget this system is called under, however far the target waypoint is.
  */
 public class LongPathFinder {
-    private static final float FUDGING = 1.5F;
     /** Wall-clock budget per {@link #findPath} call. Checked every {@link #DEADLINE_CHECK_INTERVAL} nodes. */
-    private static final long DEADLINE_NANOS = 8_000_000L; // 8ms, leaves headroom under the 10ms budget
+    private static final long DEADLINE_NANOS = 14_000_000L; // 14ms: the cost smoothing makes each node dearer, 8ms cut searches short
     private static final int DEADLINE_CHECK_INTERVAL = 32;
 
     private final Node[] neighbors = new Node[32];
@@ -77,8 +76,9 @@ public class LongPathFinder {
 
         boolean reached = false;
         int count = 0;
-        int maxVisitedNodes = (int) (maxPathLength * 16.0F);
-        long deadline = System.nanoTime() + DEADLINE_NANOS;
+        int maxVisitedNodes = (int) (maxPathLength * skwhy.chunkpath.debug.ChunkPathTuning.nodesFactor);
+        final long started = System.nanoTime();
+        long deadline = started + DEADLINE_NANOS;
 
         while (!this.openSet.isEmpty()) {
             if (++count >= maxVisitedNodes) {
@@ -108,12 +108,13 @@ public class LongPathFinder {
                     Node neighbor = this.neighbors[i];
                     float distance = this.distance(current, neighbor);
                     neighbor.walkedDistance = current.walkedDistance + distance;
+                    final float fudging = skwhy.chunkpath.debug.ChunkPathTuning.fudging;
                     float tentativeGScore = current.g + distance + neighbor.costMalus;
                     if (neighbor.walkedDistance < maxPathLength && (!neighbor.inOpenSet() || tentativeGScore < neighbor.g)) {
                         neighbor.cameFrom = current;
                         neighbor.g = tentativeGScore;
                         float h = neighbor.distanceTo(target);
-                        neighbor.h = h * FUDGING;
+                        neighbor.h = h * fudging;
                         target.updateBest(h, neighbor);
                         if (neighbor.inOpenSet()) {
                             this.openSet.changeCost(neighbor, neighbor.g + neighbor.h);
@@ -124,6 +125,11 @@ public class LongPathFinder {
                     }
                 }
             }
+        }
+
+        if (skwhy.chunkpath.longnav.LongNavigation.verbose) {
+            skwhy.SkWhy.getInstance().getLogger().info("[ChunkPath/debug] A* visited " + count + "/" + maxVisitedNodes + " nodes in "
+                    + (System.nanoTime() - started) / 1_000_000.0 + " ms, reached=" + reached);
         }
 
         if (target.getBestNode() == null) {
@@ -146,6 +152,8 @@ public class LongPathFinder {
             node = node.cameFrom;
             nodes.add(0, node);
         }
+
+        this.nodeEvaluator.smooth(nodes);
 
         return new Path(
                 nodes,

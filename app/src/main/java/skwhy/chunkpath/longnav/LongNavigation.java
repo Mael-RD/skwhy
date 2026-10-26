@@ -347,6 +347,7 @@ public class LongNavigation {
 
         mob.tick();
         syncVirtualEntity();
+        traceTick();
 
         if (verbose && world.getGameTime() % 20 == 0) {
             Vector d = mob.getDeltaMovement();
@@ -380,6 +381,99 @@ public class LongNavigation {
             lastAbsoluteSyncTick = now;
             sendTeleportPacket(loc);
         }
+    }
+
+    private java.io.PrintWriter traceOut;
+
+    /** {@code /cpdebug set trace on}: one CSV line per 2 ticks (tick, x, y, z, status, waypoint index, leg waypoint). */
+    private void traceTick() {
+        if (!skwhy.chunkpath.debug.ChunkPathTuning.trace) {
+            if (traceOut != null) { traceOut.close(); traceOut = null; }
+            return;
+        }
+        long now = world.getGameTime();
+        if (now % 2 != 0) return;
+        try {
+            if (traceOut == null) {
+                java.io.File dir = new java.io.File(SkWhy.getInstance().getDataFolder(), "traces");
+                dir.mkdirs();
+                traceOut = new java.io.PrintWriter(new java.io.FileWriter(new java.io.File(dir, "nav-" + mob.getId() + "-" + System.currentTimeMillis() + ".csv")), true);
+                traceOut.println("tick,x,y,z,status,waypoint,leg,forcedTp");
+            }
+            Location l = mob.getLocation();
+            traceOut.println(now + "," + String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", l.getX(), l.getY(), l.getZ())
+                    + "," + status + "," + waypointIndex + "," + legWaypoint + "," + forcedTeleports);
+        } catch (java.io.IOException e) {
+            skwhy.chunkpath.debug.ChunkPathTuning.trace = false;
+        }
+    }
+
+    /**
+     * Once the terrain around the next chunk border is loaded, chooses its crossing cell again with the real floor costs
+     * (see {@link RouteWaypoints#refine}).
+     *
+     * @return true when the waypoint moved
+     */
+    private boolean refineCrossing(Location waypoint) {
+        if (waypoints == null || waypointIndex >= waypoints.size() || mob.getCostRules() == null) return false;
+        PathCostRules rules = mob.getCostRules();
+        Location here = mob.getLocation();
+        boolean changed = waypoints.refine(waypointIndex,
+                new int[] { here.getBlockX(), here.getBlockY(), here.getBlockZ() },
+                new int[] { endLocation.getBlockX(), endLocation.getBlockY(), endLocation.getBlockZ() },
+                (x, y, z) -> {
+                    if (!world.isChunkLoaded(x >> 4, z >> 4)) return Integer.MIN_VALUE;
+                    org.bukkit.Material below = world.getType(x, y - 1, z);
+                    return below.isSolid() && !skwhy.chunkpath.block.BlockClassifier.noCollisionBlocks().contains(below) ? rules.costOf(below) : Integer.MIN_VALUE;
+                });
+        if (changed) {
+            if (verbose) {
+                int[] a = waypoints.cell(waypointIndex), b = waypoints.cell(waypointIndex + 1);
+                debug("crossing #" + waypointIndex + " chosen again with the floor costs: " + a[0] + "," + a[1] + "," + a[2] + " -> " + b[0] + "," + b[1] + "," + b[2]);
+            }
+            legWaypoint = -1;
+        }
+        return changed;
+    }
+
+    /**
+     * The gates only give the direction: before walking to the next waypoint, try the farthest waypoint (or
+     * the destination) within reach. The shortcut is kept when the A* really gets there and not by a detour.
+     */
+    private boolean tryShortcut(PathNavigation nav) {
+        int ahead = skwhy.chunkpath.debug.ChunkPathTuning.lookahead;
+        if (ahead <= 0 || waypoints == null || waypointIndex >= waypoints.size()) return false;
+        Location here = mob.getLocation();
+        double range = skwhy.chunkpath.debug.ChunkPathTuning.lookaheadRange;
+        int tries = 0;
+        for (int j = Math.min(waypoints.size(), waypointIndex + ahead); j > waypointIndex && tries < 3; j--) {
+            Location target = j == waypoints.size() ? endLocation : waypointLocation(j);
+            double straight = here.distance(target);
+            if (straight > range || !isChunkLoaded(target)) continue;
+            tries++;
+            if (!nav.moveTo(target, skwhy.chunkpath.debug.ChunkPathTuning.legLength) || !nav.getPath().canReach()) { nav.stop(); continue; }
+            Path path = nav.getPath();
+            double walked = 0.0;
+            for (int i = 1; i < path.getNodeCount(); i++) {
+                Node a = path.getNode(i - 1), b = path.getNode(i);
+                walked += Math.sqrt((a.x - b.x) * (double) (a.x - b.x) + (a.z - b.z) * (double) (a.z - b.z));
+            }
+            double chain = 0.0;
+            Location previous = here;
+            for (int i = waypointIndex; i <= j; i++) {
+                Location next = i == waypoints.size() ? endLocation : waypointLocation(i);
+                chain += Math.sqrt(Math.pow(previous.getX() - next.getX(), 2) + Math.pow(previous.getZ() - next.getZ(), 2));
+                previous = next;
+            }
+            if (walked > chain * skwhy.chunkpath.debug.ChunkPathTuning.lookaheadRatio + 2.0) { nav.stop(); continue; }
+            if (verbose) debug("shortcut from waypoint#" + waypointIndex + " to waypoint#" + j + " (" + Math.round(walked) + " blocks, gates " + Math.round(chain) + ")");
+            waypointIndex = j;
+            legWaypoint = j;
+            legPartial = false;
+            setStatus(Status.FOLLOWING, "shortcut leg found (" + path.getNodeCount() + " nodes)");
+            return true;
+        }
+        return false;
     }
 
     private void tickFollowing() {
@@ -431,7 +525,11 @@ public class LongNavigation {
             return; // too many A* searches this tick already, this navigation gets its turn on a later one
         }
         legSearchBudget--;
-        boolean moving = nav.moveTo(waypoint, MAX_LEG_PATH_LENGTH);
+        if (refineCrossing(waypoint)) {
+            waypoint = currentWaypointLocation();
+        }
+        if (tryShortcut(nav)) return;
+        boolean moving = nav.moveTo(waypoint, skwhy.chunkpath.debug.ChunkPathTuning.legLength);
         if (!moving) {
             LongGroundPathNavigation.FailureReason reason =
                     ((LongGroundPathNavigation) nav).lastFailureReason();
@@ -526,7 +624,7 @@ public class LongNavigation {
         if (nearDx * nearDx + nearDz * nearDz < REACHED_DISTANCE * REACHED_DISTANCE && nearDy > -1.5 && nearDy < 2.0) {
             return true; // already standing on the gate block: no leg to walk (the A* has nothing to search)
         }
-        if (waypoints != null && waypointIndex < waypoints.size()) {
+        if (skwhy.chunkpath.debug.ChunkPathTuning.switchMode >= 1 && waypoints != null && waypointIndex < waypoints.size()) {
             // a gate is only a direction: the mob heads to the gate of its chunk that leads to the next chunk
             // (the exit cell guides it around the obstacles inside the chunk) and switches to the following
             // gate as soon as it stands in the next chunk, without touching the gate block. A gate followed
@@ -535,7 +633,8 @@ public class LongNavigation {
             int[] ref = cell;
             if (waypointIndex + 1 < waypoints.size()) {
                 int[] next = waypoints.cell(waypointIndex + 1);
-                if ((next[0] >> 4) != (cell[0] >> 4) || (next[2] >> 4) != (cell[2] >> 4)) ref = next;
+                if (skwhy.chunkpath.debug.ChunkPathTuning.switchMode == 2
+                        || (next[0] >> 4) != (cell[0] >> 4) || (next[2] >> 4) != (cell[2] >> 4)) ref = next;
             }
             return (current.getBlockX() >> 4) == (ref[0] >> 4) && (current.getBlockZ() >> 4) == (ref[2] >> 4);
         }
@@ -781,7 +880,8 @@ public class LongNavigation {
             setStatus(Status.FAILED_NO_PATH, "state machine");
             return;
         }
-        waypoints = RouteWaypoints.build(route, from.getBlockX(), from.getBlockY(), from.getBlockZ());
+        waypoints = RouteWaypoints.build(route, from.getBlockX(), from.getBlockY(), from.getBlockZ(),
+                new int[] { endLocation.getBlockX(), endLocation.getBlockY(), endLocation.getBlockZ() });
         if (verbose) {
             StringBuilder sb = new StringBuilder("route of ").append(route.size()).append(" gates, waypoints:");
             for (int i = 0; i < waypoints.size(); i++) {
@@ -877,6 +977,17 @@ public class LongNavigation {
     public void setCanOpenDoors(boolean canOpen) {
         if (canOpen == mob.canOpenDoors()) return;
         mob.setCanOpenDoors(canOpen);
+        rejoinResume = null;
+        legWaypoint = -1;
+        mob.getNavigation().stop();
+    }
+
+    /** See {@link LongMob#costSmoothing()}. */
+    public int getCostSmoothing() { return mob.costSmoothing(); }
+
+    /** Size in blocks under which a more expensive patch is ignored; negative = default. The current leg is recomputed. */
+    public void setCostSmoothing(int blocks) {
+        mob.setCostSmoothing(blocks);
         rejoinResume = null;
         legWaypoint = -1;
         mob.getNavigation().stop();

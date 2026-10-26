@@ -106,8 +106,9 @@ public final class GateExtractor {
 
     /**
      * Union-Find sur les noeuds de bord d'UN SEUL bord : deux noeuds de bord directement reliés
-     * (voisins dans le maillage : même hauteur, marche ou échelle) sont fusionnés, quel que soit
-     * leur coût. La fusion est transitive : tout bord continu ne forme qu'une porte.
+     * (voisins dans le maillage : même hauteur, marche ou échelle) ne sont fusionnés que s'ils ont le
+     * même coût, c'est-à-dire la même règle de coût (un chemin bordé d'herbe donne des portes séparées).
+     * La fusion est transitive : un bord continu de même règle ne forme qu'une porte.
      */
     private static int[] clusterBoundaryNodes(ChunkNavMesh mesh, List<Integer> boundary) {
         int n = boundary.size();
@@ -120,7 +121,7 @@ public final class GateExtractor {
         for (int i = 0; i < n; i++) {
             for (int neighbor : mesh.neighborsOf(boundary.get(i))) {
                 Integer j = indexOf.get(neighbor);
-                if (j != null) union(parent, i, j);
+                if (j != null && mesh.cost(boundary.get(i)) == mesh.cost(neighbor)) union(parent, i, j);
             }
         }
 

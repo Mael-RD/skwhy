@@ -2,7 +2,9 @@ package skwhy.chunkpath.longnav;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
@@ -97,5 +99,69 @@ class RouteWaypointsTest {
         RouteWaypoints w = RouteWaypoints.build(List.of(a, b), 3, 1, 5);
         assertArrayEquals(new int[] {3, 1, 15}, w.cell(0));
         assertArrayEquals(new int[] {3, 1, 16}, w.cell(1));
+    }
+
+    /** Border x = 15 | 16 over z = 0..8, cheap road on z = 3..5, expensive everywhere else. */
+    private static Gate[] borderOfWidth9() {
+        int[][] exit = new int[9][], entry = new int[9][];
+        for (int z = 0; z < 9; z++) {
+            exit[z] = new int[] {15, 1, z};
+            entry[z] = new int[] {16, 1, z};
+        }
+        return new Gate[] {gate(0, 0, 0, Direction.EAST, exit), gate(1, 0, 0, Direction.WEST, entry)};
+    }
+
+    private static final RouteWaypoints.CellCost ROAD_ON_3_TO_5 = (x, y, z) -> z >= 3 && z <= 5 ? 1 : 200;
+
+    @Test
+    void refineMovesTheCrossingOntoTheCheapRoadInsteadOfTheClosestCell() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8); // distances only: z = 8
+        assertArrayEquals(new int[] {15, 1, 8}, w.cell(0));
+        assertTrue(w.refine(0, new int[] {10, 1, 8}, new int[] {40, 1, 8}, ROAD_ON_3_TO_5));
+        assertEquals(4, w.cell(0)[2], "the middle of the road (z 3..5) is wanted, not its edge");
+        assertEquals(4, w.cell(1)[2]);
+        assertEquals(15, w.cell(0)[0]);
+        assertEquals(16, w.cell(1)[0]);
+    }
+
+    @Test
+    void refineIsDoneOncePerWaypoint() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8);
+        assertTrue(w.refine(0, new int[] {10, 1, 8}, null, ROAD_ON_3_TO_5));
+        assertFalse(w.refine(0, new int[] {10, 1, 0}, null, ROAD_ON_3_TO_5));
+    }
+
+    @Test
+    void refineKeepsTheEarlierChoiceWhenTheTerrainIsNotLoaded() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8);
+        assertFalse(w.refine(0, new int[] {10, 1, 8}, null, (x, y, z) -> Integer.MIN_VALUE));
+        assertArrayEquals(new int[] {15, 1, 8}, w.cell(0));
+    }
+
+    @Test
+    void refineOnUniformGroundStaysAwayFromTheEndsOfTheBorder() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 0); // starts on z = 0: the end of the border
+        w.refine(0, new int[] {10, 1, 0}, null, (x, y, z) -> 7);
+        assertTrue(w.cell(0)[2] >= 2, "a crossing at the very end of a path is avoided, got z=" + w.cell(0)[2]);
+    }
+
+    @Test
+    void refineDoesNotTouchAnEntryWaypoint() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8);
+        assertFalse(w.refine(1, new int[] {10, 1, 8}, null, ROAD_ON_3_TO_5));
+    }
+
+    @Test
+    void refineAvoidsBlockedCells() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 4);
+        // z 3..5 closed (wall / blocked block): the crossing must be elsewhere even if it is close
+        w.refine(0, new int[] {10, 1, 4}, null, (x, y, z) -> z >= 3 && z <= 5 ? -1 : 5);
+        assertTrue(w.cell(0)[2] < 3 || w.cell(0)[2] > 5);
     }
 }

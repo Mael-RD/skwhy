@@ -257,7 +257,8 @@ public final class GatePathfinder {
                     if (other == null) continue; // chunk voisin jamais traité -> cul-de-sac ignoré
                     gateByKey.put(link, other);
                 }
-                relax(dist, prev, pq, u, link, crossingCost(gate, other, borderCrossingCost));
+                Integer pairCost = gate.neighborCosts.get(link);
+                relax(dist, prev, pq, u, link, pairCost != null ? pairCost : crossingCost(gate, other, borderCrossingCost));
             }
         }
 
@@ -274,7 +275,7 @@ public final class GatePathfinder {
         return path;
     }
 
-    /** Distance (Manhattan, au moins 1 bloc) entre les blocs centraux de deux portes liées, fois le coût par bloc. */
+    /** Repli quand {@link Gate#neighborCosts} n'a pas de coût pour la paire : distance (Manhattan, au moins 1 bloc) entre les blocs centraux, fois le coût par bloc. */
     private static int crossingCost(Gate from, Gate to, int blockCost) {
         int[] a = from.representativeWorld, b = to.representativeWorld;
         int blocks = Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);

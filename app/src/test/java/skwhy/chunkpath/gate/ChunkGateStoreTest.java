@@ -260,4 +260,29 @@ class ChunkGateStoreTest {
             assertTrue(store.exists("old", 0, 0));
         }
     }
+
+    @Test
+    void versionTwoAndThreeAreBackedUpThenStartEmpty() throws IOException {
+        Path dir = Files.createDirectories(folder.resolve("chunkpath-data"));
+        try (RandomAccessFile raf = new RandomAccessFile(dir.resolve("v2.db").toFile(), "rw")) {
+            raf.writeInt(0x43504442);
+            raf.writeInt(2);
+            raf.writeInt(256);
+            raf.writeInt(0);
+            raf.setLength(16 + 256 * 21);
+        }
+        try (RandomAccessFile raf = new RandomAccessFile(dir.resolve("v3.db").toFile(), "rw")) {
+            raf.writeInt(0x43504442);
+            raf.writeInt(3);
+            raf.writeInt(256);
+            raf.writeInt(0);
+            raf.setLength(16 + 256 * 21);
+        }
+        try (ChunkGateStore store = new ChunkGateStore(folder)) {
+            assertFalse(store.exists("v2", 0, 0));
+            assertTrue(Files.exists(dir.resolve("v2.db.v2.bak")));
+            assertFalse(store.exists("v3", 0, 0));
+            assertTrue(Files.exists(dir.resolve("v3.db.v3.bak")));
+        }
+    }
 }

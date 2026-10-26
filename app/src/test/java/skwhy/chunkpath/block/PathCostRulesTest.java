@@ -85,4 +85,17 @@ class PathCostRulesTest {
         // deuxieme appel : valeur en cache identique
         assertEquals(1, rules.costOf("minecraft:stone"));
     }
+
+    @Test
+    void costOfMaterialGivesTheSameCostAsCostOfName() {
+        PathCostRules rules = new PathCostRules(List.of(
+                new CostRule(List.of(Material.STONE_BRICKS), List.of(), 1),
+                new CostRule(List.of(Material.CYAN_WOOL), List.of(), -1),
+                new CostRule(List.of(), List.of(), 200)));
+        assertEquals(1, rules.costOf(Material.STONE_BRICKS));
+        assertEquals(1, rules.costOf(Material.STONE_BRICKS)); // second read comes from the table
+        assertEquals(PathCostRules.BLOCKED, rules.costOf(Material.CYAN_WOOL));
+        assertEquals(200, rules.costOf(Material.GRASS_BLOCK));
+        assertEquals(rules.costOf("minecraft:grass_block"), rules.costOf(Material.GRASS_BLOCK));
+    }
 }

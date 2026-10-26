@@ -44,6 +44,15 @@ public final class Gate {
      */
     public final Set<String> neighborLinks = new HashSet<>();
 
+    /**
+     * Coût de la paire (cette porte, porte voisine liée) : coût du chemin au sol qui va du bloc central
+     * de cette porte au bloc central de l'autre en franchissant la frontière (clé = identifiant global
+     * de la porte voisine, comme dans {@link #neighborLinks}). Absent tant qu'il n'a pas été calculé
+     * (base écrite avant cette donnée, chunk illisible, pas de chemin) : l'appelant se rabat alors sur
+     * une estimation par la distance.
+     */
+    public final Map<String, Integer> neighborCosts = new HashMap<>();
+
     Gate(int chunkX, int chunkZ, int id, Direction edge, List<int[]> memberBlocksWorld, int[] representativeWorld) {
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;

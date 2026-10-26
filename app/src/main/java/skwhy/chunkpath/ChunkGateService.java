@@ -6,8 +6,13 @@ import skwhy.chunkpath.gate.ChunkGateLinker;
 import skwhy.chunkpath.gate.Gate;
 import skwhy.chunkpath.gate.ChunkGateStore;
 
+import skwhy.chunkpath.graph.ChunkNavMesh;
+
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -102,14 +107,84 @@ public final class ChunkGateService {
                 // links kept by the neighbor would silently point to other gates and create impossible routes
                 for (Gate gate : neighbor.gates()) {
                     gate.neighborLinks.removeIf(id -> id.startsWith(replacedPrefix));
+                    gate.neighborCosts.keySet().removeIf(id -> id.startsWith(replacedPrefix));
                 }
                 ChunkGateLinker.link(data, neighbor, dir);
+                computeCrossingCosts(data, neighbor, dir, costRules);
                 // le voisin peut avoir perdu des portes (élagage) : on ré-enregistre son état à jour
                 store.save(worldName, neighbor);
             }
         }
         store.save(worldName, data);
         return data;
+    }
+
+    /**
+     * Pour chaque paire de portes liées entre {@code a} et {@code b}, calcule le coût du chemin au sol
+     * du bloc central de l'une au bloc central de l'autre : on passe par la paire de cellules adjacentes de
+     * part et d'autre de la frontière la moins chère (coût dans le chunk de a jusqu'à la cellule, puis
+     * dans celui de b depuis la cellule, comptes avec le coût d'entrée de chaque noeud, comme le Dijkstra
+     * du maillage). Le même coût est enregistré des deux côtés. Si le calcul est impossible (chunk
+     * illisible, centre non praticable, aucun chemin), la paire garde l'estimation par la distance.
+     */
+    private void computeCrossingCosts(ChunkGateData a, ChunkGateData b, Direction dirAtoB, PathCostRules costRules) {
+        ChunkNavMesh meshA;
+        ChunkNavMesh meshB;
+        try {
+            meshA = analyzer.buildMesh(a.chunkX, a.chunkZ, costRules);
+            meshB = analyzer.buildMesh(b.chunkX, b.chunkZ, costRules);
+        } catch (RuntimeException e) {
+            return;
+        }
+        Map<String, int[]> distCache = new HashMap<>();
+        String prefixB = b.chunkX + "," + b.chunkZ + ",";
+        for (Gate ga : a.gates()) {
+            for (String link : ga.neighborLinks) {
+                if (!link.startsWith(prefixB)) continue;
+                Gate gb = b.byId(Integer.parseInt(link.substring(prefixB.length())));
+                if (gb == null) continue;
+                int cost = crossingCost(ga, gb, meshA, meshB, dirAtoB, distCache);
+                if (cost >= 0) {
+                    ga.neighborCosts.put(gb.globalId(), cost);
+                    gb.neighborCosts.put(ga.globalId(), cost);
+                }
+            }
+        }
+    }
+
+    /** @return le coût, ou -1 si aucun chemin ne relie les deux blocs centraux. */
+    private static int crossingCost(Gate ga, Gate gb, ChunkNavMesh meshA, ChunkNavMesh meshB,
+                                    Direction dirAtoB, Map<String, int[]> distCache) {
+        int repA = nodeOf(meshA, ga, ga.representativeWorld);
+        int repB = nodeOf(meshB, gb, gb.representativeWorld);
+        if (repA < 0 || repB < 0) return -1;
+        int[] distA = distCache.computeIfAbsent(ga.globalId(), k -> meshA.dijkstraFrom(repA, Integer.MAX_VALUE));
+        int[] distB = distCache.computeIfAbsent(gb.globalId(), k -> meshB.dijkstraFrom(repB, Integer.MAX_VALUE));
+
+        Set<Long> membersB = new HashSet<>();
+        for (int[] m : gb.memberBlocksWorld) membersB.add(blockKey(m[0], m[1], m[2]));
+
+        long best = Long.MAX_VALUE;
+        for (int[] m : ga.memberBlocksWorld) {
+            if (!membersB.contains(blockKey(m[0] + dirAtoB.dx, m[1], m[2] + dirAtoB.dz))) continue;
+            int nodeA = nodeOf(meshA, ga, m);
+            int nodeB = nodeOf(meshB, gb, new int[]{m[0] + dirAtoB.dx, m[1], m[2] + dirAtoB.dz});
+            if (nodeA < 0 || nodeB < 0) continue;
+            if (distA[nodeA] == Integer.MAX_VALUE || distB[nodeB] == Integer.MAX_VALUE) continue;
+            // a -> b -> centre de gb, avec le coût d'entrée de chaque noeud : distB est mesuré depuis le centre,
+            // le trajet inverse (b -> centre) coûte distB[b] - cost(b) + cost(centre), et franchir la frontière coûte cost(b)
+            long total = (long) distA[nodeA] + distB[nodeB] + meshB.cost(repB);
+            best = Math.min(best, total);
+        }
+        return best == Long.MAX_VALUE ? -1 : (int) Math.min(best, Integer.MAX_VALUE);
+    }
+
+    private static int nodeOf(ChunkNavMesh mesh, Gate gate, int[] world) {
+        return mesh.nodeAt(world[0] - gate.chunkX * 16, world[1], world[2] - gate.chunkZ * 16);
+    }
+
+    private static long blockKey(int x, int y, int z) {
+        return ((long) x & 0x3FFFFFFL) << 38 | ((long) z & 0x3FFFFFFL) << 12 | ((long) y & 0xFFFL);
     }
 
     /** Données d'un chunk si déjà connues (mémoire OU disque) — ne lance jamais d'analyse. */

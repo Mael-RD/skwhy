@@ -48,6 +48,7 @@ public class LongMob {
     private float speed;
     private float maxUpStep = 0.6F;
     private boolean canOpenDoors = true;
+    private int costSmoothing = -1;
     private final DoorOpener doors = new DoorOpener(this);
 
     // ── Position ─────────────────────────────────────────────────────────────
@@ -786,6 +787,20 @@ public class LongMob {
 
     public void setCanOpenDoors(boolean canOpenDoors) {
         this.canOpenDoors = canOpenDoors;
+    }
+
+    /**
+     * Size (blocks) under which a patch of blocks costing more than its surroundings is ignored by the walk
+     * (a grass block in a dirt path); 0 = the custom costs apply block by block. The default comes from
+     * {@link skwhy.chunkpath.debug.ChunkPathTuning#localScale} until a value is set.
+     */
+    public int costSmoothing() {
+        return costSmoothing >= 0 ? costSmoothing : skwhy.chunkpath.debug.ChunkPathTuning.localScale;
+    }
+
+    /** @param blocks the size in blocks, or a negative number for the default */
+    public void setCostSmoothing(int blocks) {
+        this.costSmoothing = blocks;
     }
 
     public DoorOpener getDoors() {

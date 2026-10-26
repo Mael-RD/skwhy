@@ -82,10 +82,24 @@ public final class ChunkPathDebugCommand extends Command {
                     sender.sendMessage("geometry checks=" + skwhy.chunkpath.move.pathcalculator.CostRuleWalkNodeEvaluator.geometryChecks);
                 }
                 case "dump" -> LongNavigation.getRegistry().forEach(n -> sender.sendMessage(n.toString()));
+                case "pairs" -> {
+                    var data = ChunkPathManager.serviceFor(Bukkit.getWorld(args[1]))
+                            .getIfKnown(Integer.parseInt(args[2]), Integer.parseInt(args[3]));
+                    if (data == null) sender.sendMessage("chunk inconnu");
+                    else for (var g : data.gates()) sender.sendMessage("gate " + g.globalId() + " " + g.edge + " rep="
+                            + java.util.Arrays.toString(g.representativeWorld) + " internal=" + g.internalDistances
+                            + " links=" + g.neighborLinks + " pairCosts=" + g.neighborCosts);
+                }
                 case "verbose" -> {
                     LongNavigation.verbose = args.length < 2 || !args[1].equals("off");
                     sender.sendMessage("verbose=" + LongNavigation.verbose);
                 }
+                case "set" -> {
+                    String error = args.length < 3 ? "usage : /cpdebug set <clé> <valeur>" : skwhy.chunkpath.debug.ChunkPathTuning.set(args[1], args[2]);
+                    sender.sendMessage(error != null ? error : "ok " + skwhy.chunkpath.debug.ChunkPathTuning.describe());
+                }
+                case "get" -> sender.sendMessage(String.valueOf(skwhy.chunkpath.debug.ChunkPathTuning.describe()));
+                case "map" -> map(sender, args);
                 case "folder" -> sender.sendMessage(String.valueOf(ChunkPathManager.regionFolderOf(Bukkit.getWorld(args[1]))));
                 default -> { return false; }
             }
@@ -129,5 +143,63 @@ public final class ChunkPathDebugCommand extends Command {
                     + " pos=" + nav.getCurrentLocation() + " end=" + nav.getEnd());
         }
         sender.sendMessage(LongNavigation.getRegistry().size() + " navigation(s)");
+    }
+
+    /**
+     * {@code cpdebug map <monde> <x1> <z1> <x2> <z2> <y>} : écrit {@code plugins/SkWhy/traces/map.txt}, un caractère par colonne
+     * (sol le plus proche de y) : {@code .} coût 1, {@code 2..9} coût / 25, {@code #} coût élevé, {@code X} bloqué, espace = pas de sol.
+     * Les règles sont celles de la première long navigation enregistrée.
+     */
+    private static void map(CommandSender sender, String[] args) throws java.io.IOException {
+        World world = Bukkit.getWorld(args[1]);
+        int x1 = Integer.parseInt(args[2]), z1 = Integer.parseInt(args[3]), x2 = Integer.parseInt(args[4]), z2 = Integer.parseInt(args[5]);
+        int y = Integer.parseInt(args[6]);
+        PathCostRules rules = null;
+        for (LongNavigation n : LongNavigation.getRegistry()) if (n.getCostRules() != null) { rules = n.getCostRules(); break; }
+        if (rules == null) { sender.sendMessage("aucune long navigation avec des règles"); return; }
+        // altitude de référence par colonne : celle du point de la dernière trace le plus proche (sinon y)
+        java.util.List<double[]> trace = new java.util.ArrayList<>();
+        java.io.File[] csvs = new java.io.File(skwhy.SkWhy.getInstance().getDataFolder(), "traces").listFiles((d, n) -> n.startsWith("nav-"));
+        if (csvs != null && csvs.length > 0) {
+            java.io.File latest = java.util.Arrays.stream(csvs).max(java.util.Comparator.comparingLong(java.io.File::lastModified)).get();
+            for (String line : java.nio.file.Files.readAllLines(latest.toPath()).stream().skip(1).toList()) {
+                String[] f = line.split(",");
+                trace.add(new double[] { Double.parseDouble(f[1]), Double.parseDouble(f[2]), Double.parseDouble(f[3]) });
+            }
+        }
+        java.util.Map<String, Integer> nearTrace = new java.util.TreeMap<>();
+        StringBuilder sb = new StringBuilder("x0=" + x1 + " z0=" + z1 + " (une ligne par z, une colonne par x)\n");
+        for (int z = z1; z <= z2; z++) {
+            for (int x = x1; x <= x2; x++) {
+                char c = ' ';
+                org.bukkit.Material ground = null;
+                int ref = y;
+                double best = Double.MAX_VALUE;
+                for (double[] t : trace) {
+                    double d = (t[0] - x - 0.5) * (t[0] - x - 0.5) + (t[2] - z - 0.5) * (t[2] - z - 0.5);
+                    if (d < best) { best = d; ref = (int) Math.round(t[1]); }
+                }
+                for (int yy = ref + 4; yy >= ref - 4; yy--) {
+                    org.bukkit.block.Block below = world.getBlockAt(x, yy - 1, z);
+                    if (below.getType().isSolid() && world.getBlockAt(x, yy, z).isPassable() && world.getBlockAt(x, yy + 1, z).isPassable()) {
+                        ground = below.getType();
+                        int cost = rules.costOf(below.getType().getKey().toString());
+                        c = cost < 0 ? 'X' : cost <= 1 ? '.' : cost >= 100 ? '#' : (char) ('0' + Math.min(9, cost / 12));
+                        break;
+                    }
+                }
+                sb.append(c);
+                if (ground != null && best <= 4.0) {
+                    String name = ground.name().toLowerCase() + " (cost " + rules.costOf(ground.getKey().toString()) + ")";
+                    nearTrace.merge(name, 1, Integer::sum);
+                }
+            }
+            sb.append('\n');
+        }
+        java.io.File dir = new java.io.File(skwhy.SkWhy.getInstance().getDataFolder(), "traces");
+        dir.mkdirs();
+        java.nio.file.Files.writeString(new java.io.File(dir, "map.txt").toPath(), sb.toString());
+        java.nio.file.Files.writeString(new java.io.File(dir, "map-stats.txt").toPath(), "sol à moins de 2 blocs de la trace : " + nearTrace + "\n");
+        sender.sendMessage("map écrite (" + (x2 - x1 + 1) + "x" + (z2 - z1 + 1) + ")");
     }
 }

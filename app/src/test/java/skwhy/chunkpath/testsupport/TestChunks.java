@@ -126,10 +126,24 @@ public final class TestChunks {
             out.writeUTF("palette");
             out.writeByte(NbtTag.COMPOUND);
             out.writeInt(palette.size());
-            for (String name : palette) {
+            for (String entry : palette) {
+                // "minecraft:oak_trapdoor[half=top,open=false]" : nom + propriétés d'état
+                int bracket = entry.indexOf('[');
+                String name = bracket < 0 ? entry : entry.substring(0, bracket);
                 out.writeByte(NbtTag.STRING);
                 out.writeUTF("Name");
                 out.writeUTF(name);
+                if (bracket >= 0) {
+                    out.writeByte(NbtTag.COMPOUND);
+                    out.writeUTF("Properties");
+                    for (String property : entry.substring(bracket + 1, entry.length() - 1).split(",")) {
+                        String[] kv = property.split("=");
+                        out.writeByte(NbtTag.STRING);
+                        out.writeUTF(kv[0]);
+                        out.writeUTF(kv[1]);
+                    }
+                    out.writeByte(NbtTag.END);
+                }
                 out.writeByte(NbtTag.END);
             }
             if (palette.size() > 1) {

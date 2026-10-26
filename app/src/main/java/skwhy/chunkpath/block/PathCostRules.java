@@ -77,6 +77,25 @@ public final class PathCostRules {
         return cache.computeIfAbsent(blockName, this::computeCost);
     }
 
+    private static final int UNSET = Integer.MIN_VALUE;
+    private final int[] byMaterial = newUnsetTable();
+
+    private static int[] newUnsetTable() {
+        int[] table = new int[Material.values().length];
+        java.util.Arrays.fill(table, UNSET);
+        return table;
+    }
+
+    /** Comme {@link #costOf(String)} sans construire de nom : pour les recherches de chemin qui lisent des milliers de blocs. */
+    public int costOf(Material material) {
+        int cost = byMaterial[material.ordinal()];
+        if (cost == UNSET) {
+            cost = costOf(material.getKey().toString());
+            byMaterial[material.ordinal()] = cost;
+        }
+        return cost;
+    }
+
     /** Les règles, dans l'ordre d'évaluation (copie non modifiable). */
     public List<CostRule> rules() {
         return List.copyOf(rules);

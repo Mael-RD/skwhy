@@ -23,8 +23,12 @@ import java.util.concurrent.ConcurrentHashMap;
  *  - dalles/escaliers/pierre etc. traités comme des blocs pleins classiques (on ignore
  *    leur géométrie réelle, isSolid() suffit)
  *  - clôtures/murs/portillons : non praticables ET on ne peut pas se tenir dessus
- *  - trappes : jamais praticables, quel que soit leur état ouvert/fermé
+ *  - trappes : traversables et sans coût (ouvertes ou fermées au sol : le sol reste celui du dessous) ; la seule exception est
+ *    la trappe fermée en position haute (half=top) : elle sert aussi de sol à la case du dessus, avec la règle de coût de la
+ *    trappe ou la règle par défaut. L'état (half, open) vient de la palette NBT : voir classify(nom, half, open). La direction
+ *    dans laquelle une trappe ouverte bloque est ignorée ici ; le trajet fin la vérifie
  *  - portes : toujours traversables (on ignore l'état ouvert/fermé)
+ *  - tapis : occupables, pas un sol (cf. ThinBlocks ; la palette n'a pas l'état des blocs, donc pas de neige ni de trappe ici)
  *  - eau et lave : bloquées (ni occupables, ni un sol valide)
  *  - échelles/lianes (Tag.CLIMBABLE) : occupables ET grimpables — un noeud grimpable n'a
  *    pas besoin d'un sol praticable dessous (cf. ChunkNavMesh#isWalkable), il se suffit à
@@ -82,6 +86,20 @@ public final class BlockClassifier {
         return FLAGS_CACHE.computeIfAbsent(blockName, BlockClassifier::computeFlags);
     }
 
+    /**
+     * Comme {@link #classify(String)} avec l'état d'une entrée de palette ({@code half} et {@code open}, nuls si absents) :
+     * seule une trappe fermée en position haute est aussi un sol ({@link #STANDABLE}), le reste d'une trappe se traverse.
+     */
+    public static byte classify(String blockName, String half, String open) {
+        byte flags = classify(blockName);
+        if (half == null || !"top".equals(half) || "true".equals(open)) return flags;
+        Material mat = resolveMaterial(blockName);
+        if (mat != null && Tag.TRAPDOORS.isTagged(mat)) {
+            return (byte) (OCCUPIABLE | STANDABLE);
+        }
+        return flags;
+    }
+
     public static Material resolveMaterial(String blockName) {
         return MATERIAL_CACHE.computeIfAbsent(blockName, Material::matchMaterial);
     }
@@ -100,7 +118,10 @@ public final class BlockClassifier {
             return OCCUPIABLE | CLIMBABLE; // échelle, liane... : occupable, et grimpable sans sol requis
         }
         if (Tag.TRAPDOORS.isTagged(mat)) {
-            return 0; // jamais praticable, ni comme sol ni comme espace traversable
+            return OCCUPIABLE; // sans état connu : une trappe n'a pas de coût et se traverse (cf. classify(nom, half, open))
+        }
+        if (ThinBlocks.isCarpet(mat)) {
+            return OCCUPIABLE; // un tapis (< 1/4 de bloc) se traverse : le sol reste celui du dessous
         }
         if (Tag.DOORS.isTagged(mat)) {
             return OCCUPIABLE; // toujours traversable, jamais un "sol"

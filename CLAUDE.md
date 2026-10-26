@@ -95,6 +95,26 @@ Les tests de SkWhy sont dans `C:\Users\orimi\Desktop\proxti\serveur vide\plugins
 - Debug : commande `/cpdebug` (console) `cell|path|navs|dump|shape|collide|folder|verbose [off]`. `verbose` journalise chaque transition d'etat.
 - Serveur full (`full copy`, monde `villes`) : demarrage ~5 min ; ne pas le redemarrer sans necessite. Sondes (commandes lpgo/lpst...) dans `plugins/Skript/scripts/lp-debug/-probe.sk` (desactivees : retirer le `-` + `sk reload`).
 
+## Long pathfinding : trajet fin (apres le choix des portes)
+Rien de ce qui suit ne touche au graphe de portes (`ChunkNavMesh`, `GatePathfinder`) : tout agit **apres** que la liste des portes est decidee.
+- **Reglages a chaud** : `/cpdebug set <cle> <valeur>` / `/cpdebug get` (RCON), classe `ChunkPathTuning` : `localscale`, `edgeweight`, `edgedist`, `smooth`, `smoothspan`, `crosscost`,
+  `crossmargin`, `goalweight`, `lineweight`, `lookahead`... Pas de redemarrage pour les comparer. L'etat persiste entre deux runs : toujours le fixer completement avant une comparaison.
+- **Petite echelle** (`CostRuleWalkNodeEvaluator.costFor`) : ouverture morphologique du champ de couts (erosion = minimum sur la fenetre, puis dilatation = maximum des valeurs erodees) :
+  une tache plus chere que son entourage et plus etroite que la fenetre (herbe dans un chemin) est ignoree ; une zone large garde son cout. Taille = propriete Skript
+  `cost smoothing of long navigation` (defaut 4 = `ChunkPathTuning.localScale`, 0 = couts bloc par bloc, `LongMob.costSmoothing`). Seuls les couts positifs sont lisses : un bloc
+  non marchable (`-1`) le reste.
+- **Centrage** (`edgePenalty`) : surcout (`edgeweight`, decroit sur `edgedist` blocs) pour une case a cote d'un mur, d'un vide ou d'un sol deux fois plus cher.
+- **Lissage du trajet** (`CostRuleWalkNodeEvaluator.smooth`, appele par `LongPathFinder.reconstructPath`) : « string pulling » : un noeud saute si le mob peut marcher droit
+  (meme niveau, cases `WALKABLE`, `stepClear`) pour un cout <= celui des noeuds sautes ; les noeuds non plain-pied (portes...) sont gardes.
+- **Franchissement des bordures** (`RouteWaypoints.refine`, appele par `LongNavigation.refineCrossing` avant chaque jambe) : la case de passage est rechoisie une fois, avec les couts
+  reels du sol (`crosscost`), une marge laterale (`crossmargin` x blocs manquants sur 0..3 : passer au milieu d'un chemin) et l'attrait de l'arrivee / de la droite depart->arrivee
+  (`goalweight`, `lineweight`). Les waypoints initiaux (`build`) ne regardent que les distances (terrain pas encore charge) : sans `refine` ils tombaient sur des cases a 200.
+- **Mesurer** : `/cpdebug set trace on` ecrit `plugins/SkWhy/traces/nav-*.csv`, `/cpdebug map <monde> x1 z1 x2 z2 y` ecrit `map.txt` + `map-stats.txt`. Scenarios reproductibles sur plateforme :
+  `serveur vide/plugins/Skript/scripts/lp-debug/vrules.sk` (`/vplat`, `/vgw`, regles de l'utilisateur) + `lp-debug/scenarios.py` (`build|run|all|matrix <reglages>` : plateforme par `fill`, `save-all flush`, `register chunk path`, marche,
+  mesure de l'ecart a la droite / virages / marge ; terrain construit une fois par scenario, plusieurs reglages compares ensuite). Le monde `villes` est copie dans le serveur vide (`load world "villes"` dans `vrules.sk`,
+  `villes.db` copie aussi) ; le premier trajet apres un redemarrage echoue tant que `{-rules::*}` n'est pas charge (`/vrules2`).
+- Tests : `v1.6.0/long-navigation/cost-smoothing.sk` (+ `-errors.sk`), JUnit `RouteWaypointsTest` (`refine`), `PathCostRulesTest` (`costOf(Material)`).
+
 ## Custom entities (module `custom_entity`, `since` 1.6.0)
 - Definitions : dossier `plugins/SkWhy/custom-entities/*.yml` (config `custom_entity.folder`), une cle de premier niveau par id (`CustomEntityDef`, `CustomEntityRegistry`).
   Un entite reelle = `Interaction` dont les NBT custom sont l'id (PDC `skwhy:custom_entity`) et ses surcharges eventuelles (PDC `skwhy:custom_entity_overrides`, JSON) ; une fausse = packets uniquement

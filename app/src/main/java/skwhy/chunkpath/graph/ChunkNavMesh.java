@@ -90,9 +90,13 @@ public final class ChunkNavMesh {
         byte[] paletteFlags = new byte[palette.size()];
         String[] paletteNames = new String[palette.size()];
         for (int i = 0; i < palette.size(); i++) {
-            String name = palette.get(i).getString("Name", "minecraft:air");
+            NbtTag entry = palette.get(i);
+            String name = entry.getString("Name", "minecraft:air");
             paletteNames[i] = name;
-            paletteFlags[i] = BlockClassifier.classify(name);
+            NbtTag properties = entry.get("Properties");
+            paletteFlags[i] = properties == null
+                    ? BlockClassifier.classify(name)
+                    : BlockClassifier.classify(name, properties.getString("half", null), properties.getString("open", null));
         }
 
         // Fast-path : palette à une seule entrée (aucune donnée à dépaqueter) -> remplissage uniforme.

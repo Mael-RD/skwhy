@@ -21,6 +21,7 @@ import org.bukkit.util.Vector;
 import org.jspecify.annotations.Nullable;
 
 import skwhy.chunkpath.block.PathCostRules;
+import skwhy.chunkpath.block.ThinBlocks;
 import skwhy.chunkpath.move.LongMob;
 
 import java.util.EnumSet;
@@ -52,18 +53,299 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
     }
 
     /**
-     * Cost of standing on (x, y, z), already classified as {@code pathType}. Every PathType other
-     * than a plain walkable floor keeps its vanilla malus (hazard/passability classification, not
-     * floor material) — only WALKABLE consults the registered cost rules for the block below.
+     * Cost of standing on (x, y, z), already classified as {@code pathType}. A hazard or passability malus
+     * (vanilla) is kept for every type; a cell the mob stands in (plain floor, but also an open trapdoor, a door, a rail,
+     * the cell above a trapdoor...) also costs what the registered cost rules give to the block below: a malus of 0
+     * must not make a trapdoor cheaper than the road next to it (the entity would detour to walk through it). A cell
+     * that is not floor at all (open air, water...) keeps its malus alone.
      */
     protected float costFor(final int x, final int y, final int z, final PathType pathType) {
-        float vanillaMalus = this.getPathfindingMalus(pathType);
-        if (vanillaMalus < 0.0F || pathType != PathType.WALKABLE) {
+        final float vanillaMalus = this.getPathfindingMalus(pathType);
+        if (vanillaMalus < 0.0F || (pathType != PathType.WALKABLE && !isStandingType(pathType))) {
             return vanillaMalus;
         }
+        final long key = PathTypeCache.asLong(x, y, z);
+        final float cached = this.costCache.get(key);
+        if (!Float.isNaN(cached)) return cached;
         Block below = this.currentContext.world().getBlockAt(x, y - 1, z);
-        int cost = this.costRules.costOf(below.getType().getKey().toString());
-        return cost < 0 ? -1.0F : cost; // aucune règle ne couvre ce bloc : non marchable
+        int cost = this.costRules.costOf(below.getType());
+        float result;
+        if (cost < 0) {
+            // no rule covers this block: not walkable; a cell that is not plain floor keeps its malus
+            result = pathType == PathType.WALKABLE ? -1.0F : vanillaMalus;
+        } else {
+            if (this.smoothHalf > 0) {
+                final int opened = this.opened(x, y, z);
+                if (opened >= 0 && opened < cost) cost = opened;
+            }
+            result = vanillaMalus + cost + this.edgePenalty(x, y, z, cost);
+        }
+        this.costCache.put(key, result); // a cell is looked at from each of its neighbours
+        return result;
+    }
+
+    // ------------------------------------------------------------------
+    // Small-scale smoothing of the custom costs
+    // ------------------------------------------------------------------
+    //
+    // The custom costs describe the large scale (a road, a field, a plaza). Seen block by block they make the
+    // entity slalom around a single grass block in the middle of a dirt path, or hug the edge of a road. So:
+    //  - a morphological opening of the cost field removes the patches more expensive than their surroundings
+    //    that are narrower than the window (erosion = minimum over the window, then dilation = maximum of the
+    //    eroded values over the same window). A road, a field or any wide area is left untouched.
+    //  - cells next to a wall, a drop or a much more expensive floor cost a little more (fading out with the
+    //    distance), which keeps the entity in the middle of the path.
+    // Both only change the cost of cells the leg search visits; the gate graph is not concerned. A square window
+    // is separable, so each stage reads (2h + 1) cached values of the previous one.
+
+    private static final int NONE = Integer.MIN_VALUE; // unknown cell (no floor, unloaded chunk)
+    private static final int NO_VALUE = Integer.MAX_VALUE; // "no value" for the minimum stages
+    private static final int NOT_CACHED = Integer.MIN_VALUE + 1;
+
+    private static final float NOT_CACHED_COST = Float.NaN;
+
+    private int smoothHalf;
+    private final it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap costCache = newCostCache();
+    private final it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap rawCache = newIntCache();
+    private final it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap rowMinCache = newIntCache();
+    private final it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap erodedCache = newIntCache();
+    private final it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap rowMaxCache = newIntCache();
+    private final it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap openedCache = newIntCache();
+    private final it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap standable = new it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap();
+
+    private static it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap newCostCache() {
+        final it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap map = new it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap();
+        map.defaultReturnValue(NOT_CACHED_COST);
+        return map;
+    }
+
+    private static it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap newIntCache() {
+        final it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap map = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        map.defaultReturnValue(NOT_CACHED);
+        return map;
+    }
+
+    private void clearSmoothingCaches() {
+        this.costCache.clear();
+        this.rawCache.clear();
+        this.rowMinCache.clear();
+        this.erodedCache.clear();
+        this.rowMaxCache.clear();
+        this.openedCache.clear();
+    }
+
+    /** A block that is floor or wall: solid, with a collision box, and not a thin one (carpet, snow, closed trapdoor: see {@link ThinBlocks}). */
+    private static boolean solidAt(final World world, final int x, final int y, final int z) {
+        return hasCollision(world.getType(x, y, z)) && !ThinBlocks.isThin(world.getBlockAt(x, y, z));
+    }
+
+    /** A floor: a solid block, or a closed trapdoor of the upper half (thin, but its top is walked on). */
+    private static boolean floorAt(final World world, final int x, final int y, final int z) {
+        return solidAt(world, x, y, z) || ThinBlocks.isCeilingTrapdoor(world.getBlockAt(x, y, z));
+    }
+
+    /** Solid with a collision box: pressure plates and buttons are {@code isSolid()} but are neither floor nor wall. */
+    private static boolean hasCollision(final Material material) {
+        return material.isSolid() && !skwhy.chunkpath.block.BlockClassifier.noCollisionBlocks().contains(material);
+    }
+
+    /** Custom cost of the floor of the cell (x, y, z) as a neighbour sees it: {@code -1} blocked or a wall, {@link #NONE} no floor. */
+    private int raw(final int x, final int y, final int z) {
+        final long key = PathTypeCache.asLong(x, y, z);
+        final int cached = this.rawCache.get(key);
+        if (cached != NOT_CACHED) return cached;
+        int result = NONE;
+        if (this.isColumnLoaded(x, z)) {
+            final World world = this.currentContext.world();
+            final Material feet = world.getType(x, y, z);
+            if (solidAt(world, x, y, z)) {
+                result = solidAt(world, x, y + 1, z) ? -1 : this.costRules.costOf(feet); // a wall, or one step up
+            } else {
+                final Material below = world.getType(x, y - 1, z);
+                if (floorAt(world, x, y - 1, z)) {
+                    result = this.costRules.costOf(below);
+                } else {
+                    final Material below2 = world.getType(x, y - 2, z);
+                    if (floorAt(world, x, y - 2, z)) result = this.costRules.costOf(below2); // one step down
+                }
+            }
+        }
+        this.rawCache.put(key, result);
+        return result;
+    }
+
+    private int rowMin(final int x, final int y, final int z) {
+        final long key = PathTypeCache.asLong(x, y, z);
+        final int cached = this.rowMinCache.get(key);
+        if (cached != NOT_CACHED) return cached;
+        int min = NO_VALUE;
+        for (int dx = -this.smoothHalf; dx <= this.smoothHalf; dx++) {
+            final int value = this.raw(x + dx, y, z);
+            if (value >= 0 && value < min) min = value;
+        }
+        this.rowMinCache.put(key, min);
+        return min;
+    }
+
+    private int eroded(final int x, final int y, final int z) {
+        final long key = PathTypeCache.asLong(x, y, z);
+        final int cached = this.erodedCache.get(key);
+        if (cached != NOT_CACHED) return cached;
+        int min = NO_VALUE;
+        for (int dz = -this.smoothHalf; dz <= this.smoothHalf; dz++) {
+            min = Math.min(min, this.rowMin(x, y, z + dz));
+        }
+        this.erodedCache.put(key, min);
+        return min;
+    }
+
+    private int rowMax(final int x, final int y, final int z) {
+        final long key = PathTypeCache.asLong(x, y, z);
+        final int cached = this.rowMaxCache.get(key);
+        if (cached != NOT_CACHED) return cached;
+        int max = -1;
+        for (int dx = -this.smoothHalf; dx <= this.smoothHalf; dx++) {
+            final int value = this.eroded(x + dx, y, z);
+            if (value != NO_VALUE && value > max) max = value;
+        }
+        this.rowMaxCache.put(key, max);
+        return max;
+    }
+
+    /** Cost of the floor of the cell once the patches narrower than the window are removed; {@code -1} when there is no value. */
+    private int opened(final int x, final int y, final int z) {
+        final long key = PathTypeCache.asLong(x, y, z);
+        final int cached = this.openedCache.get(key);
+        if (cached != NOT_CACHED) return cached;
+        int max = -1;
+        for (int dz = -this.smoothHalf; dz <= this.smoothHalf; dz++) {
+            max = Math.max(max, this.rowMax(x, y, z + dz));
+        }
+        this.openedCache.put(key, max);
+        return max;
+    }
+
+    /** Smoothed cost of a neighbouring cell, as the centring sees it; negative = wall, blocked or no floor. */
+    private int neighbourCost(final int x, final int y, final int z) {
+        final int raw = this.raw(x, y, z);
+        if (raw < 0) return raw;
+        if (this.smoothHalf > 0) {
+            final int opened = this.opened(x, y, z);
+            if (opened >= 0 && opened < raw) return opened;
+        }
+        return raw;
+    }
+
+    /** Cost added next to a worse cell (wall, drop, a floor costing more than twice as much), fading out with the distance. */
+    private float edgePenalty(final int x, final int y, final int z, final int cost) {
+        final double weight = skwhy.chunkpath.debug.ChunkPathTuning.edgeWeight;
+        final int reach = skwhy.chunkpath.debug.ChunkPathTuning.edgeDistance;
+        if (weight <= 0.0 || reach <= 0) return 0.0F;
+        final int limit = 2 * cost + 1;
+        for (int r = 1; r <= reach; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    if (Math.abs(dx) != r && Math.abs(dz) != r) continue; // only the ring at distance r
+                    final int n = this.neighbourCost(x + dx, y, z + dz);
+                    if (n < 0 || n > limit) {
+                        return (float) (weight * (reach - r + 1) / reach);
+                    }
+                }
+            }
+        }
+        return 0.0F;
+    }
+
+    /**
+     * Straightens a path found by the search: nodes are dropped when the mob can walk straight from one node to a
+     * node further on, on the same level, over cells it can stand on, for no more than the cost of the nodes it
+     * skips (so a detour around an expensive area stays). Nodes that are not plain floor (doors...) are kept.
+     */
+    @Override
+    public void smooth(final java.util.List<Node> nodes) {
+        if (!skwhy.chunkpath.debug.ChunkPathTuning.smooth || nodes.size() < 3) return;
+        final int span = Math.max(2, skwhy.chunkpath.debug.ChunkPathTuning.smoothSpan);
+        final java.util.List<Node> result = new java.util.ArrayList<>(nodes.size());
+        int i = 0;
+        result.add(nodes.get(0));
+        while (i < nodes.size() - 1) {
+            int best = i + 1;
+            int failures = 0;
+            for (int j = i + 2; j < nodes.size() && j <= i + span && failures < 3; j++) {
+                final Node between = nodes.get(j - 1);
+                if (between.type != PathType.WALKABLE || between.y != nodes.get(i).y) break;
+                if (this.canWalkStraight(nodes, i, j)) {
+                    best = j;
+                    failures = 0;
+                } else {
+                    failures++;
+                }
+            }
+            result.add(nodes.get(best));
+            i = best;
+        }
+        if (result.size() < nodes.size()) {
+            nodes.clear();
+            nodes.addAll(result);
+        }
+    }
+
+    private boolean canWalkStraight(final java.util.List<Node> nodes, final int from, final int to) {
+        final Node a = nodes.get(from);
+        final Node b = nodes.get(to);
+        if (a.y != b.y || a.type != PathType.WALKABLE) return false;
+        final double stand = this.standLevel(a.x, a.y, a.z);
+        if (Double.isNaN(stand)) return false;
+        double original = 0.0;
+        for (int k = from + 1; k <= to; k++) {
+            final Node node = nodes.get(k);
+            if (node.y != a.y || node.costMalus < 0.0F) return false;
+            original += nodes.get(k - 1).distanceTo(node) + node.costMalus;
+        }
+        final double dx = b.x - a.x, dz = b.z - a.z;
+        final double length = Math.sqrt(dx * dx + dz * dz);
+        final double half = this.mob.getHitbox().getX() / 2.0 + BODY_MARGIN;
+        final int samples = (int) Math.ceil(length * 4.0);
+        int lastX = a.x, lastZ = a.z;
+        double straight = length;
+        Node fromCell = new Node(a.x, a.y, a.z);
+        for (int s = 1; s <= samples; s++) {
+            final double t = (double) s / samples;
+            final double px = a.x + 0.5 + dx * t, pz = a.z + 0.5 + dz * t;
+            for (int corner = 0; corner < 4; corner++) {
+                final int cx = (int) Math.floor(px + ((corner & 1) == 0 ? -half : half));
+                final int cz = (int) Math.floor(pz + ((corner & 2) == 0 ? -half : half));
+                if (!this.standableAt(cx, a.y, cz, stand)) return false;
+            }
+            final int centerX = (int) Math.floor(px), centerZ = (int) Math.floor(pz);
+            if (centerX != lastX || centerZ != lastZ) {
+                final Node cell = new Node(centerX, a.y, centerZ);
+                if (!this.stepClear(fromCell, cell)) return false;
+                final float cost = this.costFor(centerX, a.y, centerZ, PathType.WALKABLE);
+                if (cost < 0.0F) return false;
+                straight += cost;
+                if (straight > original + 0.01) return false;
+                fromCell = cell;
+                lastX = centerX;
+                lastZ = centerZ;
+            }
+        }
+        return straight <= original + 0.01;
+    }
+
+    /** True when the cell is plain floor at the given standing height (flat ground, no door, room for the body). */
+    private boolean standableAt(final int x, final int y, final int z, final double stand) {
+        if (!this.isColumnLoaded(x, z)) return false;
+        final long key = PathTypeCache.asLong(x, y, z);
+        final byte cached = this.standable.getOrDefault(key, (byte) 0);
+        if (cached != 0) return cached > 0;
+        boolean ok = this.getCachedPathType(x, y, z) == PathType.WALKABLE;
+        if (ok) {
+            final double level = this.standLevel(x, y, z);
+            ok = !Double.isNaN(level) && Math.abs(level - stand) < 1.0E-3 && this.costFor(x, y, z, PathType.WALKABLE) >= 0.0F;
+        }
+        this.standable.put(key, (byte) (ok ? 1 : -1));
+        return ok;
     }
 
     // 4 horizontal directions as (dx, dz, 2D-index) – mirrors Direction.Plane.HORIZONTAL
@@ -107,6 +389,9 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
         super.prepare(mob);
         this.cellBoxes.clear();
         this.standLevels.clear();
+        this.standable.clear();
+        this.clearSmoothingCaches();
+        this.smoothHalf = Math.max(0, mob.costSmoothing() / 2);
         // NMS calls navigation.onPathfindingStart() here – not available in Bukkit
     }
 
@@ -114,6 +399,8 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
     public void done() {
         this.cellBoxes.clear();
         this.standLevels.clear();
+        this.standable.clear();
+        this.clearSmoothingCaches();
         // NMS calls navigation.onPathfindingDone() here – not available in Bukkit
         this.pathTypesByPosCacheByMob.clear();
         this.collisionCache.clear();
@@ -835,7 +1122,12 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
                                               final int x, final int y, final int z) {
         PathType blockPathType = context.getPathTypeFromState(x, y, z);
         if (blockPathType == PathType.OPEN && y >= context.world().getMinHeight() + 1) {
-            return switch (context.getPathTypeFromState(x, y - 1, z)) {
+            PathType below = context.getPathTypeFromState(x, y - 1, z);
+            // the top of a closed trapdoor of the upper half is a floor for the cell above it
+            if (below == PathType.OPEN && ThinBlocks.isCeilingTrapdoor(context.world().getBlockAt(x, y - 1, z))) {
+                below = PathType.BLOCKED;
+            }
+            return switch (below) {
                 case OPEN, WATER, LAVA, WALKABLE -> PathType.OPEN;
                 case FIRE                         -> PathType.FIRE;
                 case DAMAGING                     -> PathType.DAMAGING;
@@ -900,7 +1192,9 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
         }
 
         // Trapdoors, lily pad, big dripleaf
-        if (Tag.TRAPDOORS.isTagged(mat) || mat == Material.LILY_PAD || mat == Material.BIG_DRIPLEAF) {
+        // a trapdoor is not a type of its own: closed it is thin (see ThinBlocks), open it is a panel along one side of its
+        // cell, which the body geometry (hasRoomToStand / stepClear) treats as the obstacle it is
+        if (mat == Material.LILY_PAD || mat == Material.BIG_DRIPLEAF) {
             return PathType.TRAPDOOR;
         }
         if (mat == Material.POWDER_SNOW) {
@@ -1012,7 +1306,10 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
         Material mat = block.getType();
         if (mat.isAir() || !mat.isSolid()) return true;
         // solid on paper but nothing to collide with (pressure plate, button...): a mob walks over it
-        if (block.getCollisionShape().getBoundingBoxes().isEmpty()) return true;
+        final java.util.Collection<BoundingBox> shape = block.getCollisionShape().getBoundingBoxes();
+        if (shape.isEmpty()) return true;
+        // carpet, snow, closed trapdoor...: not an obstacle (the body geometry still checks steps and headroom)
+        if (ThinBlocks.isThin(shape)) return true;
         // Open doors and gates are passable
         BlockData data = block.getBlockData();
         if (data instanceof Openable openable && openable.isOpen()) return true;

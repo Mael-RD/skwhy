@@ -133,6 +133,9 @@ public abstract class NodeEvaluator {
 
     public abstract int getNeighbors(Node[] neighbors, Node pos);
 
+    /** Straightens the nodes of a path found by the search (in place); nothing by default. */
+    public void smooth(final java.util.List<Node> nodes) {}
+
     public abstract PathType getPathTypeOfMob(PathfindingContext context, int x, int y, int z, LongMob mob);
 
     public abstract PathType getPathType(PathfindingContext context, int x, int y, int z);

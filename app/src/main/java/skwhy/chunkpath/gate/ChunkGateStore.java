@@ -119,7 +119,9 @@ public final class ChunkGateStore implements Closeable {
         private static final int MAGIC = 0x43504442; // "CPDB"
         // 2 : les données de la version 1 viennent d'un décodage NBT des chunks erroné (blocs faux) ;
         // elles sont sauvegardées à côté (.v1.bak) puis la base repart vide, à ré-enregistrer.
-        private static final int FORMAT_VERSION = 2;
+        // 3 : les tapis ne sont plus des sols ; 4 : les trappes se traversent (sauf la trappe haute fermée, qui est un sol)
+        // (BlockClassifier) : les analyses des versions précédentes sont sauvegardées (.v<n>.bak) et la base repart vide.
+        private static final int FORMAT_VERSION = 4;
         private static final int LEGACY_BAD_ANALYSIS_VERSION = 1;
         private static final int HEADER_SIZE = 4 + 4 + 4 + 4; // magic, version, capacity, used
         private static final int SLOT_SIZE = 1 + 8 + 8 + 4; // occupied, key, offset, length
@@ -269,12 +271,12 @@ public final class ChunkGateStore implements Closeable {
                 throw new IOException("Base de données invalide (magic incorrect) : " + file);
             }
             int version = raf.readInt();
-            if (version == LEGACY_BAD_ANALYSIS_VERSION) {
+            if (version >= LEGACY_BAD_ANALYSIS_VERSION && version < FORMAT_VERSION) {
                 Path backup = file.resolveSibling(file.getFileName() + ".v" + version + ".bak");
                 raf.close();
                 Files.copy(file, backup, StandardCopyOption.REPLACE_EXISTING);
                 java.util.logging.Logger.getLogger("SkWhy").warning("[ChunkPath] Base " + file.getFileName()
-                        + " issue d'une ancienne analyse erronée : sauvegardée dans " + backup.getFileName()
+                        + " issue d'une ancienne analyse (format " + version + ") : sauvegardée dans " + backup.getFileName()
                         + ", les chunks sont à ré-enregistrer.");
                 raf = new RandomAccessFile(file.toFile(), "rw");
                 initEmpty(INITIAL_CAPACITY);
@@ -444,6 +446,15 @@ public final class ChunkGateStore implements Closeable {
                     out.writeUTF(link);
                 }
             }
+
+            // section finale optionnelle (absente des enregistrements plus anciens) : coût de chaque paire de portes liées
+            for (Gate g : gates) {
+                out.writeInt(g.neighborCosts.size());
+                for (var e : g.neighborCosts.entrySet()) {
+                    out.writeUTF(e.getKey());
+                    out.writeInt(e.getValue());
+                }
+            }
         } catch (IOException e) {
             throw new RuntimeException(e); // écriture en mémoire : ne peut pas arriver
         }
@@ -486,6 +497,16 @@ public final class ChunkGateStore implements Closeable {
                 }
 
                 gates.add(gate);
+            }
+
+            if (in.available() > 0) {
+                for (Gate gate : gates) {
+                    int costCount = in.readInt();
+                    for (int c = 0; c < costCount; c++) {
+                        String link = in.readUTF();
+                        gate.neighborCosts.put(link, in.readInt());
+                    }
+                }
             }
 
             return new ChunkGateData(chunkX, chunkZ, gates);
