@@ -32,6 +32,39 @@ final class RouteWaypoints {
         int of(int x, int y, int z);
     }
 
+    /**
+     * Independent copy (cells, crossings already refined or snapped): the path preview chooses the crossings again on it, as
+     * the walk would, without touching the waypoints of the walk itself. The cells are never modified in place, so they are shared.
+     */
+    RouteWaypoints copy() {
+        RouteWaypoints result = new RouteWaypoints();
+        result.cells.addAll(cells);
+        result.owners.addAll(owners);
+        result.crossings.putAll(crossings);
+        result.refined.addAll(refined);
+        return result;
+    }
+
+    /**
+     * Whether a walk standing on {@code cell} has reached waypoint {@code index} ({@code size()} = the destination): the same test
+     * as the walk's own ({@code LongNavigation.hasReached}) on a cell. Standing on the waypoint's column is enough; and, with
+     * {@code switchMode} 1 or 2, so is standing in the chunk of the waypoint that follows the crossing (a gate is only a direction).
+     */
+    boolean isReached(int[] cell, int index, int[] destination, int switchMode) {
+        int[] waypoint = index < cells.size() ? cells.get(index) : destination;
+        int dx = cell[0] - waypoint[0], dz = cell[2] - waypoint[2], dy = cell[1] - waypoint[1];
+        if (dx * dx + dz * dz < 1 && dy > -1.5 && dy < 2.0) return true;
+        if (switchMode >= 1 && index < cells.size()) {
+            int[] ref = waypoint;
+            if (index + 1 < cells.size()) {
+                int[] next = cells.get(index + 1);
+                if (switchMode == 2 || (next[0] >> 4) != (waypoint[0] >> 4) || (next[2] >> 4) != (waypoint[2] >> 4)) ref = next;
+            }
+            return (cell[0] >> 4) == (ref[0] >> 4) && (cell[2] >> 4) == (ref[2] >> 4);
+        }
+        return false;
+    }
+
     int size() { return cells.size(); }
 
     int[] cell(int index) { return cells.get(index); }
@@ -106,6 +139,77 @@ final class RouteWaypoints {
         cells.set(index, pair[0]);
         cells.set(index + 1, pair[1]);
         return true;
+    }
+
+    /** True when the waypoint is the exit cell of a chunk border crossing (the next one is its entry cell). */
+    boolean isCrossing(int index) {
+        return crossings.containsKey(index) && index + 1 < cells.size();
+    }
+
+    /** True when the crossing was chosen again from where the walk stood, or follows the path of a leg that ended on it (it will not move any more). */
+    boolean isSettled(int index) {
+        return refined.contains(index);
+    }
+
+    /** True when the waypoint is the entry cell (first cell past the border) of a crossing. */
+    boolean isEntry(int index) {
+        return index > 0 && isCrossing(index - 1);
+    }
+
+    /**
+     * Whether a leg heading for the exit cell {@code index} may end on {@code (x, y, z)} instead: any exit cell of the same
+     * crossing, at the same level (+-1) and at most {@link #ACCEPT_LATERAL} blocks along the border from the chosen one.
+     * The mob then crosses where its path naturally leads, not on one precise block.
+     */
+    boolean acceptsExit(int index, int x, int y, int z) {
+        Map<Long, int[]> exits = exitsOf(index);
+        if (exits == null || !exits.containsKey(cellKey(x, y, z))) return false;
+        int[] chosen = cells.get(index);
+        return Math.abs(y - chosen[1]) <= 1 && Math.abs(x - chosen[0]) + Math.abs(z - chosen[2]) <= ACCEPT_LATERAL;
+    }
+
+    /** The leg ended on {@code (x, y, z)}, a cell accepted by {@link #acceptsExit}: the crossing is now that cell and its partner across the border. */
+    boolean snapExit(int index, int x, int y, int z) {
+        Map<Long, int[]> exits = exitsOf(index);
+        if (exits == null) return false;
+        int[] entry = exits.get(cellKey(x, y, z));
+        if (entry == null) return false;
+        cells.set(index, new int[] { x, y, z });
+        cells.set(index + 1, entry);
+        refined.add(index);
+        return true;
+    }
+
+    private static final int ACCEPT_LATERAL = 8;
+    private final Map<Integer, Map<Long, int[]>> exitCache = new HashMap<>();
+
+    /** Exit cell -> entry cell across the border, for every valid pair of the crossing. */
+    private Map<Long, int[]> exitsOf(int index) {
+        Gate[] gates = crossings.get(index);
+        if (gates == null || index + 1 >= cells.size()) return null;
+        return exitCache.computeIfAbsent(index, i -> {
+            Map<Long, List<int[]>> byColumn = new HashMap<>();
+            for (int[] member : gates[1].memberBlocksWorld) {
+                byColumn.computeIfAbsent(column(member[0], member[2]), k -> new ArrayList<>()).add(member);
+            }
+            Direction edge = gates[0].edge;
+            Map<Long, int[]> result = new HashMap<>();
+            for (int[] exit : gates[0].memberBlocksWorld) {
+                List<int[]> across = byColumn.get(column(exit[0] + edge.dx, exit[2] + edge.dz));
+                if (across == null) continue;
+                int[] best = null;
+                for (int[] entry : across) {
+                    if (Math.abs(entry[1] - exit[1]) > 1) continue;
+                    if (best == null || Math.abs(entry[1] - exit[1]) < Math.abs(best[1] - exit[1])) best = entry;
+                }
+                if (best != null) result.put(cellKey(exit[0], exit[1], exit[2]), best);
+            }
+            return result;
+        });
+    }
+
+    private static long cellKey(int x, int y, int z) {
+        return ((long) (x & 0x3FFFFFF) << 38) | ((long) (z & 0x3FFFFFF) << 12) | ((y + 2048) & 0xFFF);
     }
 
     /** {exit cell in {@code from}, entry cell in {@code to}}, adjacent across the border, closest to {@code ref}. */

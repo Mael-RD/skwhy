@@ -396,6 +396,47 @@ public final class ChunkNavMesh {
         return dijkstraMultiSource(new int[]{start}, cutoff);
     }
 
+    /**
+     * Chemin de moindre coût entre deux noeuds du chunk (Dijkstra, arrêté dès que l'arrivée est atteinte).
+     *
+     * @return les noeuds du départ à l'arrivée inclus, ou {@code null} s'ils ne sont pas reliés à l'intérieur du chunk
+     */
+    public int[] pathBetween(int from, int to) {
+        if (from < 0 || to < 0 || from >= nodeCount || to >= nodeCount) return null;
+        if (from == to) return new int[]{from};
+        int[] dist = new int[nodeCount];
+        int[] previous = new int[nodeCount];
+        Arrays.fill(dist, Integer.MAX_VALUE);
+        Arrays.fill(previous, -1);
+        PriorityQueue<long[]> pq = new PriorityQueue<>((a, b) -> Long.compare(a[0], b[0]));
+        dist[from] = 0;
+        pq.add(new long[]{0, from});
+        while (!pq.isEmpty()) {
+            long[] top = pq.poll();
+            int d = (int) top[0];
+            int u = (int) top[1];
+            if (d > dist[u]) continue;
+            if (u == to) break;
+            int[] ids = neighborIds[u];
+            int[] costs = neighborCosts[u];
+            for (int k = 0; k < ids.length; k++) {
+                int v = ids[k];
+                long nd = (long) d + costs[k];
+                if (nd < dist[v]) {
+                    dist[v] = (int) nd;
+                    previous[v] = u;
+                    pq.add(new long[]{nd, v});
+                }
+            }
+        }
+        if (dist[to] == Integer.MAX_VALUE) return null;
+        int length = 1;
+        for (int n = to; n != from; n = previous[n]) length++;
+        int[] path = new int[length];
+        for (int n = to, i = length - 1; i >= 0; n = previous[n], i--) path[i] = n;
+        return path;
+    }
+
     /** Dijkstra multi-source : toutes les sources partent à distance 0. */
     public int[] dijkstraMultiSource(int[] starts, int cutoff) {
         int[] dist = new int[nodeCount];

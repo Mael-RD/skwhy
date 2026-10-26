@@ -35,6 +35,12 @@ public class LongPathFinder {
         this.nodeEvaluator = new CostRuleWalkNodeEvaluator(costRules);
     }
 
+    /** On: the search reads no block next to a chunk that is not loaded (see {@link NodeEvaluator#setNeverLoadChunks}). */
+    public LongPathFinder neverLoadChunks(boolean neverLoadChunks) {
+        this.nodeEvaluator.setNeverLoadChunks(neverLoadChunks);
+        return this;
+    }
+
     public NodeEvaluator getNodeEvaluator() {
         return this.nodeEvaluator;
     }
@@ -48,14 +54,25 @@ public class LongPathFinder {
         return this.path;
     }
 
+    /** Extra cells the search may end on instead of the exact target (a whole border instead of one block of it). */
+    @FunctionalInterface
+    public interface GoalTest {
+        boolean accepts(int x, int y, int z);
+    }
+
     public @Nullable Path findPath(LongMob mob, Location target, float maxPathLength) {
+        return findPath(mob, target, maxPathLength, null);
+    }
+
+    /** @param alsoAccept when not null, the search is over as soon as it reaches a cell this accepts (the target stays the heuristic's direction) */
+    public @Nullable Path findPath(LongMob mob, Location target, float maxPathLength, @Nullable GoalTest alsoAccept) {
         this.nodeEvaluator.prepare(mob);
         Node from = this.nodeEvaluator.getStart();
         if (from == null) {
             this.path = null;
         } else {
             Target targetNode = this.nodeEvaluator.getTarget(target.getX(), target.getY(), target.getZ());
-            this.path = this.findPath(from, targetNode, target, maxPathLength);
+            this.path = this.findPath(from, targetNode, target, maxPathLength, alsoAccept);
         }
         this.nodeEvaluator.done();
         return path;
@@ -65,7 +82,8 @@ public class LongPathFinder {
             final Node from,
             final Target target,
             final Location targetLocation,
-            final float maxPathLength
+            final float maxPathLength,
+            final @Nullable GoalTest alsoAccept
     ) {
         from.g = 0.0F;
         from.h = from.distanceTo(target);
@@ -91,7 +109,9 @@ public class LongPathFinder {
             Node current = this.openSet.pop();
             current.closed = true;
 
-            if (current.distanceManhattan(target) == 0) {
+            if (current.distanceManhattan(target) == 0
+                    || (alsoAccept != null && alsoAccept.accepts(current.x, current.y, current.z))) {
+                target.updateBest(Float.NEGATIVE_INFINITY, current); // the path ends here, not on the node nearest to the target
                 target.setReached();
                 reached = true;
                 break;
@@ -109,7 +129,7 @@ public class LongPathFinder {
                     float distance = this.distance(current, neighbor);
                     neighbor.walkedDistance = current.walkedDistance + distance;
                     final float fudging = skwhy.chunkpath.debug.ChunkPathTuning.fudging;
-                    float tentativeGScore = current.g + distance + neighbor.costMalus;
+                    float tentativeGScore = current.g + distance + neighbor.costMalus + this.nodeEvaluator.stepCost(current, neighbor);
                     if (neighbor.walkedDistance < maxPathLength && (!neighbor.inOpenSet() || tentativeGScore < neighbor.g)) {
                         neighbor.cameFrom = current;
                         neighbor.g = tentativeGScore;

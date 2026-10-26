@@ -84,6 +84,31 @@ public class CostRuleWalkNodeEvaluator extends NodeEvaluator {
         return result;
     }
 
+    /**
+     * Climbing or dropping a whole block (or more) costs the dearer of the two floors on top of the move: a staircase of
+     * expensive blocks, or a ledge of a road, is not free to take. A half block or less (slabs, stairs the right way up)
+     * stays free. The two costs are the registered ones, <em>not</em> the smoothed ones: the small-scale smoothing hides a
+     * narrow expensive patch inside a cheap area, but it must not make a step onto or off that patch cheaper.
+     */
+    @Override
+    public float stepCost(final Node from, final Node to) {
+        final int dy = Math.abs(to.y - from.y);
+        if (dy == 0) return 0.0F; // same cell height: at most a half block between a slab and a full block
+        if (dy == 1) {
+            final double a = this.levelOf(from), b = this.levelOf(to);
+            if (Math.abs(a - b) <= 0.5 + BODY_EPSILON) return 0.0F;
+        }
+        final World world = this.currentContext.world();
+        final int costFrom = this.costRules.costOf(world.getType(from.x, from.y - 1, from.z));
+        final int costTo = this.costRules.costOf(world.getType(to.x, to.y - 1, to.z));
+        return Math.max(0, Math.max(costFrom, costTo));
+    }
+
+    private double levelOf(final Node node) {
+        final double level = this.standLevel(node.x, node.y, node.z);
+        return Double.isNaN(level) ? getFloorLevel(this.currentContext.world(), node.x, node.y, node.z) : level;
+    }
+
     // ------------------------------------------------------------------
     // Small-scale smoothing of the custom costs
     // ------------------------------------------------------------------

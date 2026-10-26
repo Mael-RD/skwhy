@@ -37,7 +37,9 @@ import java.util.List;
     "The optional 'using rules' takes path cost rules for the walking itself: a rule without block or tag is the " +
     "default rule, and a block covered by no rule is not walkable. There are no default rules: without any rule the " +
     "navigation logs a warning and does nothing when it should start. The route between chunks keeps the costs of the chunk path records (see 'register chunk path'). " +
-    "Change them later with 'path cost rules of long navigation'.")
+    "Change them later with 'path cost rules of long navigation'. " +
+    "A navigation made with a player as the entity never drives it (no teleport, no gravity change, no pause, no speed): " +
+    "it only answers 'blocks of long navigation', to get the path ahead of the player.")
 @Examples({
     "# Pattern 0: create from a numeric ID",
     "set {_longnav} to a new long navigation with id 12345 hitbox vector(0.6, 1.8, 0.6) location location of player",

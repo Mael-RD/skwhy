@@ -18,9 +18,11 @@ import skwhy.SkWhy;
 import skwhy.chunkpath.ChunkGateService;
 import skwhy.chunkpath.block.PathCostRules;
 import skwhy.chunkpath.gate.Gate;
+import skwhy.chunkpath.graph.ChunkNavMesh;
 import skwhy.chunkpath.move.LongMob;
 import skwhy.chunkpath.move.navigation.LongGroundPathNavigation;
 import skwhy.chunkpath.move.navigation.PathNavigation;
+import skwhy.chunkpath.move.pathcalculator.LongPathFinder;
 import skwhy.chunkpath.move.pathcalculator.Node;
 import skwhy.chunkpath.move.pathcalculator.Path;
 import skwhy.chunkpath.pathfinding.GatePathfinder;
@@ -28,7 +30,9 @@ import skwhy.modules.LongNavigationElements.ChunkPathManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Long-distance, cost-rule aware pathfinding session — the long-distance counterpart to
@@ -101,6 +105,10 @@ public class LongNavigation {
     private static final double RESUME_REJOIN_MAX = 16.0;      // blocks: short A* to the path, beyond that the route is recomputed
     private static final double RESUME_FAR_FROM_WAYPOINT = MAX_LEG_PATH_LENGTH * 0.75; // blocks, when no leg path is being walked
     private static final double REJOIN_ARRIVED_DISTANCE = 3.0; // blocks: rejoin path done close enough to resume the old one
+
+    private static final int PREVIEW_PROBE_ID = -1;      // id of the throw-away mobs the preview searches legs with
+    private static final int PREVIEW_MESH_CACHE = 16;    // chunk graphs kept between two calls
+    private static final int MAX_REQUESTED_CHUNKS = 25;  // chunks asked for in one go when the walk waits for terrain
 
     // =========================================================================
     // Registre statique
@@ -259,6 +267,8 @@ public class LongNavigation {
     private Boolean previousGravity;
     private Boolean previousAware;
     private int legWaypoint = -1; // waypoint for which the mob's current leg path was computed
+    private int cutWaypoint = -1; // crossing the current leg heads for without having decided it (see CROSSING_DECISION_RANGE): the leg is cut near it
+    private int cutBase = -1;     // waypoint the walk heads for again once that leg is cut
     private boolean skippedWaypoint; // the current stretch of the route already skipped a waypoint it could not reach
     private boolean legPartial;   // that leg path only gets as close as it can to the waypoint
     private boolean paused = true; // true while the navigation does not tick (pause), until the next active tick
@@ -271,6 +281,24 @@ public class LongNavigation {
     private long lastWaitCheckTick;
     private long expectedWaitTicks;
     private long lastStuckRetryTick;
+
+    private boolean forceChunkLoading; // false: never asks for a chunk to be loaded, true: loads the chunks the walk needs
+    private boolean routeInvalid;      // the rules changed since the route was computed
+    private final PathPreview preview = new PathPreview(new PathPreview.LegSolver() {
+        @Override public void restart() { previewWaypoints = null; }
+        @Override public PathPreview.Leg leg(int[] from, int target) { return previewLeg(from, target); }
+        @Override public PathPreview.Leg back(int[] from, int[] to) { return previewBack(from, to); }
+        @Override public boolean canRefine(int[] from) { return isSurroundingLoaded(from[0], from[2]); }
+    });
+    /** Copy of the waypoints the preview chooses the crossings on, as the walk does on its own (null = to be copied from the walk's). */
+    private RouteWaypoints previewWaypoints;
+    /** Chunk graphs read from the region files for the preview (cleared whenever the rules change). */
+    private final Map<Long, ChunkNavMesh> previewMeshes = new LinkedHashMap<>(16, 0.75F, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Long, ChunkNavMesh> eldest) {
+            return size() > PREVIEW_MESH_CACHE;
+        }
+    };
 
     // =========================================================================
     // Constructeurs
@@ -321,6 +349,8 @@ public class LongNavigation {
         mob.setCostRules(rules);
         legWaypoint = -1;
         rejoinResume = null;
+        routeInvalid = true;
+        invalidatePreview();
     }
 
     // =========================================================================
@@ -328,6 +358,7 @@ public class LongNavigation {
     // =========================================================================
 
     public void tick() {
+        if (isObserver()) return; // a player is never moved: this navigation only answers questions (see pathBlocks)
         if (pauseTicks == PAUSED_INDEFINITELY) { paused = true; return; }
         if (pauseTicks > 0) { pauseTicks--; paused = true; return; }
         if (status == Status.IDLE || status == Status.ARRIVED || status == Status.FAILED_NO_PATH) {
@@ -415,10 +446,19 @@ public class LongNavigation {
      * @return true when the waypoint moved
      */
     private boolean refineCrossing(Location waypoint) {
-        if (waypoints == null || waypointIndex >= waypoints.size() || mob.getCostRules() == null) return false;
+        return refineCrossing(waypointIndex);
+    }
+
+    /**
+     * {@link #refineCrossing(Location)} for waypoint {@code index}, from where the mob stands. A crossing further than
+     * {@link #CROSSING_DECISION_RANGE} is not chosen yet: the walk decides it once it gets there (see {@link #isUndecidedFar}).
+     */
+    private boolean refineCrossing(int index) {
+        if (waypoints == null || index >= waypoints.size() || mob.getCostRules() == null) return false;
         PathCostRules rules = mob.getCostRules();
         Location here = mob.getLocation();
-        boolean changed = waypoints.refine(waypointIndex,
+        if (here.distance(waypointLocation(index)) > CROSSING_DECISION_RANGE) return false;
+        boolean changed = waypoints.refine(index,
                 new int[] { here.getBlockX(), here.getBlockY(), here.getBlockZ() },
                 new int[] { endLocation.getBlockX(), endLocation.getBlockY(), endLocation.getBlockZ() },
                 (x, y, z) -> {
@@ -428,12 +468,48 @@ public class LongNavigation {
                 });
         if (changed) {
             if (verbose) {
-                int[] a = waypoints.cell(waypointIndex), b = waypoints.cell(waypointIndex + 1);
-                debug("crossing #" + waypointIndex + " chosen again with the floor costs: " + a[0] + "," + a[1] + "," + a[2] + " -> " + b[0] + "," + b[1] + "," + b[2]);
+                int[] a = waypoints.cell(index), b = waypoints.cell(index + 1);
+                debug("crossing #" + index + " chosen again with the floor costs: " + a[0] + "," + a[1] + "," + a[2] + " -> " + b[0] + "," + b[1] + "," + b[2]);
             }
             legWaypoint = -1;
         }
         return changed;
+    }
+
+    /**
+     * Distance (blocks) within which the walk decides where it crosses a chunk border. Further away the crossing is only a direction:
+     * a leg aiming at it is cut once it is this close (cutWaypoint), and the walk searches again from there, with the crossing chosen
+     * from that point (real floor costs, the line from where it stands) instead of from wherever the leg started.
+     */
+    static final double CROSSING_DECISION_RANGE = 16.0;
+
+    /** True when waypoint {@code index} is a border crossing nobody has decided yet and {@code here} is too far to decide it. */
+    private boolean isUndecidedFar(int index, Location here) {
+        return waypoints != null && index < waypoints.size() && waypoints.isCrossing(index) && !waypoints.isSettled(index)
+                && here.distance(waypointLocation(index)) > CROSSING_DECISION_RANGE;
+    }
+
+    /**
+     * {@code nav.moveTo} toward waypoint {@code index}. When that waypoint is the exit cell of a border crossing, the search
+     * may end on any exit cell of the crossing (see {@link RouteWaypoints#acceptsExit}) and the waypoint becomes the cell it
+     * ended on: no sideways step toward one precise block of the border.
+     */
+    private boolean moveToWaypoint(PathNavigation nav, int index, Location target) {
+        boolean tolerant = waypoints != null && index < waypoints.size() && waypoints.isCrossing(index);
+        boolean decides = tolerant && !isUndecidedFar(index, mob.getLocation()); // a far crossing is decided later, when the leg is cut
+        nav.setAlsoAccept(tolerant ? (x, y, z) -> waypoints.acceptsExit(index, x, y, z) : null);
+        try {
+            boolean moving = nav.moveTo(target, skwhy.chunkpath.debug.ChunkPathTuning.legLength);
+            Path path = nav.getPath();
+            Node end = moving && path != null && path.canReach() ? path.getEndNode() : null;
+            if (decides && end != null && waypoints.snapExit(index, end.x, end.y, end.z)) {
+                if (verbose) debug("crossing #" + index + " follows the path: " + end.x + "," + end.y + "," + end.z);
+                progressWaypoint = -1;
+            }
+            return moving;
+        } finally {
+            nav.setAlsoAccept(null);
+        }
     }
 
     /**
@@ -442,16 +518,38 @@ public class LongNavigation {
      */
     private boolean tryShortcut(PathNavigation nav) {
         int ahead = skwhy.chunkpath.debug.ChunkPathTuning.lookahead;
-        if (ahead <= 0 || waypoints == null || waypointIndex >= waypoints.size()) return false;
+        if (ahead <= 0) return false;
+        return tryShortcut(nav, waypointIndex + ahead, waypointIndex + 1, skwhy.chunkpath.debug.ChunkPathTuning.lookaheadRatio);
+    }
+
+    /**
+     * Aims past the border: the leg heads for the waypoint after the crossing (the next exit, or the destination) so the
+     * path itself decides where it crosses, instead of bending toward one block of the border. Looser than the shortcut
+     * (the way across the border is what is being improved) but still bounded.
+     */
+    private boolean tryThroughLeg(PathNavigation nav) {
+        if (waypoints == null || !waypoints.isCrossing(waypointIndex)) return false;
+        return tryShortcut(nav, waypointIndex + 2, waypointIndex + 2, THROUGH_LEG_RATIO);
+    }
+
+    private static final double THROUGH_LEG_RATIO = 2.0;
+
+    /** Tries the waypoints {@code maxJ} down to {@code minJ} (the destination counts as the one after the last). */
+    private boolean tryShortcut(PathNavigation nav, int maxJ, int minJ, double ratio) {
+        if (waypoints == null || waypointIndex >= waypoints.size()) return false;
         Location here = mob.getLocation();
         double range = skwhy.chunkpath.debug.ChunkPathTuning.lookaheadRange;
         int tries = 0;
-        for (int j = Math.min(waypoints.size(), waypointIndex + ahead); j > waypointIndex && tries < 3; j--) {
+        for (int j = Math.min(waypoints.size(), maxJ); j >= minJ && j > waypointIndex && tries < 3; j--) {
+            // never aim at an entry cell: it is one precise block past the border (a stair can start next to it), and
+            // standing in the chunk is enough to be past it
+            if (j < waypoints.size() && waypoints.isEntry(j)) continue;
+            if (j < waypoints.size()) refineCrossing(j); // only once close enough to decide it
             Location target = j == waypoints.size() ? endLocation : waypointLocation(j);
             double straight = here.distance(target);
             if (straight > range || !isChunkLoaded(target)) continue;
             tries++;
-            if (!nav.moveTo(target, skwhy.chunkpath.debug.ChunkPathTuning.legLength) || !nav.getPath().canReach()) { nav.stop(); continue; }
+            if (!moveToWaypoint(nav, j, target) || !nav.getPath().canReach()) { nav.stop(); continue; }
             Path path = nav.getPath();
             double walked = 0.0;
             for (int i = 1; i < path.getNodeCount(); i++) {
@@ -465,8 +563,11 @@ public class LongNavigation {
                 chain += Math.sqrt(Math.pow(previous.getX() - next.getX(), 2) + Math.pow(previous.getZ() - next.getZ(), 2));
                 previous = next;
             }
-            if (walked > chain * skwhy.chunkpath.debug.ChunkPathTuning.lookaheadRatio + 2.0) { nav.stop(); continue; }
+            if (walked > chain * ratio + 2.0) { nav.stop(); continue; }
             if (verbose) debug("shortcut from waypoint#" + waypointIndex + " to waypoint#" + j + " (" + Math.round(walked) + " blocks, gates " + Math.round(chain) + ")");
+            boolean undecided = isUndecidedFar(j, here);
+            cutBase = waypointIndex;
+            cutWaypoint = undecided ? j : -1;
             waypointIndex = j;
             legWaypoint = j;
             legPartial = false;
@@ -509,8 +610,18 @@ public class LongNavigation {
         }
 
         if (legWaypoint == waypointIndex && !nav.isDone()) {
-            setStatus(Status.FOLLOWING, "leg in progress");
-            return; // the leg path is being walked by the mob (ticked right after)
+            if (cutWaypoint != waypointIndex || mob.getLocation().distance(waypoint) > CROSSING_DECISION_RANGE) {
+                setStatus(Status.FOLLOWING, "leg in progress");
+                return; // the leg path is being walked by the mob (ticked right after)
+            }
+            // close enough to the crossing it was heading for to decide it: a new leg from here (a new start, like the preview's)
+            if (verbose) debug("leg cut near crossing #" + cutWaypoint + ": searched again from here");
+            nav.stop();
+            waypointIndex = cutBase;
+            legWaypoint = -1;
+            cutWaypoint = -1;
+            progressWaypoint = -1;
+            waypoint = currentWaypointLocation();
         }
         if (legWaypoint == waypointIndex && legPartial && isCloseTo(waypoint)) {
             // the waypoint (a gate block recorded earlier) cannot be stood on any more — a wall or a door built
@@ -528,8 +639,8 @@ public class LongNavigation {
         if (refineCrossing(waypoint)) {
             waypoint = currentWaypointLocation();
         }
-        if (tryShortcut(nav)) return;
-        boolean moving = nav.moveTo(waypoint, skwhy.chunkpath.debug.ChunkPathTuning.legLength);
+        if (tryShortcut(nav) || tryThroughLeg(nav)) return;
+        boolean moving = moveToWaypoint(nav, waypointIndex, waypoint);
         if (!moving) {
             LongGroundPathNavigation.FailureReason reason =
                     ((LongGroundPathNavigation) nav).lastFailureReason();
@@ -544,6 +655,8 @@ public class LongNavigation {
         }
 
         legWaypoint = waypointIndex;
+        cutBase = waypointIndex;
+        cutWaypoint = isUndecidedFar(waypointIndex, mob.getLocation()) ? waypointIndex : -1;
         legPartial = !nav.getPath().canReach();
         if (verbose) debug("leg to waypoint#" + waypointIndex + " " + (legPartial ? "PARTIAL " : "") + describePath(nav.getPath()));
         setStatus(Status.FOLLOWING, "leg path found (" + nav.getPath().getNodeCount() + " nodes)");
@@ -654,12 +767,14 @@ public class LongNavigation {
         waitStartTick = world.getGameTime();
         lastWaitCheckTick = waitStartTick;
         expectedWaitTicks = estimatedTicksForCurrentLeg();
+        requestChunks(mob.getLocation(), currentWaypointLocation());
     }
 
     private void tickWaiting() {
         long now = world.getGameTime();
         if (now - lastWaitCheckTick < WAIT_RECHECK_INTERVAL_TICKS) return;
         lastWaitCheckTick = now;
+        requestChunks(mob.getLocation(), currentWaypointLocation());
 
         Location immediateTarget = currentWaypointLocation();
         if (immediateTarget != null && isChunkLoaded(immediateTarget)
@@ -841,6 +956,8 @@ public class LongNavigation {
     // =========================================================================
 
     private void recomputeRoute() {
+        routeInvalid = false;
+        invalidatePreview();
         if (startLocation == null || endLocation == null) {
             setStatus(Status.IDLE, "state machine");
             route = null;
@@ -926,6 +1043,412 @@ public class LongNavigation {
     }
 
     // =========================================================================
+    // Chargement des chunks / aperçu du chemin
+    // =========================================================================
+
+    /** Whether the chunks the walk (or the path preview) needs are loaded when they are not. False by default. */
+    public boolean isForceChunkLoading() { return forceChunkLoading; }
+
+    /**
+     * Off, no chunk is ever loaded for this navigation: a walk waits for the terrain (see {@link #tickWaiting}) and the cells
+     * past an unloaded chunk are left out of {@link #pathBlocks}. On, a walk that waits asks for the chunks it needs (loaded
+     * asynchronously, never generated) and {@link #pathBlocks} reads the unloaded ones from the region files, without loading them.
+     */
+    public void setForceChunkLoading(boolean force) {
+        if (force == forceChunkLoading) return;
+        forceChunkLoading = force;
+        invalidatePreview();
+    }
+
+    /** True for a player: it is never driven (no teleport, no gravity change), the navigation only answers {@link #pathBlocks}. */
+    public boolean isObserver() { return mob.getEntity() instanceof Player; }
+
+    /**
+     * Asks for the chunks between two places to be loaded (asynchronously, never generated), nearest first, when
+     * {@link #setForceChunkLoading} is on.
+     */
+    private void requestChunks(Location from, Location to) {
+        if (!forceChunkLoading || from == null || to == null) return;
+        double length = from.distance(to);
+        int samples = (int) Math.min(64, Math.ceil(length / 8.0)) + 1;
+        java.util.Set<Long> wanted = new java.util.LinkedHashSet<>();
+        for (int pass = 0; pass < 2; pass++) {
+            int reach = pass == 0 ? 0 : 1;
+            for (int i = 0; i <= samples; i++) {
+                double t = (double) i / samples;
+                int cx = (int) Math.floor(from.getX() + (to.getX() - from.getX()) * t) >> 4;
+                int cz = (int) Math.floor(from.getZ() + (to.getZ() - from.getZ()) * t) >> 4;
+                for (int dx = -reach; dx <= reach; dx++) {
+                    for (int dz = -reach; dz <= reach; dz++) {
+                        wanted.add(((long) (cx + dx) << 32) ^ ((cz + dz) & 0xFFFFFFFFL));
+                    }
+                }
+            }
+        }
+        int asked = 0;
+        for (long key : wanted) {
+            int cx = (int) (key >> 32), cz = (int) key;
+            if (world.isChunkLoaded(cx, cz)) continue;
+            if (++asked > MAX_REQUESTED_CHUNKS) return;
+            world.getChunkAtAsync(cx, cz, false);
+        }
+    }
+
+    private void invalidatePreview() {
+        preview.invalidate();
+        previewWaypoints = null;
+        previewMeshes.clear();
+    }
+
+    /**
+     * The cells (feet position, block centre) the walk goes through from where the entity is now, nearest first; at most
+     * {@code limit} of them ({@link Integer#MAX_VALUE} = all). Nothing moves: this is how a player, never driven, gets its path.
+     *
+     * <p>Only what is missing is computed: the route (gates) is kept while the entity stays in the chunks it goes through, the
+     * cells already passed are dropped, a position a little off the path is brought back onto it by one small search, and
+     * asking for more cells only searches the legs after those already known (see {@link PathPreview}). A leg in a loaded chunk
+     * is searched like a real walk would; one in an unloaded chunk is read from the region file when
+     * {@link #isForceChunkLoading} is on (the chunk is not loaded), and otherwise ends the list.
+     */
+    public List<Location> pathBlocks(int limit) {
+        List<Location> out = new ArrayList<>();
+        if (limit <= 0 || endLocation == null) return out;
+        Location here = mob.getLocation();
+        if (here.getWorld() != world) return out;
+        if (routeInvalid || (route == null && status != Status.FAILED_NO_PATH)) recomputeRoute();
+        if (route == null || waypoints == null) return out;
+
+        int first = previewTargetIndex(here);
+        if (first < 0) { // out of the chunks of the route: a new route from where the entity is
+            recomputeRoute();
+            if (route == null || waypoints == null) return out;
+            first = Math.max(0, previewTargetIndex(here));
+        }
+        List<int[]> ahead = preview.next(new int[] { here.getBlockX(), here.getBlockY(), here.getBlockZ() },
+                limit, waypoints.size() + 1, first);
+        if (isObserver()) setStatus(ahead.isEmpty() && preview.isComplete() ? Status.ARRIVED : Status.FOLLOWING, "path blocks asked");
+        for (int[] cell : ahead) out.add(new Location(world, cell[0] + 0.5, cell[1], cell[2] + 0.5));
+        return out;
+    }
+
+    /**
+     * Index of the first waypoint (the destination is {@code waypoints.size()}) still ahead of a position in the chunks of the route, so the gates
+     * already found are kept when the entity changed chunk: in a chunk, it heads for the exit cell (the entry cell is behind
+     * it); in the last chunk, for the destination. -1 when the route does not go through the chunk of the position.
+     */
+    private int previewTargetIndex(Location here) {
+        int cx = here.getBlockX() >> 4, cz = here.getBlockZ() >> 4;
+        for (int i = 0; i < waypoints.size(); i++) {
+            int[] cell = waypoints.cell(i);
+            if ((cell[0] >> 4) == cx && (cell[2] >> 4) == cz) return waypoints.isEntry(i) ? i + 1 : i;
+        }
+        if ((endLocation.getBlockX() >> 4) == cx && (endLocation.getBlockZ() >> 4) == cz) return waypoints.size();
+        return -1;
+    }
+
+    // -------------------------------------------------------------------------
+    // Aperçu : rejoue les décisions de la marche (voir tickFollowing) depuis une position virtuelle.
+    // Rien de ce qui suit ne touche à la marche : les recherches se font avec des mobs sondes jetables et les
+    // passages de bordure sont rechoisis sur une copie des waypoints.
+    // -------------------------------------------------------------------------
+
+    private RouteWaypoints previewWaypoints() {
+        if (previewWaypoints == null) previewWaypoints = waypoints.copy();
+        return previewWaypoints;
+    }
+
+    private int[] destinationCell() {
+        return new int[] { endLocation.getBlockX(), endLocation.getBlockY(), endLocation.getBlockZ() };
+    }
+
+    /** Waypoint {@code index} as a cell; {@code wps.size()} is the destination. */
+    private int[] previewCell(RouteWaypoints wps, int index) {
+        return index < wps.size() ? wps.cell(index) : destinationCell();
+    }
+
+    /**
+     * {@link PathPreview.LegSolver#leg}: what the walk does standing on {@code from} and heading for waypoint {@code index}.
+     * A waypoint already reached is left at once, the crossing is chosen again with the real floor costs, a shortcut is tried
+     * (and the crossing's tolerant exit), then the plain leg; the cells stop where the walk would switch to the next waypoint.
+     */
+    private PathPreview.Leg previewLeg(int[] from, int index) {
+        RouteWaypoints wps = previewWaypoints();
+        int[] destination = destinationCell();
+        int switchMode = skwhy.chunkpath.debug.ChunkPathTuning.switchMode;
+        while (index <= wps.size() && wps.isReached(from, index, destination, switchMode)) index++;
+        if (index > wps.size()) return new PathPreview.Leg(new ArrayList<>(List.of(from)), index);
+        PathCostRules rules = mob.getCostRules();
+        if (rules == null) return null;
+
+        if (index < wps.size() && !previewUndecidedFar(wps, index, from)) { // a far crossing is decided once the walk is close (leg cut)
+            wps.refine(index, from.clone(), destination, previewFloorCost(rules));
+        }
+        if (isSurroundingLoaded(from[0], from[2])) {
+            PathPreview.Leg live = liveLeg(wps, from, index, rules);
+            if (verbose) {
+                debug("path blocks leg from " + from[0] + "," + from[1] + "," + from[2] + " toward waypoint#" + index + ": live search "
+                        + (live != null ? live.cells().size() + " cells, next waypoint#" + live.next() : "failed"));
+            }
+            if (live != null) return live;
+        }
+        PathPreview.Leg read = fallbackLeg(wps, from, index, rules);
+        if (verbose) {
+            debug("path blocks leg from " + from[0] + "," + from[1] + "," + from[2] + " toward waypoint#" + index
+                    + (forceChunkLoading ? ", file read: " + (read != null ? read.cells().size() + " cells" : "failed") : ", not read (force chunk loading is off)"));
+        }
+        return read;
+    }
+
+    /** {@link #isUndecidedFar} for the preview: standing on {@code from}, on the preview's copy of the waypoints. */
+    private boolean previewUndecidedFar(RouteWaypoints wps, int index, int[] from) {
+        if (index >= wps.size() || !wps.isCrossing(index) || wps.isSettled(index)) return false;
+        return previewDistance(from, wps.cell(index)) > CROSSING_DECISION_RANGE;
+    }
+
+    private static double previewDistance(int[] a, int[] b) {
+        double dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    /** Floor cost of a cell for {@link RouteWaypoints#refine}, as the walk reads it (see {@link #refineCrossing}). */
+    private RouteWaypoints.CellCost previewFloorCost(PathCostRules rules) {
+        return (x, y, z) -> {
+            if (!world.isChunkLoaded(x >> 4, z >> 4)) return Integer.MIN_VALUE;
+            org.bukkit.Material below = world.getType(x, y - 1, z);
+            return below.isSolid() && !skwhy.chunkpath.block.BlockClassifier.noCollisionBlocks().contains(below) ? rules.costOf(below) : Integer.MIN_VALUE;
+        };
+    }
+
+    /** A throw-away mob standing on {@code from}, with the settings of the real one, whose searches never load a chunk. */
+    private LongMob previewProbe(int[] from, PathCostRules rules) {
+        LongMob probe = new LongMob(this, PREVIEW_PROBE_ID, mob.getHitbox(),
+                new Location(world, from[0] + 0.5, from[1], from[2] + 0.5), (float) mob.getSpeed(), rules);
+        probe.setCanOpenDoors(mob.canOpenDoors());
+        probe.setCostSmoothing(mob.costSmoothing());
+        probe.setOnGround(true);
+        probe.getNavigation().getNodeEvaluator().setNeverLoadChunks(true);
+        return probe;
+    }
+
+    /** The real walk's search ({@link #tickFollowing}) in loaded terrain; null when no path can be walked (now). */
+    private PathPreview.Leg liveLeg(RouteWaypoints wps, int[] from, int index, PathCostRules rules) {
+        PathNavigation nav = previewProbe(from, rules).getNavigation();
+        int ahead = skwhy.chunkpath.debug.ChunkPathTuning.lookahead;
+        int j = ahead > 0
+                ? previewShortcut(nav, wps, from, index, index + ahead, index + 1, skwhy.chunkpath.debug.ChunkPathTuning.lookaheadRatio)
+                : -1;
+        if (j < 0 && wps.isCrossing(index)) j = previewShortcut(nav, wps, from, index, index + 2, index + 2, THROUGH_LEG_RATIO);
+        if (j < 0) {
+            if (!previewMoveTo(nav, wps, from, index, previewCell(wps, index))) return null;
+            j = index;
+        }
+        Path path = nav.getPath();
+        int[] target = previewCell(wps, j);
+        Node end = path.getEndNode();
+        if (!path.canReach()) {
+            // the walk carries on from the closest spot when it is near enough, and is stuck otherwise
+            int dx = end.x - target[0], dz = end.z - target[2], dy = end.y - target[1];
+            if (dx * dx + dz * dz > ARRIVAL_TOLERANCE * ARRIVAL_TOLERANCE || dy <= -2 || dy >= 3) return null;
+        }
+        PathPreview.Leg walked = pathCells(path, from);
+        List<int[]> cells = walked.cells();
+        double[] costs = walked.costs();
+
+        // the leg heads for a crossing nobody has decided and that is still far: the walk is cut once it is close enough, and the
+        // next leg starts from there (the crossing is then chosen again from that point), like the real walk does
+        if (previewUndecidedFar(wps, j, from)) {
+            for (int k = 1; k < cells.size(); k++) {
+                if (previewDistance(cells.get(k), target) <= CROSSING_DECISION_RANGE) {
+                    cells.subList(k + 1, cells.size()).clear();
+                    costs = java.util.Arrays.copyOf(costs, cells.size());
+                    return new PathPreview.Leg(cells, index, costs);
+                }
+            }
+        }
+
+        // the walk switches to the next waypoint as soon as it stands where waypoint j is considered reached
+        int[] destination = destinationCell();
+        int switchMode = skwhy.chunkpath.debug.ChunkPathTuning.switchMode;
+        int next = j + 1;
+        for (int k = 1; k < cells.size(); k++) {
+            if (wps.isReached(cells.get(k), j, destination, switchMode)) {
+                if (k < cells.size() - 1) {
+                    cells.subList(k + 1, cells.size()).clear();
+                    costs = java.util.Arrays.copyOf(costs, cells.size());
+                    next = j;
+                }
+                break;
+            }
+        }
+        return new PathPreview.Leg(cells, next, costs);
+    }
+
+    /** The cells a path goes through, from {@code from}, with the cost of the walk up to each (the search's own cost of the nodes). */
+    private static PathPreview.Leg pathCells(Path path, int[] from) {
+        List<int[]> nodes = new ArrayList<>(path.getNodeCount() + 1);
+        double[] g = new double[path.getNodeCount() + 1];
+        int count = 0;
+        int[] first = null;
+        for (int i = 0; i < path.getNodeCount(); i++) {
+            Node node = path.getNode(i);
+            if (first == null && (node.x != from[0] || node.y != from[1] || node.z != from[2])) {
+                nodes.add(from); // the path starts on a node other than the cell: the walk starts on the cell, at no cost
+                g[count++] = node.g;
+            }
+            first = from;
+            nodes.add(new int[] { node.x, node.y, node.z });
+            g[count++] = node.g;
+        }
+        return PathPreview.expand(nodes, java.util.Arrays.copyOf(g, count));
+    }
+
+    /**
+     * {@link #moveToWaypoint} on a probe: toward waypoint {@code index}; for the exit cell of a crossing the search may end on any
+     * exit cell of it, and the crossing becomes the cell it ended on.
+     */
+    private boolean previewMoveTo(PathNavigation nav, RouteWaypoints wps, int[] from, int index, int[] target) {
+        boolean tolerant = index < wps.size() && wps.isCrossing(index);
+        boolean decides = tolerant && !previewUndecidedFar(wps, index, from);
+        nav.setAlsoAccept(tolerant ? (x, y, z) -> wps.acceptsExit(index, x, y, z) : null);
+        try {
+            boolean moving = nav.moveTo(new Location(world, target[0], target[1], target[2]),
+                    skwhy.chunkpath.debug.ChunkPathTuning.legLength);
+            Path path = nav.getPath();
+            Node end = moving && path != null && path.canReach() ? path.getEndNode() : null;
+            if (decides && end != null) wps.snapExit(index, end.x, end.y, end.z);
+            return moving;
+        } finally {
+            nav.setAlsoAccept(null);
+        }
+    }
+
+    /** {@link #tryShortcut} on a probe: the waypoints {@code maxJ} down to {@code minJ}; the one reached (its path is on {@code nav}) or -1. */
+    private int previewShortcut(PathNavigation nav, RouteWaypoints wps, int[] from, int index, int maxJ, int minJ, double ratio) {
+        double range = skwhy.chunkpath.debug.ChunkPathTuning.lookaheadRange;
+        int size = wps.size();
+        int tries = 0;
+        for (int j = Math.min(size, maxJ); j >= minJ && j > index && tries < 3; j--) {
+            if (j < size && wps.isEntry(j)) continue; // never aim at an entry cell
+            if (j < size && !previewUndecidedFar(wps, j, from)) wps.refine(j, from.clone(), destinationCell(), previewFloorCost(mob.getCostRules()));
+            int[] target = previewCell(wps, j);
+            double dx = from[0] + 0.5 - target[0], dy = from[1] - target[1], dz = from[2] + 0.5 - target[2];
+            if (Math.sqrt(dx * dx + dy * dy + dz * dz) > range || !isSurroundingLoaded(target[0], target[2])) continue;
+            tries++;
+            if (!previewMoveTo(nav, wps, from, j, target) || !nav.getPath().canReach()) { nav.stop(); continue; }
+            Path path = nav.getPath();
+            double walked = 0.0;
+            for (int i = 1; i < path.getNodeCount(); i++) {
+                Node a = path.getNode(i - 1), b = path.getNode(i);
+                walked += Math.sqrt((a.x - b.x) * (double) (a.x - b.x) + (a.z - b.z) * (double) (a.z - b.z));
+            }
+            double chain = 0.0;
+            double previousX = from[0] + 0.5, previousZ = from[2] + 0.5;
+            for (int i = index; i <= j; i++) {
+                int[] next = previewCell(wps, i);
+                chain += Math.sqrt(Math.pow(previousX - next[0], 2) + Math.pow(previousZ - next[2], 2));
+                previousX = next[0];
+                previousZ = next[2];
+            }
+            if (walked > chain * ratio + 2.0) { nav.stop(); continue; }
+            return j;
+        }
+        return -1;
+    }
+
+    /** What is left of the walk when the terrain is not loaded: one step across a border, or a leg read from the region file. */
+    private PathPreview.Leg fallbackLeg(RouteWaypoints wps, int[] from, int index, PathCostRules rules) {
+        int[] to = previewCell(wps, index);
+        if (Math.abs(from[0] - to[0]) + Math.abs(from[2] - to[2]) == 1 && Math.abs(from[1] - to[1]) <= 1) {
+            return new PathPreview.Leg(new ArrayList<>(List.of(from, to)), index + 1); // e.g. across a chunk border (exact, not provisional)
+        }
+        int cx = from[0] >> 4, cz = from[2] >> 4;
+        if (!forceChunkLoading || cx != (to[0] >> 4) || cz != (to[2] >> 4)) return null;
+        List<int[]> read = fileLeg(from, to, cx, cz, rules);
+        return read == null ? null : new PathPreview.Leg(read, index + 1).asProvisional();
+    }
+
+    /** {@link PathPreview.LegSolver#back}: the small search that brings a position off the path back onto it (see {@link #rejoinLeg}). */
+    private PathPreview.Leg previewBack(int[] from, int[] to) {
+        PathCostRules rules = mob.getCostRules();
+        if (rules == null) return null;
+        int cx = from[0] >> 4, cz = from[2] >> 4;
+        if (isSurroundingLoaded(from[0], from[2]) && isSurroundingLoaded(to[0], to[2])) {
+            PathNavigation nav = previewProbe(from, rules).getNavigation();
+            double distance = Math.sqrt(Math.pow(from[0] - to[0], 2) + Math.pow(from[1] - to[1], 2) + Math.pow(from[2] - to[2], 2));
+            if (nav.moveTo(new Location(world, to[0], to[1], to[2]), (float) (distance * 2.0 + 8.0))) {
+                Path path = nav.getPath();
+                Node end = path.getEndNode();
+                double dx = end.x - to[0], dz = end.z - to[2];
+                if (Math.sqrt(dx * dx + dz * dz) <= REJOIN_ARRIVED_DISTANCE && Math.abs(end.y - to[1]) < 2) {
+                    PathPreview.Leg walked = pathCells(path, from);
+                    List<int[]> cells = walked.cells();
+                    double[] costs = walked.costs();
+                    if (end.x != to[0] || end.y != to[1] || end.z != to[2]) { // ends next to the cell: one more step onto it
+                        cells.add(to);
+                        costs = java.util.Arrays.copyOf(costs, cells.size());
+                        costs[cells.size() - 1] = costs[cells.size() - 2] + 1.0;
+                    }
+                    return new PathPreview.Leg(cells, 0, costs);
+                }
+            }
+        }
+        if (!forceChunkLoading || cx != (to[0] >> 4) || cz != (to[2] >> 4)) return null;
+        List<int[]> read = fileLeg(from, to, cx, cz, rules);
+        return read == null ? null : new PathPreview.Leg(read, 0).asProvisional();
+    }
+
+    /** True when the chunk of the column and the chunks of the blocks next to it are loaded (nothing read there loads a chunk). */
+    private boolean isSurroundingLoaded(int x, int z) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (!world.isChunkLoaded((x + dx) >> 4, (z + dz) >> 4)) return false;
+            }
+        }
+        return true;
+    }
+
+    /** The walk inside an unloaded chunk, from the chunk graph read from the region file (the chunk is not loaded). */
+    private List<int[]> fileLeg(int[] from, int[] to, int cx, int cz, PathCostRules rules) {
+        ChunkNavMesh mesh = previewMesh(cx, cz, rules);
+        if (mesh == null) return null;
+        int a = meshNode(mesh, from), b = meshNode(mesh, to);
+        if (a < 0 || b < 0) return null;
+        int[] ids = mesh.pathBetween(a, b);
+        if (ids == null) return null;
+        List<int[]> cells = new ArrayList<>(ids.length + 1);
+        cells.add(from);
+        for (int id : ids) {
+            int[] cell = { (cx << 4) + mesh.x(id), mesh.y(id), (cz << 4) + mesh.z(id) };
+            if (cells.size() == 1 && cell[0] == from[0] && cell[1] == from[1] && cell[2] == from[2]) continue;
+            cells.add(cell);
+        }
+        return cells;
+    }
+
+    private static int meshNode(ChunkNavMesh mesh, int[] cell) {
+        for (int dy : new int[] { 0, -1, 1, -2, 2 }) {
+            int node = mesh.nodeAt(cell[0] & 15, cell[1] + dy, cell[2] & 15);
+            if (node >= 0) return node;
+        }
+        return -1;
+    }
+
+    private ChunkNavMesh previewMesh(int cx, int cz, PathCostRules rules) {
+        long key = ((long) cx << 32) ^ (cz & 0xFFFFFFFFL);
+        ChunkNavMesh mesh = previewMeshes.get(key);
+        if (mesh == null) {
+            try {
+                mesh = ChunkPathManager.serviceFor(world).analyzer().buildMesh(cx, cz, rules);
+            } catch (RuntimeException e) {
+                debug("path blocks: chunk " + cx + "," + cz + " cannot be read from its region file: " + e.getMessage());
+                return null;
+            }
+            previewMeshes.put(key, mesh);
+        }
+        return mesh;
+    }
+
+    // =========================================================================
     // Getters / Setters publics
     // =========================================================================
 
@@ -934,10 +1457,17 @@ public class LongNavigation {
     public int getEntityId() { return mob.getId(); }
 
     public Vector getHitbox()     { return mob.getHitbox(); }
-    public void   setHitbox(Vector hitbox) { mob.setHitbox(hitbox); }
+    public void   setHitbox(Vector hitbox) {
+        mob.setHitbox(hitbox);
+        invalidatePreview();
+    }
 
     public Location getCurrentLocation() { return mob.getLocation(); }
-    public void setCurrentLocation(Location location) { mob.setLocation(location); }
+    /** Moves the entity; a player is never moved by a navigation (it only observes), so nothing happens for one. */
+    public void setCurrentLocation(Location location) {
+        if (isObserver()) return;
+        mob.setLocation(location);
+    }
 
     public Location getStart() { return startLocation != null ? startLocation.clone() : null; }
 
@@ -980,6 +1510,7 @@ public class LongNavigation {
         rejoinResume = null;
         legWaypoint = -1;
         mob.getNavigation().stop();
+        invalidatePreview();
     }
 
     /** See {@link LongMob#costSmoothing()}. */
@@ -991,6 +1522,7 @@ public class LongNavigation {
         rejoinResume = null;
         legWaypoint = -1;
         mob.getNavigation().stop();
+        invalidatePreview();
     }
 
     /** Number of times the walk had to be cut short by moving the entity (should stay 0 on a healthy walk). */

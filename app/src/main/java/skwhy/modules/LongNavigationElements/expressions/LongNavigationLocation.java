@@ -22,7 +22,8 @@ import skwhy.chunkpath.longnav.LongNavigation;
 @Description("Gets or sets the start location, end location (destination), or current location of a long " +
     "navigation object. Setting the start or end location (re)computes the chunk-gate route, from the position the " +
     "entity really is at (so changing the end while it walks does not send it back to its start); setting the " +
-    "current location teleports the underlying entity (or virtual position) directly, like 'location of navigation'.")
+    "current location teleports the underlying entity (or virtual position) directly, like 'location of navigation' " +
+    "(except for a player: a navigation never moves a player, so setting its current location does nothing).")
 @Examples({
     "set {_longnav} to a new long navigation with entity target entity speed 0.2",
     "set start location of long navigation {_longnav} to location of player",

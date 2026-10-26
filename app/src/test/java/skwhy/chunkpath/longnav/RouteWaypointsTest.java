@@ -134,6 +134,17 @@ class RouteWaypointsTest {
     }
 
     @Test
+    void aCrossingIsSettledOnceRefinedAndNotBefore() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8);
+        assertFalse(w.isSettled(0));
+        w.refine(0, new int[] {10, 1, 8}, null, ROAD_ON_3_TO_5);
+        assertTrue(w.isSettled(0));
+        assertFalse(w.copy().isSettled(1), "the entry cell is never refined by itself");
+        assertTrue(w.copy().isSettled(0), "a copy keeps what is settled");
+    }
+
+    @Test
     void refineKeepsTheEarlierChoiceWhenTheTerrainIsNotLoaded() {
         Gate[] g = borderOfWidth9();
         RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8);
@@ -157,11 +168,130 @@ class RouteWaypointsTest {
     }
 
     @Test
+    void onlyTheExitOfACrossingIsACrossingWaypoint() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 4);
+        assertTrue(w.isCrossing(0));
+        assertFalse(w.isCrossing(1));
+    }
+
+    @Test
+    void theCellPastTheBorderIsAnEntryWaypoint() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 4);
+        assertFalse(w.isEntry(0));
+        assertTrue(w.isEntry(1));
+    }
+
+    @Test
+    void anyExitOfTheCrossingIsAcceptedNotOnlyTheChosenOne() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8); // chosen: z = 8
+        assertTrue(w.acceptsExit(0, 15, 1, 8));
+        assertTrue(w.acceptsExit(0, 15, 1, 6), "a neighbouring cell of the border is as good");
+    }
+
+    @Test
+    void acceptedExitsAreBoundedAlongTheBorderAndByLevel() {
+        int[][] exit = new int[40][], entry = new int[40][];
+        for (int z = 0; z < 40; z++) {
+            exit[z] = new int[] {15, 1, z};
+            entry[z] = new int[] {16, 1, z};
+        }
+        RouteWaypoints w = RouteWaypoints.build(List.of(gate(0, 0, 0, Direction.EAST, exit), gate(1, 0, 0, Direction.WEST, entry)), 10, 1, 0);
+        assertTrue(w.acceptsExit(0, 15, 1, 8));
+        assertFalse(w.acceptsExit(0, 15, 1, 30), "too far along the border: another passage");
+        assertFalse(w.acceptsExit(0, 15, 5, 1), "another level");
+        assertFalse(w.acceptsExit(0, 14, 1, 1), "not a cell of the border");
+    }
+
+    @Test
+    void exitsWithoutAPartnerAcrossTheBorderAreRefused() {
+        Gate a = gate(0, 0, 0, Direction.EAST, new int[] {15, 1, 0}, new int[] {15, 1, 1});
+        Gate b = gate(1, 0, 0, Direction.WEST, new int[] {16, 1, 0});
+        RouteWaypoints w = RouteWaypoints.build(List.of(a, b), 10, 1, 0);
+        assertFalse(w.acceptsExit(0, 15, 1, 1));
+    }
+
+    @Test
+    void snapExitMovesTheCrossingAndItsEntryToTheCellTheLegEndedOn() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8);
+        assertTrue(w.snapExit(0, 15, 1, 6));
+        assertArrayEquals(new int[] {15, 1, 6}, w.cell(0));
+        assertArrayEquals(new int[] {16, 1, 6}, w.cell(1));
+    }
+
+    @Test
+    void snapExitRefusesACellOutsideTheCrossingAndKeepsTheWaypoints() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8);
+        assertFalse(w.snapExit(0, 3, 1, 3));
+        assertFalse(w.snapExit(1, 15, 1, 6), "an entry waypoint is not a crossing");
+        assertArrayEquals(new int[] {15, 1, 8}, w.cell(0));
+    }
+
+    @Test
+    void aSnappedCrossingIsNotChosenAgainByRefine() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8);
+        w.snapExit(0, 15, 1, 6);
+        assertFalse(w.refine(0, new int[] {10, 1, 8}, null, ROAD_ON_3_TO_5));
+        assertArrayEquals(new int[] {15, 1, 6}, w.cell(0));
+    }
+
+    @Test
     void refineAvoidsBlockedCells() {
         Gate[] g = borderOfWidth9();
         RouteWaypoints w = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 4);
         // z 3..5 closed (wall / blocked block): the crossing must be elsewhere even if it is close
         w.refine(0, new int[] {10, 1, 4}, null, (x, y, z) -> z >= 3 && z <= 5 ? -1 : 5);
         assertTrue(w.cell(0)[2] < 3 || w.cell(0)[2] > 5);
+    }
+
+    @Test
+    void aCopyIsRefinedAndSnappedWithoutChangingTheOriginal() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints original = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8);
+        RouteWaypoints copy = original.copy();
+        assertArrayEquals(original.cell(0), copy.cell(0));
+        assertTrue(copy.snapExit(0, 15, 1, 6));
+        assertArrayEquals(new int[] {15, 1, 6}, copy.cell(0));
+        assertArrayEquals(new int[] {15, 1, 8}, original.cell(0));
+        assertTrue(original.refine(0, new int[] {10, 1, 8}, null, ROAD_ON_3_TO_5), "the original was not refined by the copy");
+    }
+
+    @Test
+    void aCopyKeepsWhatWasAlreadyRefined() {
+        Gate[] g = borderOfWidth9();
+        RouteWaypoints original = RouteWaypoints.build(List.of(g[0], g[1]), 10, 1, 8);
+        original.snapExit(0, 15, 1, 6);
+        RouteWaypoints copy = original.copy();
+        assertArrayEquals(new int[] {15, 1, 6}, copy.cell(0));
+        assertFalse(copy.refine(0, new int[] {10, 1, 8}, null, ROAD_ON_3_TO_5), "a snapped crossing is not chosen again");
+        assertTrue(copy.isCrossing(0));
+        assertTrue(copy.isEntry(1));
+    }
+
+    @Test
+    void reachedOnTheWaypointColumnOrInTheChunkAfterTheCrossing() {
+        Gate a = gate(0, 0, 0, Direction.EAST, new int[] {15, 1, 0});
+        Gate b1 = gate(1, 0, 0, Direction.WEST, new int[] {16, 1, 0});
+        Gate b2 = gate(1, 0, 1, Direction.EAST, new int[] {31, 1, 0});
+        Gate c = gate(2, 0, 0, Direction.WEST, new int[] {32, 1, 0});
+        RouteWaypoints w = RouteWaypoints.build(List.of(a, b1, b2, c), 0, 1, 0);
+        int[] destination = {40, 1, 0};
+        // waypoint 0 is the exit of chunk 0: reached once in chunk 1, not before, unless standing on it
+        assertFalse(w.isReached(new int[] {10, 1, 0}, 0, destination, 1));
+        assertTrue(w.isReached(new int[] {15, 1, 0}, 0, destination, 1));
+        assertTrue(w.isReached(new int[] {16, 1, 5}, 0, destination, 1));
+        assertFalse(w.isReached(new int[] {16, 1, 5}, 0, destination, 0), "switch off: only the waypoint itself counts");
+        // waypoint 1 is the entry (same chunk as waypoint 2): reached in its chunk
+        assertTrue(w.isReached(new int[] {20, 1, 3}, 1, destination, 1));
+        assertFalse(w.isReached(new int[] {15, 1, 3}, 1, destination, 1));
+        // the destination: its column only
+        assertTrue(w.isReached(new int[] {40, 1, 0}, w.size(), destination, 1));
+        assertFalse(w.isReached(new int[] {41, 1, 0}, w.size(), destination, 1));
+        assertFalse(w.isReached(new int[] {40, 4, 0}, w.size(), destination, 1), "three blocks above is another floor");
     }
 }

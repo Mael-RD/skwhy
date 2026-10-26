@@ -264,4 +264,47 @@ class ChunkNavMeshTest {
             assertEquals(-1, mesh(chunk).nodeAt(5, 1, 5), state);
         }
     }
+
+    @Test
+    void pathBetweenFollowsTheCheapestWay() {
+        ChunkNavMesh mesh = mesh(TestChunks.flatChunk());
+        int from = mesh.nodeAt(0, 1, 0), to = mesh.nodeAt(15, 1, 0);
+        int[] path = mesh.pathBetween(from, to);
+        assertEquals(16, path.length);
+        assertEquals(from, path[0]);
+        assertEquals(to, path[15]);
+        for (int i = 1; i < path.length; i++) { // chaque pas est un voisin direct
+            final int step = path[i];
+            assertTrue(java.util.Arrays.stream(mesh.neighborsOf(path[i - 1])).anyMatch(n -> n == step));
+        }
+    }
+
+    @Test
+    void pathBetweenGoesAroundAWall() {
+        NbtTag chunk = TestChunks.builder(0).fill(0, 0, 0, 15, 0, 15, "minecraft:stone")
+                .fill(8, 1, 0, 8, 3, 14, "minecraft:stone").build(); // mur de x=8, ouvert en z=15
+        ChunkNavMesh mesh = mesh(chunk);
+        int[] path = mesh.pathBetween(mesh.nodeAt(2, 1, 2), mesh.nodeAt(12, 1, 2));
+        assertTrue(path.length > 11, "le chemin droit est bloque, il contourne");
+        boolean throughGap = false;
+        for (int node : path) throughGap |= mesh.x(node) == 8 && mesh.z(node) == 15;
+        assertTrue(throughGap);
+    }
+
+    @Test
+    void pathBetweenSameNodeIsThatNode() {
+        ChunkNavMesh mesh = mesh(TestChunks.flatChunk());
+        int node = mesh.nodeAt(3, 1, 3);
+        assertEquals(java.util.List.of(node), java.util.Arrays.stream(mesh.pathBetween(node, node)).boxed().toList());
+    }
+
+    @Test
+    void pathBetweenUnconnectedOrInvalidNodesIsNull() {
+        NbtTag chunk = TestChunks.builder(0).fill(0, 0, 0, 15, 0, 15, "minecraft:stone")
+                .fill(8, 1, 0, 8, 3, 15, "minecraft:stone").build(); // mur complet : deux moities
+        ChunkNavMesh mesh = mesh(chunk);
+        assertEquals(null, mesh.pathBetween(mesh.nodeAt(2, 1, 2), mesh.nodeAt(12, 1, 2)));
+        assertEquals(null, mesh.pathBetween(-1, 0));
+        assertEquals(null, mesh.pathBetween(0, mesh.nodeCount()));
+    }
 }

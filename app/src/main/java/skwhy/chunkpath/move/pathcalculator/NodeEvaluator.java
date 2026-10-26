@@ -42,6 +42,7 @@ public abstract class NodeEvaluator {
     protected boolean canWalkOverFences;
     /** Set when the search met a chunk that is not loaded (never read: that would load it synchronously). */
     protected boolean hitUnloadedChunk;
+    private boolean neverLoadChunks;
     private final it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap loadedChunks = new it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap();
 
     /**
@@ -85,17 +86,18 @@ public abstract class NodeEvaluator {
         pathfindingMalusMap.remove(type);
     }
 
-    /** True when the chunk holding block column (x, z) is loaded; records the first unloaded one met. */
+    /**
+     * True when the chunk holding block column (x, z) is loaded; records the first unloaded one met. With
+     * {@link #setNeverLoadChunks}, the chunks around the column must be loaded too (see there).
+     */
     protected boolean isColumnLoaded(final int x, final int z) {
-        final int cx = x >> 4;
-        final int cz = z >> 4;
-        final long key = ((long) cx << 32) ^ (cz & 0xFFFFFFFFL);
-        boolean loaded;
-        if (this.loadedChunks.containsKey(key)) {
-            loaded = this.loadedChunks.get(key);
-        } else {
-            loaded = this.currentContext.world().isChunkLoaded(cx, cz);
-            this.loadedChunks.put(key, loaded);
+        boolean loaded = this.isChunkLoaded(x >> 4, z >> 4);
+        if (loaded && this.neverLoadChunks) {
+            for (int dx = -1; dx <= 1 && loaded; dx++) {
+                for (int dz = -1; dz <= 1 && loaded; dz++) {
+                    loaded = this.isChunkLoaded((x + dx) >> 4, (z + dz) >> 4);
+                }
+            }
         }
         if (!loaded) {
             this.hitUnloadedChunk = true;
@@ -103,8 +105,32 @@ public abstract class NodeEvaluator {
         return loaded;
     }
 
+    private boolean isChunkLoaded(final int cx, final int cz) {
+        final long key = ((long) cx << 32) ^ (cz & 0xFFFFFFFFL);
+        if (this.loadedChunks.containsKey(key)) {
+            return this.loadedChunks.get(key);
+        }
+        final boolean loaded = this.currentContext.world().isChunkLoaded(cx, cz);
+        this.loadedChunks.put(key, loaded);
+        return loaded;
+    }
+
+    /**
+     * On: a column only counts as loaded when the chunks of the blocks around it are loaded as well. Reading the blocks
+     * next to a node (the body's collisions, the neighbours that tell a cactus or a fire) would otherwise load, synchronously,
+     * the chunk across the border; a search that must not load any chunk (the preview of a path) needs this.
+     */
+    public void setNeverLoadChunks(final boolean neverLoadChunks) {
+        this.neverLoadChunks = neverLoadChunks;
+    }
+
     public boolean hitUnloadedChunk() {
         return this.hitUnloadedChunk;
+    }
+
+    /** Cost added to the move from one node to the next on top of the distance and the cost of the next node (0 here). */
+    public float stepCost(final Node from, final Node to) {
+        return 0.0F;
     }
 
     // ------------------------------------------------------------------

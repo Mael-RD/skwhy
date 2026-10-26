@@ -45,6 +45,13 @@ public abstract class PathNavigation {
       this.mob = mob;
    }
 
+   private LongPathFinder.@Nullable GoalTest alsoAccept;
+
+   /** The next searches may also end on any cell this accepts (null = only the exact target). Set around a {@link #moveTo}. */
+   public void setAlsoAccept(LongPathFinder.@Nullable GoalTest alsoAccept) {
+      this.alsoAccept = alsoAccept;
+   }
+
    public @Nullable Location getTargetPos() {
       return this.targetPos;
    }
@@ -80,7 +87,7 @@ public abstract class PathNavigation {
          return this.path;
       } else {
          // Block fromPos = this.mob.getLocation().getBlock();
-         Path path = this.pathFinder().findPath(this.mob, location, maxPathLength);
+         Path path = this.pathFinder().findPath(this.mob, location, maxPathLength, this.alsoAccept);
 
          if (path != null && path.getTarget() != null) {
             this.targetPos = new Location(mob.getWorld(), path.getTargetX(), path.getTargetY(), path.getTargetZ());
