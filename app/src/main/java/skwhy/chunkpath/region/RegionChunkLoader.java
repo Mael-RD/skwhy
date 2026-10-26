@@ -67,8 +67,10 @@ public final class RegionChunkLoader {
             }
 
             long chunkStart = sectorOffset * (long) SECTOR_SIZE;
-            long chunkEnd = chunkStart + sectorCount * (long) SECTOR_SIZE;
-            if (sectorOffset < HEADER_SIZE / SECTOR_SIZE || sectorCount == 0 || chunkEnd > fileLength) {
+            // Le dernier secteur n'est complete qu'a la fermeture du fichier : un chunk ecrit en dernier peut finir
+            // avant la fin de son secteur (frequent avec des chunks vides, ex. monde void). Seul le debut doit exister,
+            // la lecture du contenu echoue (RegionReadException) si les donnees depassent vraiment la fin du fichier.
+            if (sectorOffset < HEADER_SIZE / SECTOR_SIZE || sectorCount == 0 || chunkStart + 5 > fileLength) {
                 throw new RegionReadException(chunkX, chunkZ, "entrée d'en-tête incohérente (offset=" + sectorOffset
                         + ", secteurs=" + sectorCount + ", taille fichier=" + fileLength + ")");
             }

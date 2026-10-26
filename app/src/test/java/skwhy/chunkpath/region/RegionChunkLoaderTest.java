@@ -140,6 +140,29 @@ class RegionChunkLoaderTest {
     }
 
     @Test
+    void lastChunkNotPaddedToAFullSectorIsReadable() throws IOException {
+        byte[] nbt = flat("full");
+        writeRegion(0, 0, 0, 0, 2, nbt);
+        Path file = folder.resolve("r.0.0.mca");
+        // le fichier s'arrete au dernier octet du chunk, sans completer le secteur (etat d'un serveur en marche)
+        try (RandomAccessFile raf = new RandomAccessFile(file.toFile(), "rw")) {
+            raf.seek(2 * 4096L);
+            long end = 2 * 4096L + 4 + raf.readInt();
+            raf.setLength(end);
+        }
+        assertTrue(RegionChunkLoader.loadChunkRoot(folder, 0, 0) != null);
+    }
+
+    @Test
+    void chunkDataCutShortIsUnreadable() throws IOException {
+        writeRegion(0, 0, 0, 0, 2, flat("full"));
+        try (RandomAccessFile raf = new RandomAccessFile(folder.resolve("r.0.0.mca").toFile(), "rw")) {
+            raf.setLength(2 * 4096L + 20);
+        }
+        assertThrows(RegionReadException.class, () -> RegionChunkLoader.loadChunkRoot(folder, 0, 0));
+    }
+
+    @Test
     void headerPointingIntoTheHeaderIsUnreadable() throws IOException {
         try (RandomAccessFile raf = new RandomAccessFile(folder.resolve("r.0.0.mca").toFile(), "rw")) {
             raf.setLength(3 * 4096);
