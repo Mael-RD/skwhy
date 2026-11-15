@@ -40,7 +40,7 @@ public class API_request {
 
     /**
      * Envoie une réponse HTTP 200 avec le texte fourni.
-     * Appelé depuis une expression Skript "reply to {_req} with ..."
+     * Appelé depuis une expression Skript "api reply to {_req} with ..."
      */
     public void reply(String responseBody) {
         reply(200, responseBody);
@@ -97,17 +97,17 @@ public class API_request {
             .description(
                 "Represents an incoming HTTP or HTTPS request received by the built-in API server. " +
                 "Exposes the method, path, query string, and body. " +
-                "Use 'reply to %apirequest% with %string%' to send a response."
+                "Use 'api reply to %apirequest% with %string%' to send a response."
             )
             .usage("Obtained via 'event-apirequest' inside an 'on api request' event.")
             .user("api ?requests?")
             .examples(
                 "on api request:",
                 "\tset {_req} to event-apirequest",
-                "\tif method of {_req} is \"GET\":",
-                "\t\treply to {_req} with \"{\\\"ok\\\": true}\"",
+                "\tif api method of {_req} is \"GET\":",
+                "\t\tapi reply to {_req} with \"{\\\"ok\\\": true}\"",
                 "\telse:",
-                "\t\treply to {_req} with code 405 and \"{\\\"error\\\": \\\"method not allowed\\\"}\""
+                "\t\tapi reply to {_req} with code 405 and \"{\\\"error\\\": \\\"method not allowed\\\"}\""
             )
             .since("1.3.0")
 

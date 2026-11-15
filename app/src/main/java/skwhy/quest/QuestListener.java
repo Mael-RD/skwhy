@@ -21,6 +21,7 @@ import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.inventory.EquipmentSlot;
 
 import com.destroystokyo.paper.event.entity.EntityAddToWorldEvent;
+import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
 
 import io.papermc.paper.event.player.PlayerInventorySlotChangeEvent;
 import io.papermc.paper.event.player.PlayerPurchaseEvent;
@@ -29,6 +30,7 @@ import skwhy.SkWhy;
 import skwhy.quest.data.QuestStore;
 import skwhy.quest.model.NpcEntityRef;
 import skwhy.quest.npc.CompassService;
+import skwhy.quest.npc.CustomNpcBodies;
 import skwhy.quest.npc.DialogueService;
 import skwhy.quest.npc.IndicatorService;
 import skwhy.quest.npc.NpcService;
@@ -73,7 +75,8 @@ public final class QuestListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onInteract(PlayerInteractEntityEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) return;
-        if (NpcService.refOf(event.getRightClicked()) == null) return;
+        // une entité custom réelle est gérée par l'évènement des entités custom (CustomNpcListener), qui voit aussi son visuel
+        if (CustomNpcBodies.isCustom(event.getRightClicked()) || NpcService.refOf(event.getRightClicked()) == null) return;
         event.setCancelled(true);
         NpcService.interact(event.getPlayer(), event.getRightClicked(), ClickType.RIGHT);
     }
@@ -81,7 +84,7 @@ public final class QuestListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player player)) return;
-        if (NpcService.refOf(event.getEntity()) == null) return;
+        if (CustomNpcBodies.isCustom(event.getEntity()) || NpcService.refOf(event.getEntity()) == null) return;
         event.setCancelled(true);
         NpcService.interact(player, event.getEntity(), ClickType.LEFT);
     }
@@ -92,9 +95,15 @@ public final class QuestListener implements Listener {
         if (ref != null && !NpcService.shouldSee(event.getPlayer(), ref)) event.setCancelled(true);
     }
 
+    /** Une entité qui quitte le monde (chunk déchargé) : on l'oublie, son tag la retrouvera à son retour. */
+    @EventHandler
+    public void onEntityRemove(EntityRemoveFromWorldEvent event) {
+        QuestRegistry.onUnload(event.getEntity());
+    }
+
     @EventHandler
     public void onEntityAdd(EntityAddToWorldEvent event) {
-        if (NpcService.refOf(event.getEntity()) != null) {
+        if (QuestRegistry.onLoad(event.getEntity()) != null || NpcService.refOf(event.getEntity()) != null) {
             NpcService.refreshVisibility(event.getEntity());
             for (Player player : Bukkit.getOnlinePlayers()) IndicatorService.invalidate(player.getUniqueId());
         }

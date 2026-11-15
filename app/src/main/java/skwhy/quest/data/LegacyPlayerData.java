@@ -1,11 +1,9 @@
 package skwhy.quest.data;
 
-import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import skwhy.quest.NbtTree;
 import skwhy.quest.QuestSettings;
 import skwhy.quest.Tree;
 import skwhy.quest.model.QuestStatus;
@@ -18,15 +16,9 @@ public final class LegacyPlayerData {
 
     private LegacyPlayerData() {}
 
-    /** Lit le fichier du joueur (toujours à jour, sans cache) ; {@code null} s'il n'existe pas. */
-    public static Map<String, Object> read(UUID uuid) {
-        return NbtTree.read(new File(QuestSettings.legacyPlayerFolder(), uuid + ".dat"));
-    }
-
-    /** Valeur d'un chemin {@code a;b;c} du fichier joueur historique. */
+    /** Valeur d'un chemin {@code a;b;c} du NBT custom du joueur (toujours à jour, sans cache). */
     public static Object path(UUID uuid, String path) {
-        Map<String, Object> root = read(uuid);
-        return root == null ? null : Tree.path(root, path);
+        return PlayerNbt.path(uuid, path);
     }
 
     /** {@code true} si le joueur a choisi le genre féminin dans ses options. */
@@ -34,14 +26,19 @@ public final class LegacyPlayerData {
         return Tree.toBool(path(uuid, "options;genre"), false);
     }
 
-    /** Importe la progression de quête de l'ancien fichier, ou {@code null} s'il n'y en a pas. */
+    /** Lit la progression de quête du NBT custom du joueur, ou {@code null} s'il n'y en a pas. */
+    @SuppressWarnings("unchecked")
     public static PlayerQuestData importQuests(UUID uuid) {
-        Map<String, Object> root = read(uuid);
-        if (root == null) return null;
-        Map<String, Object> quest = Tree.map(root, "quest");
-        if (quest.isEmpty()) return null;
+        Object quest = path(uuid, "quest");
+        if (!(quest instanceof Map<?, ?> map) || map.isEmpty()) return null;
+        return parse(uuid, (Map<String, Object>) map);
+    }
+
+    /** Construit les données d'un joueur depuis l'arbre {@code quest} de son NBT. */
+    public static PlayerQuestData parse(UUID uuid, Map<String, Object> quest) {
 
         PlayerQuestData data = new PlayerQuestData(uuid);
+        data.compass = Tree.toBool(quest.get("boussole"), QuestSettings.compassAuto());
         data.selected = Tree.str(quest, "sélectionnée");
         data.categories.addAll(Tree.strings(quest, "catégorie"));
         data.metNpcs.addAll(Tree.strings(quest, "npcs"));
@@ -58,6 +55,8 @@ public final class LegacyPlayerData {
 
         for (Map.Entry<String, Object> e : Tree.map(quest, "liste").entrySet()) {
             Map<String, Object> q = Tree.map(e.getValue());
+            // Une entrée sans statut ne contient que des variables écrites par un script : la quête n'est pas débloquée
+            if (!q.containsKey("statut")) continue;
             QuestProgress p = new QuestProgress();
             QuestStatus status = QuestStatus.parse(Tree.str(q, "statut"));
             p.status = status == null || status == QuestStatus.UNKNOWN ? QuestStatus.AVAILABLE : status;
@@ -73,14 +72,13 @@ public final class LegacyPlayerData {
             }
             for (Map.Entry<String, Object> ve : Tree.map(q, "variables").entrySet()) {
                 Object v = ve.getValue();
-                if (v instanceof Byte b) v = (int) b;
-                if (v instanceof List<?>) continue;
+                if (v instanceof Byte b) v = b != 0;
+                if (v instanceof List<?> || v instanceof Map<?, ?>) continue;
                 p.variables.put(ve.getKey(), v);
             }
             p.rewardClaimed = Tree.toBool(q.get("récompense"), false);
             data.quests.put(e.getKey(), p);
         }
-        data.markDirty();
         return data;
     }
 }

@@ -26,6 +26,7 @@ import skwhy.modules.APIModule;
 import skwhy.modules.ChunkPathModule;
 import skwhy.modules.QuestModule;
 import skwhy.modules.CustomEntityModule;
+import skwhy.modules.CustomItemModule;
 
 
 // import com.github.retrooper.packetevents.PacketEvents;
@@ -50,6 +51,7 @@ public class SkWhy extends JavaPlugin {
         instance = this;
         saveDefaultConfig();
         mergeConfigWithDefaults();
+        skwhy.chunkpath.longnav.LongNavSettings.load(getConfig());
 
 
         getLogger().info("Addon chargé avec succès !");
@@ -99,6 +101,11 @@ public class SkWhy extends JavaPlugin {
         } else {
             getLogger().info("Module CustomEntity désactivé dans la config.");
         }
+        if (isModuleEnabled("modules.custom_item")) {
+            skriptAddon.loadModules(new CustomItemModule());
+        } else {
+            getLogger().info("Module CustomItem désactivé dans la config.");
+        }
         // Écouteurs globaux : seulement si un module qui s'en sert est activé
         boolean fakeDisplay = isModuleEnabled("modules.fake_display");
         boolean randomStuff = isModuleEnabled("modules.random_stuff");
@@ -111,6 +118,8 @@ public class SkWhy extends JavaPlugin {
             FutureRotationTracker.startTracking(this);
         }
 
+        SkWhyCommand.register();
+
         getLogger().info("SkWhy activé avec succès !");
     }
 
@@ -120,11 +129,19 @@ public class SkWhy extends JavaPlugin {
         ChunkPathModule.shutdown();
         QuestModule.shutdown();
         CustomEntityModule.shutdown();
+        CustomItemModule.shutdown();
         getLogger().info("SkWhy désactivé.");
     }
 
     public static SkWhy getInstance() { return instance; }
     public static SkriptAddon getSkriptAddon() { return skriptAddon; }
+
+    /** Relit {@code config.yml} (et y ajoute les clés manquantes). */
+    public void reloadSettings() {
+        reloadConfig();
+        mergeConfigWithDefaults();
+        skwhy.chunkpath.longnav.LongNavSettings.load(getConfig());
+    }
 
     public boolean isModuleEnabled(String path) {
         return getConfig().getBoolean(path, true);

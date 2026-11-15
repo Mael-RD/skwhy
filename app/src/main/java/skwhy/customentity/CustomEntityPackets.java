@@ -137,12 +137,31 @@ public final class CustomEntityPackets {
                 case "float" -> new EntityData<>(raw.index(), EntityDataTypes.FLOAT, ((Number) number(raw.value())).floatValue());
                 case "boolean" -> new EntityData<>(raw.index(), EntityDataTypes.BOOLEAN, Boolean.parseBoolean(text));
                 case "string" -> new EntityData<>(raw.index(), EntityDataTypes.STRING, text);
+                case "cat_variant" -> variant(raw, EntityDataTypes.TYPED_CAT_VARIANT,
+                    com.github.retrooper.packetevents.protocol.entity.cat.CatVariants.getRegistry().getByName(namespaced(text)));
+                case "wolf_variant" -> variant(raw, EntityDataTypes.TYPED_WOLF_VARIANT,
+                    com.github.retrooper.packetevents.protocol.entity.wolfvariant.WolfVariants.getRegistry().getByName(namespaced(text)));
+                case "frog_variant" -> variant(raw, EntityDataTypes.TYPED_FROG_VARIANT,
+                    com.github.retrooper.packetevents.protocol.entity.frog.FrogVariants.getRegistry().getByName(namespaced(text)));
                 default -> null;
             };
         } catch (NumberFormatException | ClassCastException e) {
             SkWhy.getInstance().getLogger().warning("[CustomEntity] metadata " + raw.index() + " ignorée : valeur '" + raw.value() + "' invalide pour le type " + raw.type());
             return null;
         }
+    }
+
+    private static String namespaced(String name) {
+        String lower = name.trim().toLowerCase(Locale.ROOT);
+        return lower.contains(":") ? lower : "minecraft:" + lower;
+    }
+
+    private static <T> EntityData<?> variant(CustomEntityDef.RawMetadata raw, com.github.retrooper.packetevents.protocol.entity.data.EntityDataType<T> type, T value) {
+        if (value == null) {
+            SkWhy.getInstance().getLogger().warning("[CustomEntity] metadata " + raw.index() + " ignorée : variante '" + raw.value() + "' inconnue pour le type " + raw.type());
+            return null;
+        }
+        return new EntityData<>(raw.index(), type, value);
     }
 
     private static Number number(Object value) {

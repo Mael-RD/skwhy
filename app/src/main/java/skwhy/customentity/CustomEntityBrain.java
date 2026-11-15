@@ -25,13 +25,15 @@ final class CustomEntityBrain {
 
     private final Mob mob;
     private final String type;
+    private final boolean goals;
     private final org.bukkit.World world;
     // Dernière position transmise à l'entité custom : si elle en diffère, quelqu'un l'a déplacée et le mob la suit
     private double lastX, lastY, lastZ;
     private float lastYaw, lastPitch;
 
-    private CustomEntityBrain(Mob mob, String type, org.bukkit.World world) {
+    private CustomEntityBrain(Mob mob, String type, boolean goals, org.bukkit.World world) {
         this.mob = mob;
+        this.goals = goals;
         this.type = type;
         this.world = world;
     }
@@ -41,7 +43,7 @@ final class CustomEntityBrain {
      *
      * @return le cerveau, ou {@code null} (avec un avertissement) si le type n'existe pas ou n'est pas un mob
      */
-    static CustomEntityBrain create(String type, Location at, Logger logger) {
+    static CustomEntityBrain create(String type, boolean goals, Location at, Logger logger) {
         if (at.getWorld() == null) return null;
         Identifier id = Identifier.tryParse("minecraft:" + type);
         Optional<? extends EntityType<?>> entityType = id == null ? Optional.empty() : BuiltInRegistries.ENTITY_TYPE.getOptional(id);
@@ -58,7 +60,21 @@ final class CustomEntityBrain {
             mob.setSilent(true);
             mob.setInvulnerable(true);
             mob.setPersistenceRequired();
-            CustomEntityBrain brain = new CustomEntityBrain(mob, type, at.getWorld());
+            if (!goals) {
+                // plus de buts vanille ni de cibles, sauf la flottaison (sinon un mob terrestre coulerait)
+                org.bukkit.entity.Mob bukkit = (org.bukkit.entity.Mob) mob.getBukkitEntity();
+                com.destroystokyo.paper.entity.ai.MobGoals mobGoals = org.bukkit.Bukkit.getMobGoals();
+                // un slime ne se déplace que par ses buts (son contrôle de mouvement saute dans la direction qu'ils donnent)
+                if (!type.equals("slime") && !type.equals("magma_cube")) {
+                    for (com.destroystokyo.paper.entity.ai.Goal<org.bukkit.entity.Mob> goal : mobGoals.getAllGoals(bukkit)) {
+                        if (!goal.getKey().getNamespacedKey().getKey().equals("float")) mobGoals.removeGoal(bukkit, goal);
+                    }
+                }
+                for (com.destroystokyo.paper.entity.ai.Goal<org.bukkit.entity.Mob> goal : mobGoals.getAllGoals(bukkit, com.destroystokyo.paper.entity.ai.GoalType.TARGET)) {
+                    mobGoals.removeGoal(bukkit, goal);
+                }
+            }
+            CustomEntityBrain brain = new CustomEntityBrain(mob, type, goals, at.getWorld());
             brain.place(at);
             return brain;
         } catch (Throwable t) {
@@ -68,6 +84,8 @@ final class CustomEntityBrain {
     }
 
     String type() { return type; }
+
+    boolean goals() { return goals; }
 
     org.bukkit.World world() { return world; }
 
@@ -98,7 +116,9 @@ final class CustomEntityBrain {
                 || Math.abs(current.getYaw() - lastYaw) > 0.01F || Math.abs(current.getPitch() - lastPitch) > 0.01F) {
             place(current);
         }
+        if (!goals) clearTargets();
         mob.tick();
+        if (!goals) clearTargets();
         boolean moved = mob.getX() != lastX || mob.getY() != lastY || mob.getZ() != lastZ
             || mob.getYRot() != lastYaw || mob.getXRot() != lastPitch;
         if (moved) {
@@ -109,6 +129,13 @@ final class CustomEntityBrain {
             lastPitch = mob.getXRot();
         }
         return moved;
+    }
+
+    /** Les mobs à « cerveau » (warden, hoglin, bouc...) ciblent par mémoire, pas par buts : on l'efface à chaque tick. */
+    private void clearTargets() {
+        mob.setTarget(null);
+        mob.getBrain().eraseMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.ATTACK_TARGET);
+        mob.getBrain().eraseMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.RAM_TARGET);
     }
 
     /** Nouvelle position du mob (après {@link #step}). */

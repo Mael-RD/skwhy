@@ -78,6 +78,7 @@ public class Navigation {
     private Location           destination;
     private int                pauseTicks = PAUSED_INDEFINITELY;
     private boolean            tickFailed;
+    private int                movesSinceSync;
 
     // =========================================================================
     // Constructeurs
@@ -127,6 +128,8 @@ public class Navigation {
 
     /** Envoie un packet de téléportation aux joueurs abonnés (entité fictive uniquement). */
     public void sendTeleportPacket(Location loc) {
+        movesSinceSync = 0;
+        skwhy.chunkpath.debug.PacketLog.teleport("fake", mob.getId(), loc, mob.getLocation(), players);
         WrapperPlayServerEntityTeleport packet = new WrapperPlayServerEntityTeleport(
                 mob.getId(),
                 new com.github.retrooper.packetevents.protocol.world.Location(
@@ -146,10 +149,15 @@ public class Navigation {
      * sur un paquet de téléportation.
      */
     public void sendMovePacket(Vector movement) {
-        short dx = (short) Math.round(movement.getX() * 4096);
-        short dy = (short) Math.round(movement.getY() * 4096);
-        short dz = (short) Math.round(movement.getZ() * 4096);
-        WrapperPlayServerEntityRelativeMove packet = new WrapperPlayServerEntityRelativeMove(mob.getId(), dx, dy, dz, mob.onGround());
+        // Le wrapper prend des BLOCS et applique lui-même le facteur 4096 (short) : ne pas pré-multiplier.
+        // Au-delà de ±8 blocs un paquet relatif déborde : téléportation absolue.
+        if (++movesSinceSync >= 20 || Math.abs(movement.getX()) >= 7.9 || Math.abs(movement.getY()) >= 7.9 || Math.abs(movement.getZ()) >= 7.9) {
+            sendTeleportPacket(mob.getLocation());
+            return;
+        }
+        skwhy.chunkpath.debug.PacketLog.move("fake", mob.getId(), movement.getX(), movement.getY(), movement.getZ(), mob.getLocation(), players);
+        WrapperPlayServerEntityRelativeMove packet = new WrapperPlayServerEntityRelativeMove(
+                mob.getId(), movement.getX(), movement.getY(), movement.getZ(), mob.onGround());
         for (Player p : players) {
             PacketEvents.getAPI().getPlayerManager().sendPacket(p, packet);
         }

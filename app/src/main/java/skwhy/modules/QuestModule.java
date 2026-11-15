@@ -57,6 +57,11 @@ public class QuestModule implements AddonModule {
     @Override
     public void load(SkriptAddon addon) {
         QuestManager.init(SkWhy.getInstance());
+        for (String obsolete : new String[] { "quests.item_function", "quests.item_count_function" }) {
+            if (SkWhy.getInstance().getConfig().contains(obsolete)) {
+                SkWhy.getInstance().getLogger().warning("[Quest] '" + obsolete + "' n'est plus utilise : les items viennent du module custom_item (dossier custom-items), cle ignoree.");
+            }
+        }
 
         loadEvents(addon);
 
@@ -64,6 +69,7 @@ public class QuestModule implements AddonModule {
         ExprQuestStatus.register(addon);
         ExprQuestStep.register(addon);
         ExprObjectiveProgress.register(addon);
+        ExprObjectiveColor.register(addon);
         ExprQuestVariable.register(addon);
         ExprSelectedQuest.register(addon);
         ExprQuestsOf.register(addon);
@@ -73,12 +79,16 @@ public class QuestModule implements AddonModule {
         ExprNpcEntities.register(addon);
         ExprNpcInfo.register(addon);
         ExprNpcPosition.register(addon);
+        ExprNpcPlace.register(addon);
         ExprKnownName.register(addon);
         ExprDialogueState.register(addon);
         ExprNpcIndicator.register(addon);
         ExprEventIndicator.register(addon);
         ExprCompass.register(addon);
         ExprCompassTargets.register(addon);
+        ExprQuestDefinition.register(addon);
+        ExprRewardItems.register(addon);
+        ExprQuestItemEntry.register(addon);
 
         CondQuestState.register(addon);
         CondQuestAvailable.register(addon);
@@ -96,11 +106,16 @@ public class QuestModule implements AddonModule {
         EffOpenQuestMenu.register(addon);
         EffShowHideNpc.register(addon);
         EffMoveNpc.register(addon);
+        EffNpcBind.register(addon);
         EffSendQuestMessage.register(addon);
         EffStartDialogue.register(addon);
         EffShowIndicator.register(addon);
         EffCompass.register(addon);
         EffReloadQuests.register(addon);
+        EffSaveDefinition.register(addon);
+        EffRefreshNpcs.register(addon);
+        EffEditorLink.register(addon);
+        EffPreviewTrade.register(addon);
         try {
             Class.forName("com.github.retrooper.packetevents.PacketEvents");
             EffNpcLook.register(addon);

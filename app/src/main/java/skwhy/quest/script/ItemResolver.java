@@ -1,6 +1,7 @@
 package skwhy.quest.script;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -17,14 +18,27 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import skwhy.quest.QuestSettings;
+import skwhy.customitem.CustomItemCounter;
+import skwhy.customitem.CustomItemDef;
+import skwhy.customitem.CustomItemFactory;
+import skwhy.customitem.CustomItemIdentity;
+import skwhy.customitem.CustomItemManager;
 import skwhy.quest.Tree;
 import skwhy.util.TextComponents;
 
 /**
- * Fabrique et compte les items cités par les quêtes. Un item peut être décrit par une table
- * ({@code id}, {@code name}, {@code enchantments}, {@code pages}) ou par un nom d'item personnalisé du serveur, résolu
- * par la fonction Skript {@code quests.item_function}.
+ * Fabrique et compte les items cités par les quêtes. Une entrée ({@code items} / {@code result} / {@code buy1}...) est
+ * {@code {item: ..., count: n}} où {@code item} est :
+ * <ul>
+ * <li>l'<b>id d'un item custom</b> (fichier {@code custom-items/<id>.yml}), avec en plus {@code placeholders} (ou {@code params}) : table
+ * {@code clé: valeur} qui remplace les {@code {clé}} de la définition (ex. {@code value} d'un billet), et {@code parameters} : liste
+ * {@code owner}, {@code safe}, {@code save}, {@code invulnerable}, {@code preserve} ;</li>
+ * <li>un <b>matériau vanilla</b> ({@code stone}), sans id custom ;</li>
+ * <li>une <b>table</b> au format d'une définition d'item custom ({@code material_id}, {@code name}, ...) pour un item utilisé à un seul
+ * endroit : mêmes {@code placeholders} / {@code parameters} ;</li>
+ * <li>l'ancienne table ({@code id}, {@code name}, {@code enchantments}, {@code pages}).</li>
+ * </ul>
+ * Un id est cherché parmi les items custom avant les matériaux.
  */
 public final class ItemResolver {
 
@@ -38,25 +52,43 @@ public final class ItemResolver {
         int count = Math.max(1, Tree.integer(entry, "count", 1));
         Object item = entry.get("item");
         ItemStack stack = null;
-        if (item instanceof Map<?, ?>) stack = fromTable(Tree.map(item));
-        else if (item != null) stack = create(String.valueOf(item), player);
+        if (item instanceof Map<?, ?>) {
+            Map<String, Object> table = Tree.map(item);
+            stack = table.containsKey("material_id")
+                ? CustomItemFactory.createAnonymous(table, options(entry, player))
+                : fromTable(table);
+        } else if (item != null) {
+            stack = create(String.valueOf(item), entry, player);
+        }
         if (stack == null) return null;
         stack.setAmount(Math.min(count, 99));
         return stack;
     }
 
-    /** Un item par son identifiant : matériau vanilla, sinon item personnalisé du serveur. */
+    /** Un item par son identifiant : item custom, sinon matériau vanilla. */
     public static ItemStack create(String id, OfflinePlayer player) {
-        Material material = material(id);
-        if (material != null) return new ItemStack(material);
-        Object custom = SkriptFunctions.call(QuestSettings.itemFunction(), id, player.getPlayer());
-        return toStack(custom);
+        return create(id, Map.of(), player);
     }
 
-    private static ItemStack toStack(Object value) {
-        if (value instanceof ItemStack s) return s.clone();
-        if (value instanceof ch.njol.skript.aliases.ItemType t) return t.getRandom();
-        return null;
+    private static ItemStack create(String id, Map<String, Object> entry, OfflinePlayer player) {
+        CustomItemManager manager = CustomItemManager.get();
+        CustomItemDef def = manager == null ? null : manager.registry().get(id);
+        if (def != null) return CustomItemFactory.create(def, options(entry, player));
+        Material material = material(id);
+        return material == null ? null : new ItemStack(material);
+    }
+
+    private static CustomItemFactory.Options options(Map<String, Object> entry, OfflinePlayer player) {
+        Map<String, String> placeholders = new LinkedHashMap<>();
+        for (String key : new String[] { "params", "placeholders" }) {
+            for (Map.Entry<String, Object> e : Tree.map(entry, key).entrySet()) placeholders.put(e.getKey(), String.valueOf(e.getValue()));
+        }
+        List<String> parameters = new ArrayList<>();
+        for (String parameter : Tree.strings(entry, "parameters")) {
+            String lower = parameter.trim().toLowerCase(Locale.ROOT);
+            if (lower.equals("owner") || CustomItemIdentity.FLAGS.contains(lower)) parameters.add(lower);
+        }
+        return new CustomItemFactory.Options(player, parameters, null, List.of(), placeholders);
     }
 
     public static Material material(String id) {
@@ -89,17 +121,16 @@ public final class ItemResolver {
         return stack;
     }
 
-    /** Nombre d'exemplaires de l'item dans l'inventaire du joueur. */
+    /** Nombre d'exemplaires de l'item dans l'inventaire du joueur (item custom par son id, sinon matériau vanilla). */
     public static int count(Player player, String id) {
+        CustomItemManager manager = CustomItemManager.get();
+        if (manager != null && manager.registry().has(id)) return CustomItemCounter.count(player.getInventory(), id);
         Material material = material(id);
-        if (material != null) {
-            int total = 0;
-            for (ItemStack s : player.getInventory().getContents()) {
-                if (s != null && s.getType() == material) total += s.getAmount();
-            }
-            return total;
+        if (material == null) return 0;
+        int total = 0;
+        for (ItemStack s : player.getInventory().getContents()) {
+            if (s != null && s.getType() == material) total += s.getAmount();
         }
-        Object value = SkriptFunctions.call(QuestSettings.itemCountFunction(), id.replace('_', ' '), player);
-        return value instanceof Number n ? n.intValue() : 0;
+        return total;
     }
 }

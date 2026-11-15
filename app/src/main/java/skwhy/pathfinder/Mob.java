@@ -190,8 +190,10 @@ public class Mob {
     private void moveTo(final Vector movement) {
         if (isRealEntity())
             entity.teleport(entity.getLocation().add(movement));
-        else
+        else {
+            this.position = this.position.clone().add(movement);
             navigation.sendMovePacket(movement);
+        }
     }
 
     public Vector position() {

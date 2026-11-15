@@ -111,14 +111,24 @@ public class SecretHide extends Effect {
 
         if (targetEntities == null || targetPlayers == null) return;
 
-        ensureListenerRegistered();
-
         for (Player player : targetPlayers) {
             for (Entity entity : targetEntities) {
-                pendingSuppression.add(player.getUniqueId() + ":" + entity.getEntityId());
-                player.hideEntity(owningPlugin, entity);
+                hide(owningPlugin, player, entity);
             }
         }
+    }
+
+    /**
+     * Masque {@code entity} pour {@code player} sans que le client reçoive le paquet de suppression (il la garde telle quelle, sans
+     * plus aucune mise à jour du serveur). Le paquet n'est filtré que si l'entité est vraiment suivie et visible : sinon aucun paquet
+     * ne part et l'entrée en attente filtrerait à tort une suppression ultérieure.
+     */
+    public static void hide(Plugin plugin, Player player, Entity entity) {
+        ensureListenerRegistered();
+        if (player.canSee(entity) && entity.getTrackedBy().contains(player)) {
+            pendingSuppression.add(player.getUniqueId() + ":" + entity.getEntityId());
+        }
+        player.hideEntity(plugin, entity);
     }
 
     @Override

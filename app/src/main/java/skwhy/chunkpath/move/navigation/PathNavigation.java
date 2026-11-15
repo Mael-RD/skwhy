@@ -2,12 +2,17 @@ package skwhy.chunkpath.move.navigation;
 
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.util.BoundingBox;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import skwhy.chunkpath.move.LongMob;
 import skwhy.chunkpath.move.pathcalculator.LongPathFinder;
@@ -16,6 +21,7 @@ import skwhy.chunkpath.move.pathcalculator.PathType;
 import skwhy.chunkpath.move.pathcalculator.Node;
 import skwhy.chunkpath.move.pathcalculator.NodeEvaluator;
 import skwhy.chunkpath.move.pathcalculator.CostRuleWalkNodeEvaluator;
+import skwhy.util.PathSmoothing;
 
 public abstract class PathNavigation {
    private static final int MAX_TIME_RECOMPUTE = 20;
@@ -147,9 +153,114 @@ public abstract class PathNavigation {
 
          if (!this.isDone()) {
             Vector target = this.path.getNextEntityPos(this.mob);
+            Vector smoothed = this.smoothedTarget();
+            if (smoothed != null && !this.isDone()) {
+               target = smoothed;
+            }
             this.mob.getMoveControl().setWantedPosition(target.getX(), this.getGroundY(target), target.getZ());
          }
       }
+   }
+
+   // ─── smoothed following (LongMob#pathSmoothing) ──────────────────────────
+
+   private static final double SMOOTH_WINDOW = 4.0;
+   private static final double SMOOTH_STEP_CHECK = 0.4;
+
+   private @Nullable Path smoothedPath;
+   private int smoothedNodeCount;
+   private double smoothedSigma;
+   private PathSmoothing.@Nullable Result smoothedCurve;
+   private int smoothedPos;
+
+   /**
+    * The point of the smoothed curve (x and z averaged over the route, {@link PathSmoothing}) the mob walks toward, a little
+    * ahead of its projection on the curve; null = walk to the next node as usual (smoothing off, or the hitbox does not fit
+    * on the curve here). Nodes passed by the projection are consumed.
+    */
+   private @Nullable Vector smoothedTarget() {
+      double sigma = this.mob.pathSmoothing();
+      if (!(sigma > 0) || this.path == null || this.path.getNodeCount() < 2) {
+         return null;
+      }
+      if (this.smoothedPath != this.path || this.smoothedNodeCount != this.path.getNodeCount() || this.smoothedSigma != sigma) {
+         List<Vector> pts = new ArrayList<>();
+         for (int i = 0; i < this.path.getNodeCount(); i++) {
+            pts.add(this.path.getEntityPosAtNode(this.mob, i));
+         }
+         this.smoothedCurve = PathSmoothing.smooth(pts, sigma, true);
+         this.smoothedPath = this.path;
+         this.smoothedNodeCount = this.path.getNodeCount();
+         this.smoothedSigma = sigma;
+         this.smoothedPos = 0;
+      }
+      PathSmoothing.Result r = this.smoothedCurve;
+      if (r == null) {
+         return null;
+      }
+      List<Vector> curve = r.curve();
+      int last = curve.size() - 1;
+      int next = this.path.getNextNodeIndex();
+      if (next > 0) {
+         this.smoothedPos = Math.max(this.smoothedPos, r.vertexIndex()[Math.min(next - 1, r.vertexIndex().length - 1)]);
+      }
+      // projection of the mob on the curve, never going back
+      Location loc = this.mob.getLocation();
+      int window = (int) Math.ceil(SMOOTH_WINDOW / r.step());
+      int best = this.smoothedPos;
+      double bestD = Double.MAX_VALUE;
+      for (int i = this.smoothedPos; i <= Math.min(last, this.smoothedPos + window); i++) {
+         Vector c = curve.get(i);
+         double dx = c.getX() - loc.getX(), dz = c.getZ() - loc.getZ(), dy = (c.getY() - loc.getY()) * 0.5;
+         double d = dx * dx + dz * dz + dy * dy;
+         if (d < bestD) {
+            bestD = d;
+            best = i;
+         }
+      }
+      this.smoothedPos = best;
+
+      double look = Math.max(0.75, this.mob.getSpeed() * 5.0);
+      Vector carrot = curve.get(Math.min(last, best + (int) Math.ceil(look / r.step())));
+      if (!this.hitboxFits(loc, carrot)) {
+         return null;
+      }
+      // the projection went past nodes: they are done (the last one is reached the usual way)
+      while (!this.path.isDone() && this.path.getNextNodeIndex() < this.path.getNodeCount() - 1
+            && r.vertexIndex()[this.path.getNextNodeIndex()] <= best) {
+         this.path.advance();
+      }
+      return this.path.isDone() ? null : carrot;
+   }
+
+   /** Whether the mob's hitbox can walk from where it stands to {@code to} in a straight line, on solid ground, nothing loaded for it. */
+   private boolean hitboxFits(final Location from, final Vector to) {
+      World world = this.mob.getWorld();
+      Vector hitbox = this.mob.getHitbox();
+      double halfW = hitbox.getX() / 2;
+      double height = hitbox.getY();
+      double dx = to.getX() - from.getX(), dy = to.getY() - from.getY(), dz = to.getZ() - from.getZ();
+      double len = Math.sqrt(dx * dx + dz * dz);
+      int steps = Math.max(1, (int) Math.ceil(len / SMOOTH_STEP_CHECK));
+      for (int s = 1; s <= steps; s++) {
+         double t = (double) s / steps;
+         double x = from.getX() + dx * t, y = from.getY() + dy * t, z = from.getZ() + dz * t;
+         if (!world.isChunkLoaded((int) Math.floor((x - halfW) / 16), (int) Math.floor((z - halfW) / 16))
+               || !world.isChunkLoaded((int) Math.floor((x + halfW) / 16), (int) Math.floor((z + halfW) / 16))) {
+            return false;
+         }
+         BoundingBox box = new BoundingBox(x - halfW, y + 0.1, z - halfW, x + halfW, y + height, z + halfW);
+         if (world.hasCollisionsIn(box)) {
+            return false;
+         }
+         Block ground = world.getBlockAt((int) Math.floor(x), (int) Math.floor(y - 0.05), (int) Math.floor(z));
+         Material m = ground.getType();
+         if (ground.getCollisionShape().getBoundingBoxes().isEmpty() || m == Material.CACTUS || m == Material.MAGMA_BLOCK
+               || m == Material.CAMPFIRE || m == Material.SOUL_CAMPFIRE) {
+            return false;
+         }
+      }
+      return true;
    }
 
    protected double getGroundY(final Vector target) {

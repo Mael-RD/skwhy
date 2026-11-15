@@ -35,9 +35,11 @@ import skwhy.customentity.CustomEntityManager;
 @Description("Creates a real or fake custom entity from a definition and overrides some of its parameters for this entity only, " +
     "so a unique case does not need a new definition. Each line is 'parameter: expression' and the expression is parsed like anywhere else in Skript " +
     "(variables, functions, vectors...). The parameters are the ones of a definition: " +
-    "type (text), ai (text: type of the mob whose vanilla AI drives the entity, e.g. zombie, villager, wolf), name (text, colors like <green>), name_visible (boolean), " +
+    "type (text), ai (text: type of the mob whose vanilla AI drives the entity, e.g. zombie, villager, wolf), ai_goals (boolean, default true: false removes the vanilla goals and targets of the mob, " +
+    "which then only follows 'make custom entity walk to' and never attacks anyone; since 1.6.1), name (text, colors like <green>), name_visible (boolean), " +
     "scale (number above 0, up to 16), glowing/invisible/silent/on_fire (boolean), hitbox_width/hitbox_height (numbers above 0), skin_value/skin_signature (text), " +
-    "an equipment slot (main_hand, off_hand, head, chest, legs, feet, body: a material name) and metadata_<index> or a 'metadata:' sub-section with '<index>: type:value' lines. " +
+    "an equipment slot (main_hand, off_hand, head, chest, legs, feet, body: a material name) and metadata_<index> or a 'metadata:' sub-section with '<index>: type:value' lines " +
+    "(types: byte, int, long, float, string, boolean, and cat_variant, wolf_variant, frog_variant with the name of the variant, e.g. cat_variant:calico). " +
     "'hitbox', 'skin' and 'equipment' can also be written as sub-sections ('width: 1' under 'hitbox:'). " +
     "A text that is a single word (zombie, diamond_helmet, byte:1) can be written without quotes. A real entity keeps its overrides in its NBT, a fake one in memory. " +
     "The new entity is put in the variable; it stays unset when the id is not defined. A value that cannot be applied is ignored with a warning in the console. " +

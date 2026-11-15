@@ -25,8 +25,8 @@ import skwhy.customentity.CustomEntityManager;
 @Description("A parameter of ONE custom entity, real or fake: its value is the override of the entity if it has one, else the value of its definition (nothing if the definition does not set it). " +
     "Setting it overrides the definition for this entity only, without creating a new definition: a real entity keeps the override in its NBT (\"BukkitValues\" → \"skwhy:custom_entity_overrides\", JSON), " +
     "so it survives a restart; deleting or resetting it gives back the value of the definition. " +
-    "The names are the YAML paths of a definition: type, ai (type of the mob whose vanilla AI drives the entity), name, name_visible, scale, glowing, invisible, silent, on_fire, " +
-    "hitbox.width, hitbox.height, skin.value, skin.signature, equipment.<slot> (main_hand, off_hand, head, chest, legs, feet, body) and metadata.<index> (written type:value, e.g. \"byte:1\"). " +
+    "The names are the YAML paths of a definition: type, ai (type of the mob whose vanilla AI drives the entity), ai_goals (false = no vanilla goals nor targets, since 1.6.1), name, name_visible, scale, glowing, invisible, silent, on_fire, " +
+    "hitbox.width, hitbox.height, skin.value, skin.signature, equipment.<slot> (main_hand, off_hand, head, chest, legs, feet, body) and metadata.<index> (written type:value, e.g. \"byte:1\"; also cat_variant, wolf_variant and frog_variant: \"cat_variant:calico\"). " +
     "A number gives a number, true/false a boolean, anything else a text; an unknown name or a value of the wrong kind is refused with a warning in the console.")
 @Examples({
     "set custom entity parameter \"scale\" of {_pet} to 2.5",

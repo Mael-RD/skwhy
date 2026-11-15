@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<base href="__BASE__">
+<title>Éditeur de quêtes SkWhy</title>
+<link rel="stylesheet" href="static/editor.css">
+</head>
+<body>
+<header id="top">
+  <button id="menu" class="btn icon" title="Afficher / masquer le menu">☰</button>
+  <button id="back" class="btn icon" title="Retour à l'élément précédent" disabled>←</button>
+  <div id="title"></div>
+  <div class="spacer"></div>
+  <button id="undo" class="btn icon" title="Annuler (Ctrl+Z)" disabled>↶</button>
+  <button id="redo" class="btn icon" title="Rétablir (Ctrl+Y)" disabled>↷</button>
+  <button id="add" class="btn icon" title="Ajouter une étape ou une action">➕</button>
+  <button id="props" class="btn icon" title="Propriétés générales">⚙</button>
+  <button id="mergedlg" class="btn icon" title="Dialogues compacts : réduit chaque dialogue dans son action, avec toutes ses sorties cumulées">🗨</button>
+  <button id="indgen" class="btn icon hidden" title="Générer les indicateurs de quête : ? rouge pour une nouvelle quête, ! de la couleur du type pour une progression (ne retire et n'écrase rien)">✨</button>
+  <button id="indclean" class="btn icon hidden" title="Nettoyer : retirer tous les indicateurs de ce NPC">🧹</button>
+  <span class="sep"></span>
+  <button id="zout" class="btn icon" title="Dézoomer">−</button>
+  <span id="zoomlabel" class="zoomlabel">100 %</span>
+  <button id="zin" class="btn icon" title="Zoomer">＋</button>
+  <button id="foldall" class="btn icon" title="Tout réduire (titres seulement)">⊟</button>
+  <button id="unfoldall" class="btn icon" title="Tout déployer et montrer toutes les branches">⊞</button>
+  <button id="fit" class="btn icon" title="Vue d'ensemble : tout voir d'un coup">⛶</button>
+  <span class="sep"></span>
+  <span id="clock" class="clock" title="Durée de validité du lien"></span>
+  <button id="save" class="btn primary" title="Enregistrer / envoyer les modifications (Ctrl+S)" disabled>💾<span id="savecount" class="pill"></span></button>
+</header>
+
+<button id="tab-side" class="ptab left" title="Replier / déplier le menu" aria-label="Replier / déplier le menu"></button>
+<button id="closeinsp" class="ptab right" title="Replier / déplier le panneau d'édition" aria-label="Replier / déplier le panneau d'édition"></button>
+<div id="rz-side" class="rz" title="Glisser pour changer la largeur du menu"></div>
+<div id="rz-insp" class="rz" title="Glisser pour changer la largeur du panneau d'édition"></div>
+<aside id="sidebar">
+  <section class="side-sec">
+    <div class="side-head"><b>Quêtes</b><span id="count-quests" class="count"></span></div>
+    <input id="q-search" type="search" placeholder="Rechercher une quête…" autocomplete="off">
+    <div id="list-quests" class="list"></div>
+  </section>
+  <section class="side-sec">
+    <div class="side-head"><b>NPC</b><span id="count-npcs" class="count"></span></div>
+    <input id="n-search" type="search" placeholder="Rechercher un NPC…" autocomplete="off">
+    <div id="list-npcs" class="list"></div>
+  </section>
+</aside>
+
+<main id="stage">
+  <div id="viewport"></div>
+  <div id="emptygraph" class="emptygraph hidden">Rien à afficher ici. Utilisez « Ajouter » pour créer une étape ou une action.</div>
+  <div id="loading" class="loading hidden"><span class="spin"></span><span id="loadingtext">Chargement…</span></div>
+  <div id="minimap" class="minimap hidden"></div>
+  <div id="pickbar" class="pickbar hidden"><span id="picktext"></span><button id="pickcancel" class="btn mini">Annuler (Échap)</button></div>
+  <div class="legend">
+    <span><i class="lg answer"></i>réponse</span><span><i class="lg action"></i>action</span><span><i class="lg next"></i>enchaîne</span><span><i class="lg unlock"></i>NPC</span><span class="hint">Molette : zoom · glisser : déplacer · cliquer une carte : modifier · ▾ réduire · ⤴ masquer la suite</span>
+  </div>
+</main>
+
+<aside id="inspector-wrap">
+  <div id="inspector"></div>
+</aside>
+
+<datalist id="worlds-list"></datalist>
+<datalist id="items-list"></datalist>
+<div id="overlay" class="overlay hidden"></div>
+<div id="toasts"></div>
+
+<script src="static/util.js"></script>
+<script src="static/layout.js"></script>
+<script src="static/ops.js"></script>
+<script src="static/forms.js"></script>
+<script src="static/model.js"></script>
+<script src="static/canvas.js"></script>
+<script src="static/inspector.js"></script>
+<script src="static/app.js"></script>
+</body>
+</html>

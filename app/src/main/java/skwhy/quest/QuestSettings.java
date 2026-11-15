@@ -29,23 +29,23 @@ public final class QuestSettings {
         return new File(SkWhy.getInstance().getDataFolder(), config().getString("quests.npc_folder", "quest-npcs"));
     }
 
-    /** Dossier des données de progression des joueurs. */
-    public static File dataFolder() {
-        return new File(SkWhy.getInstance().getDataFolder(), config().getString("quests.data_folder", "quest-data"));
-    }
-
     /** Dossier historique contenant {@code quests/} et {@code npcs/} au format NBT (lecture seule). */
     public static File legacyFolder() {
         return new File(config().getString("quests.legacy_folder", "plugins/Skript/configs/data/quêtes"));
     }
 
-    /** Dossier des fichiers joueur historiques ({@code <uuid>.dat}) : import de la progression et données de métiers. */
-    public static File legacyPlayerFolder() {
-        return new File(config().getString("quests.legacy_player_folder", "plugins/Skript/configs/data/players"));
+    /** Dossier des fichiers de données des joueurs ({@code <uuid>.dat}) : le NBT custom des joueurs déconnectés y est lu et écrit. */
+    public static File playerFolder() {
+        return new File(config().getString("quests.player_folder", "world/players/data"));
     }
 
     public static boolean legacyImportEnabled() {
         return config().getBoolean("quests.legacy_import", true);
+    }
+
+    /** Convertit les anciens fichiers NBT en YAML au chargement (un seul format) ; les .nbt sont renommés en .nbt.migrated. */
+    public static boolean legacyMigrate() {
+        return config().getBoolean("quests.legacy_migrate", true);
     }
 
     public static int saveIntervalTicks() {
@@ -76,16 +76,6 @@ public final class QuestSettings {
         return config().getString("quests.admin_permission", "skwhy.quest.admin");
     }
 
-    /** Fonction Skript utilisée pour fabriquer un item personnalisé à partir de son nom ({@code item_get(nom, joueur)}). */
-    public static String itemFunction() {
-        return config().getString("quests.item_function", "item_get");
-    }
-
-    /** Fonction Skript qui compte les exemplaires d'un item personnalisé ({@code item_count(nom, joueur)}). */
-    public static String itemCountFunction() {
-        return config().getString("quests.item_count_function", "item_count");
-    }
-
     /** Fonction Skript qui ouvre le menu des quêtes ({@code f(joueur, données, cible)}). */
     public static String menuFunction() {
         return config().getString("quests.menu_function", "quest_répertoire_open");
@@ -111,6 +101,16 @@ public final class QuestSettings {
     /** Distance (en blocs) à partir de laquelle un NPC en mode {@code wait} s'arrête pour attendre le joueur. */
     public static double waitStopDistance() {
         return config().getDouble("quests.npc_wait_distance", 15.0);
+    }
+
+    /** Facteur de vitesse maximal d'un NPC en mode {@code wait} quand il est loin derrière le joueur. */
+    public static double npcMaxSpeedFactor() {
+        return Math.max(1.0, config().getDouble("quests.npc_max_speed_factor", 1.6));
+    }
+
+    /** Variables Skript de règles de coût proposées à l'action {@code move} ({@code a::b} = {@code {a::b::*}}). */
+    public static List<String> pathfindingRules() {
+        return SkWhy.getInstance() == null ? List.of() : config().getStringList("quests.pathfinding_rules");
     }
 
     public static boolean debug() {

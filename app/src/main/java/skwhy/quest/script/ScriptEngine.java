@@ -179,7 +179,7 @@ public final class ScriptEngine {
                     if (variable == null) return;
                     Object value = node.data().get("value");
                     if ("%%now%%".equals(value)) value = System.currentTimeMillis() / 1000L;
-                    if (value instanceof Byte b) value = (int) b;
+                    if (value instanceof Byte b) value = b != 0;
                     if (value != null) QuestEngine.setVariable(player, quest, variable, value, op(node.str("operator", "set")));
                 }
                 default -> { }
@@ -272,17 +272,36 @@ public final class ScriptEngine {
             Player player = ctx.online();
             String npcId = node.str("npc");
             QuestNpc npc = npcId == null ? ctx.npc() : QuestRegistry.npc(npcId);
-            if (player == null || npc == null || !node.has("position")) return false;
+            // destination fixe (coordonnées) ou position du NPC
+            boolean fixed = "location".equalsIgnoreCase(node.str("destination", "position"));
+            if (player == null || npc == null) return false;
+            if (fixed ? !(node.has("x") && node.has("y") && node.has("z")) : !node.has("position")) return false;
             NpcMover.Mode mode = NpcMover.Mode.parse(node.str("mode", "instant"));
-            List<Object> raw = Tree.list(node.data(), "path");
-            double[] path = new double[raw.size()];
-            for (int i = 0; i < path.length; i++) path[i] = raw.get(i) instanceof Number n ? n.doubleValue() : 0;
             NpcMover.Options options = new NpcMover.Options();
             options.speed = node.integer("speed", 2);
             options.onStop = Tree.strings(node.data(), "on_stop");
             options.onContinue = Tree.strings(node.data(), "on_continue");
-            options.path = path;
-            boolean async = NpcMover.start(player, npc, node.integer("position", 1), mode, options, this::proceed);
+            options.rules = node.str("rules", "");
+            int position = node.integer("position", 1);
+            if (fixed) {
+                World world = Bukkit.getWorld(node.str("world", ""));
+                options.destination = new Location(world, node.dbl("x", 0), node.dbl("y", 0), node.dbl("z", 0));
+                options.real = node.bool("real", false);
+            }
+            // une marche réelle est vue par tout le monde : pas de copie par joueur
+            if (!options.real && "global".equalsIgnoreCase(node.str("scope", "personal"))) {
+                // Déplacement global : tous les joueurs connectés voient le NPC marcher (chacun sa navigation virtuelle) ;
+                // le script reprend quand celui qui l'a déclenché a fini, les autres n'entendent pas les répliques d'arrêt.
+                for (Player other : Bukkit.getOnlinePlayers()) {
+                    if (other.getUniqueId().equals(player.getUniqueId())) continue;
+                    NpcMover.Options shared = new NpcMover.Options();
+                    shared.speed = options.speed;
+                    shared.rules = options.rules;
+                    shared.destination = options.destination;
+                    NpcMover.start(other, npc, position, mode, shared, null);
+                }
+            }
+            boolean async = NpcMover.start(player, npc, position, mode, options, this::proceed);
             return async;
         }
 
@@ -300,6 +319,35 @@ public final class ScriptEngine {
             if (player == null || world == null) return;
             player.teleport(new Location(world, node.dbl("x", 0), node.dbl("y", 0), node.dbl("z", 0),
                 (float) node.dbl("yaw", 0), (float) node.dbl("pitch", 0)));
+        }
+    }
+
+    /** Objets que donnerait le script {@code reward} : les actions {@code give}, en suivant les listes dont la condition est vraie. */
+    public static List<ItemStack> rewardItems(ScriptContext ctx) {
+        List<ItemStack> out = new ArrayList<>();
+        collectItems(ctx, "reward", out, 0);
+        return out;
+    }
+
+    private static void collectItems(ScriptContext ctx, String id, List<ItemStack> out, int depth) {
+        ScriptNode node = ctx.scripts().get(id);
+        if (node == null || depth > 64) return;
+        if ("list".equals(node.action())) {
+            boolean single = "single".equals(node.str("mode", "list"));
+            for (String child : Tree.strings(node.data(), "liste")) {
+                ScriptNode c = ctx.scripts().get(child);
+                if (c == null) continue;
+                String guard = c.guard();
+                if (guard == null || Conditions.eval(ctx, guard)) {
+                    collectItems(ctx, child, out, depth + 1);
+                    if (single) break;
+                }
+            }
+        } else if ("give".equals(node.action())) {
+            for (Map<String, Object> entry : Tree.maps(node.data(), "items")) {
+                ItemStack stack = ItemResolver.read(entry, ctx.player());
+                if (stack != null) out.add(stack);
+            }
         }
     }
 

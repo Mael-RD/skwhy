@@ -59,6 +59,8 @@ public final class YamlTree {
             for (Object o : l) out.add(toYaml(o));
             return out;
         }
+        // Un octet NBT est un booléen (0/1) ou un petit entier : YAML ne connaît pas les octets
+        if (value instanceof Byte b) return b == 0 || b == 1 ? (Object) (b == 1) : (Object) (int) b;
         return value;
     }
 

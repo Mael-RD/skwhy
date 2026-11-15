@@ -39,7 +39,13 @@ import java.util.List;
     "navigation logs a warning and does nothing when it should start. The route between chunks keeps the costs of the chunk path records (see 'register chunk path'). " +
     "Change them later with 'path cost rules of long navigation'. " +
     "A navigation made with a player as the entity never drives it (no teleport, no gravity change, no pause, no speed): " +
-    "it only answers 'blocks of long navigation', to get the path ahead of the player.")
+    "it only answers 'blocks of long navigation', to get the path ahead of the player. " +
+    "With 'for <players>' the real entity is driven virtually: the walk is simulated and sent as packets to these players only, " +
+    "the entity itself never moves on the server (the others keep seeing it where it is; the client loses it when it leaves its " +
+    "tracking range, so prefer an id-based navigation for a long trip). " +
+    "A security allows one navigation per entity: a real one (the entity is moved) is alone on it; several virtual ones (by id, or 'for') " +
+    "can share an entity if they have no player in common, never together with a real one. A refused creation logs an error in the " +
+    "console and returns nothing; config 'long_navigation.allow_multiple: true' lifts the security.")
 @Examples({
     "# Pattern 0: create from a numeric ID",
     "set {_longnav} to a new long navigation with id 12345 hitbox vector(0.6, 1.8, 0.6) location location of player",
@@ -49,9 +55,12 @@ import java.util.List;
     "set {_road} to a new path cost rule with cost 1",
     "add stone bricks to blocks of path cost rule {_road}",
     "set {_other} to a new path cost rule with cost 5",
-    "set {_longnav} to a new long navigation with entity target entity speed 0.2 using rules {_road} and {_other}"
+    "set {_longnav} to a new long navigation with entity target entity speed 0.2 using rules {_road} and {_other}",
+    "",
+    "# Pattern 1 with players: the entity is shown walking to the player only, it stays where it is for the others",
+    "set {_longnav} to a new long navigation with entity target entity speed 0.2 for player using rules {_road} and {_other}"
 })
-@Since("1.5.0")
+@Since("1.5.0, 1.6.1 (for <players>, security)")
 public class LongNavigationCreate extends SimpleExpression<LongNavigation> {
 
     private Expression<Number>   idExpr;
@@ -78,7 +87,8 @@ public class LongNavigationCreate extends SimpleExpression<LongNavigation> {
         } else {
             this.entityExpr  = (Expression<Entity>) exprs[0];
             this.speedExpr   = (Expression<Number>) exprs[1]; // null si omis
-            this.rulesExpr   = (Expression<PathCostRuleData>) exprs[2]; // null si omis
+            this.playersExpr = (Expression<Player>) exprs[2]; // null si omis
+            this.rulesExpr   = (Expression<PathCostRuleData>) exprs[3]; // null si omis
         }
 
         return true;
@@ -94,6 +104,17 @@ public class LongNavigationCreate extends SimpleExpression<LongNavigation> {
 
         PathCostRules rules = rulesExpr != null ? PathCostRuleData.buildRules(rulesExpr.getAll(event)) : null;
 
+        try {
+            return create(event, speed, rules);
+        } catch (skwhy.chunkpath.longnav.NavigationGuard.Refused e) {
+            // jamais d'exception vers le script : erreur en console, pas de navigation
+            skwhy.SkWhy.getInstance().getLogger().severe("[ChunkPath] Long navigation refusée : " + e.getMessage()
+                    + " (long_navigation.allow_multiple: true pour lever cette sécurité)");
+            return null;
+        }
+    }
+
+    private @Nullable LongNavigation[] create(Event event, float speed, PathCostRules rules) {
         if (matchedPattern == 0) {
             Number id = idExpr.getSingle(event);
             if (id == null) return null;
@@ -110,6 +131,12 @@ public class LongNavigationCreate extends SimpleExpression<LongNavigation> {
         } else {
             Entity entity = entityExpr.getSingle(event);
             if (entity == null) return null;
+            if (playersExpr != null) { // pilotée virtuellement : l'entité ne bouge pas, ces joueurs la voient marcher
+                Player[] players = playersExpr.getAll(event);
+                List<Player> viewers = new ArrayList<>();
+                if (players != null) Collections.addAll(viewers, players);
+                return new LongNavigation[]{ LongNavigation.virtualOf(entity, speed, rules, viewers) };
+            }
             return new LongNavigation[]{ new LongNavigation(entity, speed, rules) };
         }
     }
@@ -135,6 +162,7 @@ public class LongNavigationCreate extends SimpleExpression<LongNavigation> {
             StringBuilder sb = new StringBuilder("new long navigation with entity ");
             sb.append(entityExpr.toString(event, debug));
             if (speedExpr != null) sb.append(" speed ").append(speedExpr.toString(event, debug));
+            if (playersExpr != null) sb.append(" for ").append(playersExpr.toString(event, debug));
             if (rulesExpr != null) sb.append(" using rules ").append(rulesExpr.toString(event, debug));
             return sb.toString();
         }
@@ -146,8 +174,8 @@ public class LongNavigationCreate extends SimpleExpression<LongNavigation> {
             SyntaxInfo.Expression.builder(LongNavigationCreate.class, LongNavigation.class)
                 // exprs : [0]number [1]vector [2]location [3]number? [4]players? [5]rules?
                 .addPattern("[a] [new] long navigation with id %number% hitbox %vector% location %location% [speed %-number%] [with players %-players%] [using rules %-pathcostrules%]")
-                // exprs : [0]entity [1]number? [2]rules?
-                .addPattern("[a] [new] long navigation with entity %entity% [speed %-number%] [using rules %-pathcostrules%]")
+                // exprs : [0]entity [1]number? [2]players? [3]rules?
+                .addPattern("[a] [new] long navigation with entity %entity% [speed %-number%] [for %-players%] [using rules %-pathcostrules%]")
                 .build()
         );
     }

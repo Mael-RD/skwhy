@@ -14,7 +14,6 @@ import org.bukkit.scheduler.BukkitTask;
 
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import skwhy.SkWhy;
 import skwhy.quest.QuestEngine;
@@ -39,23 +38,28 @@ public final class CompassService {
     /** Une cible affichée sur la boussole. */
     public record Target(QuestDestination.Kind kind, String world, double x, double y, double z, double radius, int color) {}
 
-    private static final String[] PALETTE = {"#ffaa00", "#00ff00", "#ff0000", "#00ffff", "#ffff00", "#8800ff", "#ffbbcc", "#3333ff",
-        "#777777", "#886543", "#333333", "#ff6600", "#00aa88", "#aa00ff", "#aaff00", "#ff0088", "#0088ff", "#996600", "#00ff99", "#cc0000", "#4444aa"};
-    private static final String[] LETTERS = {"S", "SO", "O", "NO", "N", "NE", "E", "SE"};
     private static final int CELLS = 96;
     private static final double CELL_DEGREES = 360.0 / CELLS;
-    private static final int HALF_WINDOW = 12;
-    private static final TextColor DECOR = TextColor.color(0xddddcc);
 
     private static final Map<UUID, BossBar> BARS = new ConcurrentHashMap<>();
     private static final Map<UUID, List<Target>> TARGETS = new ConcurrentHashMap<>();
     private static final Set<UUID> DIRTY = ConcurrentHashMap.newKeySet();
     private static BukkitTask task;
+    private static CompassStyle style = CompassStyle.load();
 
     private CompassService() {}
 
     public static void start() {
-        task = Bukkit.getScheduler().runTaskTimer(SkWhy.getInstance(), CompassService::tick, 2L, 2L);
+        style = CompassStyle.load();
+        task = Bukkit.getScheduler().runTaskTimer(SkWhy.getInstance(), CompassService::tick, style.refreshTicks, style.refreshTicks);
+    }
+
+    /** Relit {@code quests.compass_display} (après un {@code reload quests}) : la fréquence ne change qu'au redémarrage. */
+    public static void reloadStyle() {
+        SkWhy.getInstance().reloadConfig();
+        style = CompassStyle.load();
+        for (UUID id : BARS.keySet()) DIRTY.add(id);
+        for (BossBar bar : BARS.values()) bar.overlay(style.overlay);
     }
 
     public static void shutdown() {
@@ -82,7 +86,7 @@ public final class CompassService {
 
     private static void show(Player player) {
         BARS.computeIfAbsent(player.getUniqueId(), id -> {
-            BossBar bar = BossBar.bossBar(Component.empty(), 1f, BossBar.Color.BLUE, BossBar.Overlay.NOTCHED_6);
+            BossBar bar = BossBar.bossBar(Component.empty(), 1f, style.barColor, style.overlay);
             player.showBossBar(bar);
             return bar;
         });
@@ -111,6 +115,14 @@ public final class CompassService {
         DIRTY.add(player);
     }
 
+    /**
+     * Couleur de la boussole pour l'objectif {@code number} (1 = premier objectif ; 0 = destinations de l'étape, sans objectif) :
+     * la palette {@code quests.compass_display.colors} est parcourue en boucle, donc le 22e objectif reprend la couleur du 1er.
+     */
+    public static TextColor objectiveColor(int number) {
+        return style.color(number);
+    }
+
     /** Cibles actuelles du joueur (recalculées si nécessaire). */
     public static List<Target> targets(Player player) {
         if (DIRTY.remove(player.getUniqueId()) || !TARGETS.containsKey(player.getUniqueId())) {
@@ -126,7 +138,7 @@ public final class CompassService {
             List<Target> targets = targets(player);
             boolean[] inZone = new boolean[1];
             e.getValue().name(render(player, targets, inZone));
-            e.getValue().color(inZone[0] ? BossBar.Color.GREEN : BossBar.Color.BLUE);
+            e.getValue().color(inZone[0] ? style.zoneBarColor : style.barColor);
         }
     }
 
@@ -152,7 +164,7 @@ public final class CompassService {
         for (QuestDestination d : destinations) {
             if (d.kind() == QuestDestination.Kind.NPC) {
                 QuestNpc npc = QuestRegistry.npc(d.npc());
-                NpcEntityRef ref = npc == null ? null : npc.entityAt(data.npcPosition(npc.id()));
+                NpcEntityRef ref = npc == null ? null : QuestRegistry.entityAt(npc, data.npcPosition(npc.id()));
                 if (ref != null) out.add(new Target(QuestDestination.Kind.POINT, ref.world(), ref.x(), ref.y() + 1, ref.z(), 0, color));
             } else {
                 out.add(new Target(d.kind(), d.world(), d.x(), d.y(), d.z(), d.radius(), color));
@@ -163,6 +175,7 @@ public final class CompassService {
     // ── Rendu ───────────────────────────────────────────────────────────────
 
     private static Component render(Player player, List<Target> targets, boolean[] inZone) {
+        CompassStyle st = style;
         Location at = player.getLocation();
         Target[] cells = new Target[CELLS];
         boolean[] arrowUp = new boolean[CELLS];
@@ -181,25 +194,29 @@ public final class CompassService {
                 cells[cell] = t;
                 double horizontal = Math.sqrt(dx * dx + dz * dz);
                 double targetPitch = Math.toDegrees(Math.atan((at.getY() + 1.7 - t.y()) / Math.max(horizontal, 0.0001)));
-                arrowUp[cell] = at.getPitch() >= targetPitch + 10;
-                arrowDown[cell] = at.getPitch() <= targetPitch - 10;
+                arrowUp[cell] = at.getPitch() >= targetPitch + st.pitchMargin;
+                arrowDown[cell] = at.getPitch() <= targetPitch - st.pitchMargin;
             }
         }
         int center = cell(at.getYaw());
         Component out = Component.empty();
-        for (int i = -HALF_WINDOW; i <= HALF_WINDOW; i++) {
+        // Défilement fin : un quart de case = un espace avant ou après (comme l'ancienne boussole)
+        int phase = (int) Math.floor((((at.getYaw() % 360) + 360) % 360 / CELL_DEGREES % 1) * 4);
+        if (st.smoothScroll && phase == 0) out = out.append(Component.space());
+        for (int i = -st.halfWindow; i <= st.halfWindow; i++) {
             int cell = Math.floorMod(center + i, CELLS);
             Target t = cells[cell];
             if (t != null && t.kind() == QuestDestination.Kind.FARM) {
-                out = out.append(Component.text("◯", NamedTextColor.GREEN));
+                out = out.append(st.zone);
             } else if (t != null) {
-                String symbol = arrowUp[cell] ? "⮝" : arrowDown[cell] ? "⮟" : "❖";
-                out = out.append(Component.text(symbol, TextColor.fromHexString(PALETTE[t.color() % PALETTE.length])));
+                Component symbol = arrowUp[cell] ? st.up : arrowDown[cell] ? st.down : st.objective;
+                out = out.append(symbol.colorIfAbsent(st.color(t.color())));
             } else {
-                out = out.append(Component.text(decoration(cell), DECOR));
+                out = out.append(decoration(st, cell));
             }
         }
-        return out;
+        if (st.smoothScroll && phase == 3) out = out.append(Component.space());
+        return st.font == null ? out : out.font(st.font);
     }
 
     private static int cell(double yaw) {
@@ -207,11 +224,12 @@ public final class CompassService {
         return (int) Math.floor(normalized / CELL_DEGREES) % CELLS;
     }
 
-    private static String decoration(int cell) {
+    private static Component decoration(CompassStyle st, int cell) {
         int r = cell % 12;
-        if (r == 0) return LETTERS[cell / 12];
-        if (r == 6) return "◈";
-        if (r == 3 || r == 9) return "•";
-        return "·";
+        if (r == 0) return st.letters[cell / 12];
+        if (r == 1) return st.first;
+        if (r == 6) return st.half;
+        if (r == 3 || r == 9) return st.quarter;
+        return st.plain;
     }
 }

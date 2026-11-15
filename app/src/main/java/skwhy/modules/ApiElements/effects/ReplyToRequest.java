@@ -21,16 +21,16 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 @Description("Sends an HTTP response to an API request. Optionally specify a status code (default 200).")
 @Examples({
     "on api request:",
-    "\treply to event-apirequest with \"hello\"",
+    "\tapi reply to event-apirequest with \"hello\"",
     "",
     "on api request:",
-    "\treply to event-apirequest with code 404 and \"not found\"",
+    "\tapi reply to event-apirequest with code 404 and \"not found\"",
     "",
     "on api request:",
     "\tset {_body} to \"{\"\"ok\"\": true}\"",
-    "\treply to event-apirequest with {_body}"
+    "\tapi reply to event-apirequest with {_body}"
 })
-@Since("1.3.0")
+@Since("1.3.0 (the 'api' prefix: 1.6.1)")
 public class ReplyToRequest extends Effect {
 
     private Expression<API_request> requestExpr;
@@ -73,11 +73,11 @@ public class ReplyToRequest extends Effect {
     @Override
     public String toString(@Nullable Event event, boolean debug) {
         if (hasCode) {
-            return "reply to " + requestExpr.toString(event, debug)
+            return "api reply to " + requestExpr.toString(event, debug)
                 + " with code " + codeExpr.toString(event, debug)
                 + " and " + bodyExpr.toString(event, debug);
         }
-        return "reply to " + requestExpr.toString(event, debug)
+        return "api reply to " + requestExpr.toString(event, debug)
             + " with " + bodyExpr.toString(event, debug);
     }
 
@@ -87,9 +87,9 @@ public class ReplyToRequest extends Effect {
             SyntaxRegistry.EFFECT,
             SyntaxInfo.builder(ReplyToRequest.class)
                 // Pattern 0 : sans code
-                .addPattern("reply to %apirequest% with %string%")
+                .addPattern("api reply to %apirequest% with %string%")
                 // Pattern 1 : avec code HTTP explicite
-                .addPattern("reply to %apirequest% with code %number% and %string%")
+                .addPattern("api reply to %apirequest% with code %number% and %string%")
                 .build()
         );
     }

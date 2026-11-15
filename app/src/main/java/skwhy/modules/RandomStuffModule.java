@@ -50,6 +50,7 @@ public class RandomStuffModule implements AddonModule {
         FutureDirection.register(addon);
         GenerateId.register(addon);
         SplitRegex.register(addon);
+        SmoothedLocations.register(addon);
         TrackedEntities.register(addon);
 
         SecretHide.register(addon);

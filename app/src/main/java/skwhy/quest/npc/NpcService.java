@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.advancement.Advancement;
 import org.bukkit.advancement.AdvancementProgress;
@@ -59,6 +60,7 @@ public final class NpcService {
 
     // ── Entités et positions ────────────────────────────────────────────────
 
+    /** L'entité réelle d'une référence, {@code null} si elle n'est pas chargée ou si c'est une entité custom fausse. */
     public static Entity entity(NpcEntityRef ref) {
         try {
             return Bukkit.getEntity(UUID.fromString(ref.entityUuid()));
@@ -68,7 +70,54 @@ public final class NpcService {
     }
 
     public static NpcEntityRef refOf(Entity entity) {
-        return entity == null ? null : QuestRegistry.refOf(entity.getUniqueId());
+        return entity == null ? null : QuestRegistry.refOf(entity);
+    }
+
+    /**
+     * Ce qui représente un NPC dans le monde pour les services (marqueurs, regard) : une entité réelle, éventuellement avec le visuel
+     * d'une entité custom réelle, ou une entité custom fausse (paquets seulement, {@code entity} vaut alors {@code null}).
+     *
+     * @param key       identifiant stable (UUID de l'entité, ou de l'interaction fausse)
+     * @param attachId  id de paquet où monter un marqueur (l'entité ou l'interaction fausse)
+     * @param lookIds   ids de paquet à tourner pour que le NPC regarde quelqu'un (l'entité, et le visuel d'une entité custom)
+     */
+    public record Body(UUID key, Location location, Entity entity, int attachId, int[] lookIds, double height) {
+
+        public boolean valid() {
+            return entity != null ? entity.isValid() : true;
+        }
+    }
+
+    /** Le corps d'une référence de NPC, {@code null} s'il n'est pas chargé. */
+    public static Body body(NpcEntityRef ref) {
+        skwhy.customentity.CustomEntity fake = CustomNpcBodies.fake(ref);
+        if (fake != null) {
+            Location at = fake.fakeLocation();
+            return at == null || fake.isDestroyed() ? null : new Body(fake.hitboxUuid(), at, null, fake.hitboxId(), new int[]{ fake.visualId() }, 1.8);
+        }
+        Entity entity = entity(ref);
+        if (entity == null) return null;
+        int visual = CustomNpcBodies.visualId(entity);
+        int[] ids = visual < 0 ? new int[]{ entity.getEntityId() } : new int[]{ entity.getEntityId(), visual };
+        return new Body(entity.getUniqueId(), entity.getLocation(), entity, entity.getEntityId(), ids, entity.getHeight());
+    }
+
+    /** Remet à jour ce que voit chaque joueur connecté (une liaison vient de changer). */
+    public static void refreshAll() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            refreshVisibility(player);
+            IndicatorService.invalidate(player.getUniqueId());
+        }
+    }
+
+    /** Une entité n'est plus un NPC : elle redevient visible pour ceux à qui nous la cachions. */
+    public static void release(Entity entity) {
+        for (Map.Entry<UUID, Set<UUID>> e : HIDDEN.entrySet()) {
+            if (!e.getValue().remove(entity.getUniqueId())) continue;
+            Player player = Bukkit.getPlayer(e.getKey());
+            if (player != null) player.showEntity(SkWhy.getInstance(), entity);
+        }
+        for (Player player : Bukkit.getOnlinePlayers()) IndicatorService.invalidate(player.getUniqueId());
     }
 
     /** Position (1, 2, 3...) sous laquelle ce joueur voit le NPC. */
@@ -130,6 +179,7 @@ public final class NpcService {
                 player.showEntity(SkWhy.getInstance(), entity);
             }
         }
+        CustomNpcBodies.refreshViewers();
     }
 
     /** Applique la visibilité d'une entité qui vient de se charger à tous les joueurs connectés. */
@@ -156,6 +206,16 @@ public final class NpcService {
     public static boolean interact(Player player, Entity entity, ClickType click) {
         NpcEntityRef ref = refOf(entity);
         if (ref == null) return false;
+        return interact(player, entity, ref, click, entity instanceof Mannequin);
+    }
+
+    /**
+     * Interaction avec un NPC dont on connaît déjà la référence.
+     *
+     * @param entity     l'entité réelle, {@code null} pour une entité custom fausse
+     * @param attackable {@code true} si un clic gauche fait réagir le NPC (mannequin, entité custom) au lieu de ne rien faire
+     */
+    public static boolean interact(Player player, Entity entity, NpcEntityRef ref, ClickType click, boolean attackable) {
         QuestNpc npc = QuestRegistry.npc(ref.npcId());
         if (npc == null) return false;
 
@@ -164,7 +224,7 @@ public final class NpcService {
         if (event.isCancelled()) return true;
 
         if (click == ClickType.LEFT) {
-            if (entity instanceof Mannequin) {
+            if (attackable) {
                 List<String> texts = npc.attackTexts();
                 String text = texts.isEmpty() ? ATTACKED.get(RANDOM.nextInt(ATTACKED.size())) : texts.get(RANDOM.nextInt(texts.size()));
                 DialogueService.say(player, npc, text, null, null);

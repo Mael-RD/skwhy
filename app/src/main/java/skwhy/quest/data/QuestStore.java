@@ -1,63 +1,60 @@
 package skwhy.quest.data;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitTask;
 
+import net.minecraft.nbt.CompoundTag;
 import skwhy.SkWhy;
 import skwhy.quest.QuestSettings;
-import skwhy.quest.YamlTree;
 
 /**
- * Cache mémoire des données de quête des joueurs. Les écritures disque sont groupées et faites sur un thread
- * dédié : les modifications de progression ne touchent jamais le disque sur le thread principal.
+ * Données de quête des joueurs, stockées dans leur NBT custom ({@code quest;liste;<quête>;...}, voir {@link PlayerNbt}) :
+ * les scripts continuent de les lire et de les écrire avec {@code player_nbt}. Le module garde un objet par joueur ;
+ * toute modification est écrite tout de suite dans le NBT (celui du joueur connecté, ou le fichier d'un joueur
+ * déconnecté), et une modification faite par un script est relue au prochain accès. Un joueur sans données du tout
+ * (UUID inconnu du serveur) reste seulement en mémoire.
  */
 public final class QuestStore {
 
     private static final Map<UUID, PlayerQuestData> CACHE = new ConcurrentHashMap<>();
-    private static ExecutorService writer;
-    private static BukkitTask autosave;
+    private static BukkitTask sweep;
 
     private QuestStore() {}
 
     public static void start() {
-        writer = Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "SkWhy-QuestStore");
-            t.setDaemon(true);
-            return t;
-        });
+        PlayerQuestData.onDirty = QuestStore::onDirty;
         int interval = QuestSettings.saveIntervalTicks();
-        autosave = Bukkit.getScheduler().runTaskTimer(SkWhy.getInstance(), QuestStore::saveDirty, interval, interval);
+        sweep = Bukkit.getScheduler().runTaskTimer(SkWhy.getInstance(), QuestStore::saveDirty, interval, interval);
     }
 
-    /** Sauvegarde tout puis arrête le thread d'écriture (à l'arrêt du plugin). */
+    /** Écrit tout ce qui reste à écrire (à l'arrêt du plugin). */
     public static void shutdown() {
-        if (autosave != null) autosave.cancel();
-        List<Runnable> jobs = collectJobs(false);
-        if (writer != null) {
-            for (Runnable job : jobs) writer.submit(job);
-            writer.shutdown();
-            try { writer.awaitTermination(10, TimeUnit.SECONDS); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
-        } else {
-            jobs.forEach(Runnable::run);
-        }
+        if (sweep != null) sweep.cancel();
+        for (PlayerQuestData data : CACHE.values()) if (data.isDirty()) flush(data);
         CACHE.clear();
     }
 
-    /** Les données du joueur, chargées (ou importées de l'ancien format) si nécessaire. */
+    /** Les données du joueur, relues du NBT si un script les a modifiées depuis. */
     public static PlayerQuestData get(UUID uuid) {
         PlayerQuestData data = CACHE.get(uuid);
-        if (data != null) return data;
-        data = load(uuid);
+        if (data != null) {
+            if (!data.dirty) {
+                long now = PlayerNbt.stamp(uuid);
+                if (now != Long.MIN_VALUE && now != data.stamp) {
+                    data.replaceWith(read(uuid));
+                    data.stamp = now;
+                    skwhy.quest.QuestEngine.reindex(data);
+                }
+            }
+            return data;
+        }
+        data = read(uuid);
+        data.stamp = PlayerNbt.stamp(uuid);
+        skwhy.quest.QuestEngine.reindex(data);
         PlayerQuestData previous = CACHE.putIfAbsent(uuid, data);
         return previous != null ? previous : data;
     }
@@ -66,63 +63,50 @@ public final class QuestStore {
         return CACHE.get(uuid);
     }
 
-    private static PlayerQuestData load(UUID uuid) {
-        File file = new File(QuestSettings.dataFolder(), uuid + ".yml");
-        Map<String, Object> tree = YamlTree.read(file);
-        PlayerQuestData data;
-        if (tree != null) {
-            data = PlayerQuestData.fromTree(uuid, tree);
-        } else {
-            data = QuestSettings.legacyImportEnabled() ? LegacyPlayerData.importQuests(uuid) : null;
-            if (data == null) {
-                data = new PlayerQuestData(uuid);
-                data.compass = QuestSettings.compassAuto();
-            }
-        }
-        skwhy.quest.QuestEngine.reindex(data);
+    private static PlayerQuestData read(UUID uuid) {
+        PlayerQuestData data = LegacyPlayerData.importQuests(uuid);
+        if (data != null) return data;
+        data = new PlayerQuestData(uuid);
+        data.compass = QuestSettings.compassAuto();
         return data;
     }
 
-    /** Décharge un joueur (déconnexion) après l'avoir sauvegardé si besoin. */
+    /** Appelé par {@link PlayerQuestData#markDirty()} : seules les données du cache sont écrites (tout de suite : un script relit le NBT juste après). */
+    static void onDirty(PlayerQuestData data) {
+        if (CACHE.get(data.uuid) == data) flush(data);
+    }
+
+    /** Écrit les données dans le NBT du joueur (ou les garde en mémoire si le serveur ne le connaît pas). */
+    private static void flush(PlayerQuestData data) {
+        PlayerNbt.Access access = PlayerNbt.open(data.uuid, PlayerNbt.exists(data.uuid));
+        if (access == null) {
+            data.dirty = false;
+            return;
+        }
+        CompoundTag quest = access.custom.getCompound("quest").orElse(null);
+        if (quest == null) {
+            quest = new CompoundTag();
+            access.custom.put("quest", quest);
+        }
+        PlayerQuestNbt.write(data, quest);
+        if (!access.commit()) return;
+        data.dirty = false;
+        data.stamp = PlayerNbt.stamp(data.uuid);
+    }
+
+    /** Décharge un joueur (déconnexion). */
     public static void unload(UUID uuid) {
         PlayerQuestData data = CACHE.get(uuid);
         if (data == null) return;
-        if (data.isDirty()) {
-            Runnable job = job(data);
-            if (writer != null && !writer.isShutdown()) writer.submit(job); else job.run();
-        }
+        if (data.isDirty()) flush(data);
         CACHE.remove(uuid);
     }
 
     public static void saveDirty() {
-        if (writer == null || writer.isShutdown()) return;
-        for (Runnable job : collectJobs(true)) writer.submit(job);
-        // Les joueurs hors-ligne consultés par un script ne restent pas en mémoire une fois sauvegardés
+        for (PlayerQuestData data : CACHE.values()) if (data.isDirty()) flush(data);
+        // Les joueurs hors-ligne consultés par un script ne restent pas en mémoire une fois écrits
         for (PlayerQuestData data : CACHE.values()) {
-            if (!data.isDirty() && Bukkit.getPlayer(data.uuid) == null) CACHE.remove(data.uuid);
+            if (!data.isDirty() && Bukkit.getPlayer(data.uuid) == null && PlayerNbt.exists(data.uuid)) CACHE.remove(data.uuid);
         }
-    }
-
-    private static List<Runnable> collectJobs(boolean onlyDirty) {
-        List<Runnable> jobs = new ArrayList<>();
-        for (PlayerQuestData data : CACHE.values()) {
-            if (onlyDirty && !data.isDirty()) continue;
-            if (!data.isDirty() && !onlyDirty) continue;
-            jobs.add(job(data));
-        }
-        return jobs;
-    }
-
-    private static Runnable job(PlayerQuestData data) {
-        // L'instantané est construit tout de suite (thread principal) ; seule l'écriture est asynchrone
-        Map<String, Object> snapshot = data.snapshot();
-        data.dirty = false;
-        File file = new File(QuestSettings.dataFolder(), data.uuid + ".yml");
-        return () -> {
-            if (!YamlTree.write(file, snapshot)) {
-                SkWhy.getInstance().getLogger().warning("[Quest] Impossible d'écrire " + file.getPath());
-                data.dirty = true;
-            }
-        };
     }
 }

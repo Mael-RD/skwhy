@@ -14,7 +14,7 @@ import org.bukkit.event.HandlerList;
 @Examples({
     "on api request:",
     "\tset {_req} to event-apirequest",
-    "\treply to {_req} with \"Hello!\""
+    "\tapi reply to {_req} with \"Hello!\""
 })
 @Since("1.3.0")
 public class API_request_event extends Event {

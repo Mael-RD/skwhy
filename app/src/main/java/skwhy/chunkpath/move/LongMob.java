@@ -49,6 +49,7 @@ public class LongMob {
     private float maxUpStep = 0.6F;
     private boolean canOpenDoors = true;
     private int costSmoothing = -1;
+    private double pathSmoothing = 0;
     private final DoorOpener doors = new DoorOpener(this);
 
     // ── Position ─────────────────────────────────────────────────────────────
@@ -801,6 +802,18 @@ public class LongMob {
     /** @param blocks the size in blocks, or a negative number for the default */
     public void setCostSmoothing(int blocks) {
         this.costSmoothing = blocks;
+    }
+
+    /**
+     * Smoothing of the position the entity follows, in blocks (x and z only, {@link skwhy.util.PathSmoothing}); 0 = it walks
+     * node to node. Where its hitbox does not fit on the smoothed curve it walks the plain path until it does again.
+     */
+    public double pathSmoothing() {
+        return pathSmoothing;
+    }
+
+    public void setPathSmoothing(double blocks) {
+        this.pathSmoothing = Math.max(0, blocks);
     }
 
     public DoorOpener getDoors() {

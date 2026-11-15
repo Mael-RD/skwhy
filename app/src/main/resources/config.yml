@@ -8,6 +8,7 @@ modules:
   chunk_path: true
   quest: true
   custom_entity: true
+  custom_item: true
 
 api_rest:
   # Port pour les requête
@@ -21,6 +22,47 @@ api_rest:
   # Chemin vers le certificat et la clef privée, generate the certificat by yourself or disable use_https.
   certificate: "certificate.crt"
   private_key: "private.key"
+  # Certificat Let's Encrypt automatique (preuve DNS-01 par l'API OVH : aucun port a ouvrir, ca marche sur n'importe quel port).
+  # Si actif, `certificate` / `private_key` (ci-dessus) sont crees et renouveles par le plugin. Necessite use_https: true.
+  # Cles OVH : https://eu.api.ovh.com/createToken/ avec GET/POST/DELETE sur /domain/zone/<zone>/*
+  acme:
+    enabled: false
+    # Nom du serveur (ex. api.proxti.fr) et adresse e-mail du compte Let's Encrypt
+    domain: ""
+    email: ""
+    # Renouvelle quand il reste moins de N jours (verification toutes les 12 h, rechargement a chaud)
+    renew_before_days: 30
+    # true = serveur de test Let's Encrypt (certificat NON reconnu par les navigateurs, pas de limite de taux) : le passer a false une fois que ca marche
+    staging: true
+    # Attente (secondes) de la propagation du TXT avant la verification
+    dns_wait_seconds: 45
+    ovh:
+      endpoint: "ovh-eu"
+      # Zone DNS (vide = les deux derniers libelles du domaine, ex. proxti.fr)
+      zone: ""
+      application_key: ""
+      application_secret: ""
+      consumer_key: ""
+
+# Client HTTP du module api : requetes sortantes vers d'autres API (syntaxes `api call`, `send api call`...)
+api_client:
+  # Delai (secondes) d'une requete qui n'a pas son propre `timeout`, redirections comprises
+  default_timeout_seconds: 10
+  # Taille maximale (Mo) d'une reponse lue : au-dela elle est coupee et `api error of` l'indique
+  max_response_megabytes: 10
+  # Nombre maximal de requetes en meme temps (les autres attendent). Pris en compte au demarrage du serveur.
+  max_concurrent: 8
+  # Nombre maximal de redirections suivies (0 = jamais)
+  max_redirects: 5
+  # Securite : false = refuse les adresses privees (localhost, 127.x, 10.x, 192.168.x, 172.16-31.x, liens locaux, IPv6 privees).
+  # A mettre a false si des joueurs peuvent choisir l'URL d'une requete (sinon ils peuvent atteindre des services internes du serveur).
+  allow_private_addresses: true
+  # Securite : true = un script peut utiliser `trust all certificates: true` (certificat auto-signe accepte, connexion non verifiee)
+  allow_insecure_certificates: false
+  # Securite : si la liste n'est pas vide, seuls ces noms de domaine (et leurs sous-domaines) sont joignables. Exemple : ["api.example.com"]
+  allowed_hosts: []
+  # Securite : noms de domaine (et sous-domaines) jamais joignables
+  blocked_hosts: []
 
 chunkpath:
   # Dossier (dans le dossier du plugin) contenant les bases de données de chemins, une par monde
@@ -29,8 +71,81 @@ chunkpath:
   # Les fichiers région sont lus dans <world_folder>/<overworld|the_nether|the_end>/region
   world_folder: "world/dimensions/minecraft"
 
+long_navigation:
+  # Sécurité : une seule long navigation par entité. Une navigation « réelle » (qui déplace l'entité) est seule sur elle ;
+  # plusieurs navigations « virtuelles » (packets pour des joueurs précis) peuvent coexister si elles n'ont aucun joueur en commun.
+  # true = aucune limite ; "long navigation of <entité>" avec plusieurs navigations écrit alors une erreur en console et renvoie la première.
+  allow_multiple: false
+  # Une navigation virtuelle (packets) envoie une téléportation absolue tous les N paquets de déplacement relatif
+  # pour que l'entité reste synchronisée avec le serveur (les paquets relatifs s'arrondissent).
+  sync_every_moves: 20
+
 custom_entity:
   # Dossier (dans le dossier du plugin) des définitions d'entités custom : fichiers .yml, une clé de premier niveau par id
   folder: "custom-entities"
   # Distance (en blocs) à partir de laquelle une entité custom fausse est envoyée à un joueur
   view_distance: 48
+
+custom_item:
+  # Dossier (dans le dossier du plugin) des items custom : un fichier <id>.yml par item, directement dedans (pas de sous-dossier)
+  folder: "custom-items"
+
+quest_editor:
+  # Éditeur web des quêtes et des NPC (syntaxe Skript : send quest editor link of ... to ...).
+  # Il utilise le port de api_rest.port mais ne dépend pas du démarrage de l'API : il a ses propres clefs à usage limité.
+  enabled: true
+  # Durée de validité d'une clef (minutes)
+  key_ttl_minutes: 120
+  # Durée pendant laquelle la clef reste valide après la réponse du joueur (valider / annuler), le temps de la renouveler
+  renew_minutes: 5
+  # Adresse publique utilisée dans les liens (ex. https://play.exemple.fr). Vide = ip du serveur. Le port de api_rest est toujours ajouté s'il n'est pas dans l'adresse
+  public_url: ""
+  # Modifications validées par un joueur absent : dossier (dans celui du plugin) lu à sa reconnexion
+  pending_folder: "quest-editor-pending"
+  # Copies des fichiers remplacés (dans le dossier du plugin) et nombre gardé par quête / NPC (0 = aucune)
+  backup_folder: "quest-editor-backups"
+  backups_per_entity: 10
+
+quests:
+  # Variables Skript de règles de coût (liste de « path cost rule ») proposées dans l'action « move » (déplacement d'un NPC).
+  # "pathfinding::rules::villes" désigne {pathfinding::rules::villes::*}. L'action choisit l'une de ces entrées dans un menu déroulant.
+  pathfinding_rules: []
+  # Mode « wait » d'un déplacement de NPC : écart (blocs, le long du trajet) à partir duquel le NPC s'arrête pour attendre le joueur,
+  # et vitesse maximale (multiple de la vitesse choisie) quand il est loin derrière le joueur (le facteur décroît de ce maximum à 0 selon l'écart).
+  npc_wait_distance: 15
+  npc_max_speed_factor: 1.6
+  # Un seul format (YAML) : au chargement, chaque ancien fichier .nbt (quests.legacy_folder) sans YAML est converti en YAML
+  # puis renommé en .nbt.migrated (jamais supprimé). false = les .nbt restent lus tels quels ; legacy_import: false = ne plus les lire du tout.
+  legacy_import: true
+  legacy_migrate: true
+  # Boussole des quêtes (bossbar) : chaque texte accepte les balises <#rrggbb>, <green>, &a...
+  # Valeurs par défaut = ancienne boussole Skript ; une clé absente reprend sa valeur par défaut.
+  compass_display:
+    font: ""              # police Adventure du texte (ex. "minecraft:default", "monpack:boussole"), vide = police par défaut
+    half_window: 12       # cases affichées de chaque côté du regard (96 cases = 360°)
+    refresh_ticks: 2      # fréquence de rafraîchissement (pris en compte au redémarrage)
+    smooth_scroll: true   # un espace avant/après le texte selon le quart de case (défilement fin)
+    pitch_margin: 10      # écart de pitch (degrés) avant d'afficher la flèche haut/bas
+    bar_color: blue       # pink, blue, red, green, yellow, purple, white
+    zone_bar_color: green # couleur de la barre dans une zone de recherche
+    overlay: notched_6    # progress, notched_6, notched_10, notched_12, notched_20
+    letters:              # une par octant (le texte remplace la lettre, ex. "𝙉𝙊")
+      S: "<#ddddcc>𝙎"
+      SO: "<#ddddcc>𝙎𝙊"
+      O: "<#ddddcc>𝙊"
+      NO: "<#ddddcc>𝙉𝙊"
+      N: "<#ddddcc>𝙉"
+      NE: "<#ddddcc>𝙉𝙀"
+      E: "<#ddddcc>𝙀"
+      SE: "<#ddddcc>𝙎𝙀"
+    cells:
+      first: " <#ddddcc>· "   # case qui suit une lettre
+      quarter: "<#ddddcc>• "  # 1/4 et 3/4 d'un octant
+      half: "<#ddddcc>◈ "     # milieu d'un octant
+      plain: "<#ddddcc>· "
+    objective:              # sans couleur propre, le symbole prend la couleur de `colors`
+      level: "❖ "
+      up: "⮝ "
+      down: "⮟ "
+      zone: "&a◯"
+    colors: ["#ffaa00", "#00ff00", "#ff0000", "#00ffff", "#ffff00", "#8800ff", "#ffbbcc", "#3333ff", "#777777", "#886543", "#333333", "#ff6600", "#00aa88", "#aa00ff", "#aaff00", "#ff0088", "#0088ff", "#996600", "#00ff99", "#cc0000", "#4444aa"]

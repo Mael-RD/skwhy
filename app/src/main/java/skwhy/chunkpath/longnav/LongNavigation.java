@@ -29,7 +29,11 @@ import skwhy.chunkpath.pathfinding.GatePathfinder;
 import skwhy.modules.LongNavigationElements.ChunkPathManager;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +81,9 @@ public class LongNavigation {
         /** Reached the final destination. */
         ARRIVED,
         /** {@link GatePathfinder} could not find a route (missing registered chunks along the way). */
-        FAILED_NO_PATH
+        FAILED_NO_PATH,
+        /** Every player that watched this (virtual) entity is gone (offline, other world, too far): the navigation stopped. */
+        ABANDONED
     }
 
     // =========================================================================
@@ -97,7 +103,6 @@ public class LongNavigation {
     private static final double PROGRESS_EPSILON = 0.3; // blocks
     private static final double ARRIVAL_TOLERANCE = 3.0; // blocks, accepted as 'arrived' when the last steps cannot be walked
     private static final int MAX_LEG_SEARCHES_PER_TICK = 3; // A* budget shared by all navigations
-    private static final long ABSOLUTE_SYNC_INTERVAL_TICKS = 100L;
     private static final double REACHED_DISTANCE = 1.0; // blocks, horizontally, around a waypoint's block centre
 
     // reprise après une pause : l'entité a pu être déplacée pendant ce temps
@@ -123,7 +128,8 @@ public class LongNavigation {
     @SuppressWarnings("null")
     public static void tickAll() {
         REGISTRY.removeIf(nav -> {
-            boolean gone = nav.isRealEntity() && !nav.getEntity().isValid();
+            Entity bound = nav.isRealEntity() ? nav.getEntity() : null; // a virtually driven entity may unload: the client keeps its copy
+            boolean gone = bound != null && !bound.isValid();
             if (gone) {
                 nav.debug("entity no longer valid (dead, removed or its chunk unloaded): navigation dropped");
                 nav.releaseEntity();
@@ -182,7 +188,8 @@ public class LongNavigation {
     private void setStatus(Status newStatus, String why) {
         if (mob.isRealEntity()) {
             // vanilla behaviour only while the navigation is not actively driving the entity (a paused one is not)
-            if (newStatus == Status.IDLE || newStatus == Status.ARRIVED || newStatus == Status.FAILED_NO_PATH) {
+            if (newStatus == Status.IDLE || newStatus == Status.ARRIVED || newStatus == Status.FAILED_NO_PATH
+                    || newStatus == Status.ABANDONED) {
                 releaseEntity();
             } else if (!paused) {
                 takeOverEntity(mob.getEntity());
@@ -192,7 +199,21 @@ public class LongNavigation {
             debug(status + " -> " + newStatus + " (" + why + ") pos=" + fmt(mob.getLocation())
                     + " waypoint#" + waypointIndex + "=" + fmt(currentWaypointLocation()));
         }
+        Status previous = status;
         status = newStatus;
+        if (newStatus != previous && !isObserver()) fireEnd(newStatus);
+    }
+
+    /** Declares the end of the navigation (arrival, no route, last viewer gone) to the scripts. */
+    private void fireEnd(Status newStatus) {
+        if (newStatus == Status.ARRIVED && !mob.isRealEntity() && !players.isEmpty()) sendTeleportPacket(mob.getLocation()); // exact final position
+        org.bukkit.event.Event event = switch (newStatus) {
+            case ARRIVED -> new skwhy.chunkpath.longnav.event.LongNavigationEvent.Arrive(this);
+            case FAILED_NO_PATH -> new skwhy.chunkpath.longnav.event.LongNavigationEvent.Fail(this);
+            case ABANDONED -> new skwhy.chunkpath.longnav.event.LongNavigationEvent.Abandon(this);
+            default -> null;
+        };
+        if (event != null) org.bukkit.Bukkit.getPluginManager().callEvent(event);
     }
 
     /** Blocks at the mob's feet and around the node it is heading to (debug of a stalled walk). */
@@ -263,7 +284,9 @@ public class LongNavigation {
     private long lastProgressTick;
     private int stuckLevel;
     private float lastSentYaw = Float.NaN;
-    private long lastAbsoluteSyncTick;
+    private int movesSinceSync;   // relative move packets sent since the last absolute position
+    private boolean hadViewers;   // a virtual navigation had at least one watcher (see checkViewers)
+    private final Entity boundEntity; // real entity shown moving to the viewers only (virtual drive), null otherwise
     private Boolean previousGravity;
     private Boolean previousAware;
     private int legWaypoint = -1; // waypoint for which the mob's current leg path was computed
@@ -312,12 +335,30 @@ public class LongNavigation {
     /** Entité virtuelle ; {@code customRules} {@code null} = aucune règle (pas de marche). */
     public LongNavigation(int entityId, Vector hitbox, Location location, float speed, List<Player> players,
                           PathCostRules customRules) {
+        this(entityId, hitbox, location, speed, players, customRules, null);
+    }
+
+    private LongNavigation(int entityId, Vector hitbox, Location location, float speed, List<Player> players,
+                           PathCostRules customRules, Entity bound) {
+        admit(entityId, false, players);
         this.world = location.getWorld();
         this.customCostRules = customRules;
+        this.boundEntity = bound;
         this.mob = new LongMob(this, entityId, hitbox, location, speed, customRules);
         this.startLocation = location.clone();
         this.players = new ArrayList<>(players);
         register();
+    }
+
+    /**
+     * Entité réelle <b>pilotée virtuellement</b> : la navigation simule le trajet et envoie ses déplacements en packets
+     * aux {@code viewers} seulement ; côté serveur l'entité ne bouge pas. Les autres joueurs la voient toujours à sa
+     * place. Le client perd l'entité si elle sort de sa portée de suivi (côté serveur) : pour un long trajet, préférer
+     * une entité fictive (par id).
+     */
+    public static LongNavigation virtualOf(Entity entity, float speed, PathCostRules rules, List<Player> viewers) {
+        Vector hitbox = new Vector(entity.getWidth(), entity.getHeight(), entity.getWidth());
+        return new LongNavigation(entity.getEntityId(), hitbox, entity.getLocation(), speed, viewers, rules, entity);
     }
 
     /** Entité Bukkit réelle, sans règle de coût (elle ne marchera pas tant qu'on ne lui en donne pas). */
@@ -327,12 +368,61 @@ public class LongNavigation {
 
     /** Entité Bukkit réelle ; {@code customRules} {@code null} = aucune règle (pas de marche). */
     public LongNavigation(Entity entity, float speed, PathCostRules customRules) {
+        if (!(entity instanceof Player)) admit(entity.getEntityId(), true, List.of());
         this.world = entity.getWorld();
         this.customCostRules = customRules;
+        this.boundEntity = null;
         this.mob = new LongMob(this, entity, speed, customRules);
         this.startLocation = entity.getLocation();
         this.players = new ArrayList<>();
         register();
+    }
+
+    /** Applique {@link NavigationGuard} ; lève {@link NavigationGuard.Refused} si la navigation n'est pas permise. */
+    private static void admit(int entityId, boolean driving, Collection<Player> viewers) {
+        if (LongNavSettings.allowMultiple) return;
+        String why = NavigationGuard.refusal(entryOf(entityId, driving, viewers), entries());
+        if (why != null) throw new NavigationGuard.Refused(why);
+    }
+
+    private static NavigationGuard.Entry entryOf(int entityId, boolean driving, Collection<Player> viewers) {
+        Set<UUID> ids = new HashSet<>();
+        for (Player p : viewers) ids.add(p.getUniqueId());
+        return new NavigationGuard.Entry(entityId, driving, ids);
+    }
+
+    private static List<NavigationGuard.Entry> entries() {
+        List<NavigationGuard.Entry> list = new ArrayList<>();
+        synchronized (REGISTRY) {
+            for (LongNavigation nav : REGISTRY) {
+                if (nav.isObserver()) continue;
+                list.add(entryOf(nav.getEntityId(), nav.isRealEntity(), nav.players));
+            }
+        }
+        return list;
+    }
+
+    /**
+     * La long navigation de l'entité d'id {@code entityId} (réelle, virtuelle ou fictive), ou {@code null}. Avec
+     * {@code long_navigation.allow_multiple} et plusieurs navigations, écrit une erreur en console et renvoie la première créée.
+     */
+    public static LongNavigation of(int entityId) {
+        List<LongNavigation> found = allOf(entityId);
+        if (found.isEmpty()) return null;
+        if (found.size() > 1) {
+            SkWhy.getInstance().getLogger().severe("[ChunkPath] " + found.size() + " long navigations sur l'entité " + entityId
+                    + " : 'long navigation of' renvoie la première créée (toutes : 'all long navigations of').");
+        }
+        return found.get(0);
+    }
+
+    /** Toutes les navigations de l'entité d'id {@code entityId}, de la plus ancienne à la plus récente. */
+    public static List<LongNavigation> allOf(int entityId) {
+        List<LongNavigation> found = new ArrayList<>();
+        synchronized (REGISTRY) {
+            for (LongNavigation nav : REGISTRY) if (nav.getEntityId() == entityId) found.add(nav);
+        }
+        return found;
     }
 
     /** Règles de coût utilisées par cette navigation, ou {@code null} si aucune n'a été donnée (pas de règle par défaut). */
@@ -359,9 +449,10 @@ public class LongNavigation {
 
     public void tick() {
         if (isObserver()) return; // a player is never moved: this navigation only answers questions (see pathBlocks)
+        if (!checkViewers()) return;
         if (pauseTicks == PAUSED_INDEFINITELY) { paused = true; return; }
         if (pauseTicks > 0) { pauseTicks--; paused = true; return; }
-        if (status == Status.IDLE || status == Status.ARRIVED || status == Status.FAILED_NO_PATH) {
+        if (status == Status.IDLE || status == Status.ARRIVED || status == Status.FAILED_NO_PATH || status == Status.ABANDONED) {
             mob.getDoors().tickIdle();
             return;
         }
@@ -408,10 +499,35 @@ public class LongNavigation {
                 PacketEvents.getAPI().getPlayerManager().sendPacket(p, head);
             }
         }
-        if (now - lastAbsoluteSyncTick >= ABSOLUTE_SYNC_INTERVAL_TICKS) {
-            lastAbsoluteSyncTick = now;
-            sendTeleportPacket(loc);
+    }
+
+    /**
+     * A virtual navigation (packets only) has watchers: those who went away (offline, another world, beyond their view
+     * distance) are dropped. Once the last one is gone the navigation stops at once ({@link Status#ABANDONED}).
+     * Watchers added later by a script are fine: a navigation that never had any is not abandoned.
+     *
+     * @return false when the navigation ended on this call
+     */
+    private boolean checkViewers() {
+        if (mob.isRealEntity()) return true;
+        if (!players.isEmpty()) hadViewers = true;
+        if (!hadViewers) return true;
+        Location at = mob.getLocation();
+        players.removeIf(p -> !isWatching(p, at));
+        if (!players.isEmpty()) return true;
+        if (status != Status.ARRIVED && status != Status.FAILED_NO_PATH && status != Status.ABANDONED) {
+            mob.getNavigation().stop();
+            setStatus(Status.ABANDONED, "no viewer left");
         }
+        return false;
+    }
+
+    private boolean isWatching(Player p, Location at) {
+        if (!p.isOnline() || !p.getWorld().equals(at.getWorld())) return false;
+        double range = Math.max(2, p.getViewDistance()) * 16.0;
+        double dx = p.getLocation().getX() - at.getX();
+        double dz = p.getLocation().getZ() - at.getZ();
+        return dx * dx + dz * dz <= range * range;
     }
 
     private java.io.PrintWriter traceOut;
@@ -1487,8 +1603,31 @@ public class LongNavigation {
     public void   setSpeed(float s)   { mob.setSpeed(s); }
 
     public List<Player> getPlayers()       { return Collections.unmodifiableList(players); }
-    public void setPlayers(List<Player> p) { players.clear(); players.addAll(p); }
-    public void addPlayer(Player p)        { if (!players.contains(p)) players.add(p); }
+    public void setPlayers(List<Player> p) {
+        List<Player> previous = new ArrayList<>(players);
+        players.clear();
+        try {
+            for (Player each : p) addPlayer(each);
+        } catch (NavigationGuard.Refused e) {
+            players.clear();
+            players.addAll(previous);
+            throw e;
+        }
+    }
+
+    public void addPlayer(Player p) {
+        if (players.contains(p)) return;
+        if (!LongNavSettings.allowMultiple && !isObserver() && !mob.isRealEntity()) {
+            List<NavigationGuard.Entry> others = new ArrayList<>();
+            for (NavigationGuard.Entry e : entries()) {
+                boolean self = e.entityId() == getEntityId() && !e.driving() && e.viewers().equals(entryOf(getEntityId(), false, players).viewers());
+                if (!self) others.add(e);
+            }
+            String why = NavigationGuard.refusal(entryOf(getEntityId(), false, List.of(p)), others);
+            if (why != null) throw new NavigationGuard.Refused(why);
+        }
+        players.add(p);
+    }
     public void removePlayer(Player p)     { players.remove(p); }
 
     public int  getPauseTicks()      { return pauseTicks; }
@@ -1525,16 +1664,29 @@ public class LongNavigation {
         invalidatePreview();
     }
 
+    /** See {@link LongMob#pathSmoothing()}. */
+    public double getPathSmoothing() { return mob.pathSmoothing(); }
+
+    /** Smoothing of the followed position in blocks (0 = off). The current leg is walked again with it. */
+    public void setPathSmoothing(double blocks) {
+        mob.setPathSmoothing(blocks);
+        rejoinResume = null;
+        legWaypoint = -1;
+        mob.getNavigation().stop();
+    }
+
     /** Number of times the walk had to be cut short by moving the entity (should stay 0 on a healthy walk). */
     public int getForcedTeleports() { return forcedTeleports; }
 
-    public Entity  getEntity()    { return mob.getEntity(); }
+    public Entity  getEntity()    { return boundEntity != null ? boundEntity : mob.getEntity(); }
     public boolean isRealEntity() { return mob.isRealEntity(); }
 
     public Status getStatus() { return status; }
 
     /** Envoie un packet de téléportation aux joueurs abonnés (entité fictive uniquement). */
     public void sendTeleportPacket(Location loc) {
+        movesSinceSync = 0;
+        skwhy.chunkpath.debug.PacketLog.teleport("long", mob.getId(), loc, mob.getLocation(), players);
         WrapperPlayServerEntityTeleport packet = new WrapperPlayServerEntityTeleport(
                 mob.getId(),
                 new com.github.retrooper.packetevents.protocol.world.Location(
@@ -1548,10 +1700,19 @@ public class LongNavigation {
 
     /** Envoie un packet de mouvement relatif aux joueurs abonnés (voir {@link skwhy.pathfinder.Navigation#sendMovePacket}). */
     public void sendMovePacket(Vector movement) {
-        short dx = (short) Math.round(movement.getX() * 4096);
-        short dy = (short) Math.round(movement.getY() * 4096);
-        short dz = (short) Math.round(movement.getZ() * 4096);
-        WrapperPlayServerEntityRelativeMove packet = new WrapperPlayServerEntityRelativeMove(mob.getId(), dx, dy, dz, mob.onGround());
+        if (++movesSinceSync >= LongNavSettings.syncEveryMoves) { // regular absolute position: the relative packets round
+            sendTeleportPacket(mob.getLocation());
+            return;
+        }
+        // The wrapper takes BLOCKS and applies the 4096 factor (short) itself: never pre-multiply.
+        // Beyond ±8 blocks a relative packet overflows: absolute teleport instead.
+        if (Math.abs(movement.getX()) >= 7.9 || Math.abs(movement.getY()) >= 7.9 || Math.abs(movement.getZ()) >= 7.9) {
+            sendTeleportPacket(mob.getLocation());
+            return;
+        }
+        skwhy.chunkpath.debug.PacketLog.move("long", mob.getId(), movement.getX(), movement.getY(), movement.getZ(), mob.getLocation(), players);
+        WrapperPlayServerEntityRelativeMove packet = new WrapperPlayServerEntityRelativeMove(
+                mob.getId(), movement.getX(), movement.getY(), movement.getZ(), mob.onGround());
         for (Player p : players) {
             PacketEvents.getAPI().getPlayerManager().sendPacket(p, packet);
         }

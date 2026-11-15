@@ -15,6 +15,8 @@ public final class QuestProgress {
     public int step = -1;
     public final Map<Integer, Object> progress = new LinkedHashMap<>();
     public final Map<String, Object> variables = new LinkedHashMap<>();
+    /** Variables supprimées depuis la dernière écriture dans le NBT du joueur. */
+    public final java.util.Set<String> removedVariables = new java.util.LinkedHashSet<>();
     public boolean rewardClaimed;
 
     /** Valeur du compteur de l'objectif (le total demandé quand il est terminé). */

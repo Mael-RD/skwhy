@@ -25,6 +25,8 @@ dependencies {
     // API REST (certificat)
     implementation("org.bouncycastle:bcpkix-jdk18on:1.78")
     implementation("org.bouncycastle:bcprov-jdk18on:1.78")
+    // Certificat Let's Encrypt automatique (ACME, DNS-01 via l'API OVH)
+    implementation("org.shredzone.acme4j:acme4j-client:3.5.1")
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -69,7 +71,11 @@ tasks.jar {
 val pluginVersion = project.version.toString()
 
 tasks.processResources {
-    expand("version" to pluginVersion)
+    // Seuls ces fichiers contiennent ${version} ; les autres (éditeur web : JS/HTML) ne doivent pas être interprétés
+    val version = pluginVersion
+    filesMatching(listOf("plugin.yml", "lang/default.lang")) {
+        expand("version" to version)
+    }
 }
 
 tasks {

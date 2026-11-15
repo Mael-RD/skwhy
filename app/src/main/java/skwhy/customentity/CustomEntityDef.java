@@ -16,7 +16,8 @@ public final class CustomEntityDef {
     public record RawMetadata(int index, String type, Object value) {}
 
     private static final List<String> SLOTS = List.of("main_hand", "off_hand", "head", "chest", "legs", "feet", "body");
-    private static final List<String> RAW_TYPES = List.of("byte", "int", "long", "float", "string", "boolean");
+    private static final List<String> RAW_TYPES = List.of("byte", "int", "long", "float", "string", "boolean",
+        "cat_variant", "wolf_variant", "frog_variant");
 
     private final String id;
     private final String type;
@@ -24,6 +25,7 @@ public final class CustomEntityDef {
     private Map<String, Object> source = new LinkedHashMap<>();
     private String name;
     private String ai;
+    private boolean aiGoals = true;
     private boolean nameVisible = true;
     private double scale = 1.0;
     private boolean glowing;
@@ -49,6 +51,11 @@ public final class CustomEntityDef {
     public String name() { return name; }
     /** Type du mob dont l'IA vanilla pilote l'entité (sans namespace), ou {@code null} pour une entité immobile. */
     public String ai() { return ai; }
+    /**
+     * {@code false} = le mob d'IA n'a ni buts vanille (errance, regard) ni cibles : il ne fait que subir la physique et suivre
+     * {@code make custom entity walk to}. Sert aux entités pilotées par script (un zombie ne s'en prend plus au joueur).
+     */
+    public boolean aiGoals() { return aiGoals; }
     public boolean nameVisible() { return nameVisible; }
     public double scale() { return scale; }
     public boolean glowing() { return glowing; }
@@ -86,6 +93,7 @@ public final class CustomEntityDef {
             ai = ai.trim().toLowerCase(Locale.ROOT);
             def.ai = ai.startsWith("minecraft:") ? ai.substring("minecraft:".length()) : ai;
         }
+        def.aiGoals = bool(tree.get("ai_goals"), true);
         def.nameVisible = bool(tree.get("name_visible"), true);
         def.scale = number(tree.get("scale"), 1.0);
         if (def.scale <= 0 || def.scale > 16) {
@@ -142,7 +150,7 @@ public final class CustomEntityDef {
     public static String kindOf(String path) {
         return switch (path) {
             case "scale", "hitbox.width", "hitbox.height" -> "number";
-            case "name_visible", "glowing", "invisible", "silent", "on_fire" -> "boolean";
+            case "name_visible", "glowing", "invisible", "silent", "on_fire", "ai_goals" -> "boolean";
             case "type", "name", "ai", "skin.value", "skin.signature" -> "text";
             default -> {
                 if (path.startsWith("equipment.") && SLOTS.contains(path.substring("equipment.".length()))) yield "text";
@@ -163,7 +171,7 @@ public final class CustomEntityDef {
 
     /** Chemins de paramètres fixes (hors {@code equipment.*} et {@code metadata.*}), pour les messages d'erreur. */
     public static List<String> fixedPaths() {
-        return List.of("type", "ai", "name", "name_visible", "scale", "glowing", "invisible", "silent", "on_fire",
+        return List.of("type", "ai", "ai_goals", "name", "name_visible", "scale", "glowing", "invisible", "silent", "on_fire",
             "hitbox.width", "hitbox.height", "skin.value", "skin.signature");
     }
 
@@ -248,6 +256,7 @@ public final class CustomEntityDef {
             case "type" -> type;
             case "name" -> name;
             case "ai" -> ai;
+            case "ai_goals" -> aiGoals;
             case "name_visible" -> nameVisible;
             case "scale" -> scale;
             case "glowing" -> glowing;

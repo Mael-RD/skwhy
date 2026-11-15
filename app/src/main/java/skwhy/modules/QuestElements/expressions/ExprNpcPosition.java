@@ -16,7 +16,9 @@ import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
+import skwhy.customentity.CustomEntity;
 import skwhy.quest.QuestRegistry;
+import skwhy.quest.npc.CustomNpcBodies;
 import skwhy.quest.model.NpcEntityRef;
 import skwhy.quest.model.QuestNpc;
 import skwhy.quest.npc.NpcService;
@@ -25,7 +27,8 @@ import skwhy.quest.npc.NpcService;
 @Description("A quest NPC can stand at several places (positions 1, 2, 3...) and a player sees it at one of them. " +
     "'quest npc position of <npc> for <player>' is the position that player sees: setting it moves the NPC for this player at once " +
     "(use 'move quest npc' for a walk). 'quest npc position of <entity>' is the position an entity stands for (1 by default); " +
-    "setting it re-binds the entity to the same NPC at another position. Positions start at 1.")
+    "setting it re-binds the entity to the same NPC at another position (and records where it stands as that position). It works with custom entities, real or fake. " +
+    "Positions start at 1.")
 @Examples({
     "set quest npc position of quest npc \"maire\" for player to 2",
     "send \"%quest npc position of quest npc \"maire\" for player%\"",
@@ -55,8 +58,7 @@ public class ExprNpcPosition extends SimpleExpression<Integer> {
             if (npc == null || player == null) return null;
             return new Integer[]{ NpcService.position(player, npc) };
         }
-        Entity entity = (Entity) source.getSingle(event);
-        NpcEntityRef ref = entity == null ? null : QuestRegistry.refOf(entity.getUniqueId());
+        NpcEntityRef ref = ExprQuestNpc.refOf(source.getSingle(event));
         return ref == null ? null : new Integer[]{ ref.position() };
     }
 
@@ -75,10 +77,11 @@ public class ExprNpcPosition extends SimpleExpression<Integer> {
             if (npc != null && player != null) NpcService.setPosition(player, npc, position);
             return;
         }
-        Entity entity = (Entity) source.getSingle(event);
-        NpcEntityRef ref = entity == null ? null : QuestRegistry.refOf(entity.getUniqueId());
+        Object target = source.getSingle(event);
+        NpcEntityRef ref = ExprQuestNpc.refOf(target);
         if (ref == null) return;
-        QuestRegistry.bindEntity(entity.getUniqueId(), new NpcEntityRef(ref.npcId(), ref.entityUuid(), position, ref.world(), ref.x(), ref.y(), ref.z()));
+        if (target instanceof Entity entity) QuestRegistry.bind(entity, ref.npcId(), position);
+        else if (target instanceof CustomEntity custom) CustomNpcBodies.bind(custom, ref.npcId(), position);
     }
 
     @Override
@@ -99,7 +102,7 @@ public class ExprNpcPosition extends SimpleExpression<Integer> {
             SyntaxRegistry.EXPRESSION,
             SyntaxInfo.Expression.builder(ExprNpcPosition.class, Integer.class)
                 .addPattern("quest npc position of %questnpc% for %offlineplayer%")
-                .addPattern("quest npc position of %entity%")
+                .addPattern("quest npc position of %entity/customentity%")
                 .build()
         );
     }

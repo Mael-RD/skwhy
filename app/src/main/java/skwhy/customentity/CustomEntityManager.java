@@ -58,6 +58,11 @@ public final class CustomEntityManager implements Listener {
     private static final double HIDE_MARGIN = 8.0;
 
     private static CustomEntityManager instance;
+    /**
+     * Filtre de visibilité par joueur posé par d'autres modules (ex. les NPC de quêtes ne se montrent qu'à la position que voit
+     * le joueur) : une entité que ce filtre refuse n'est pas envoyée à ce joueur. Il survit à un redémarrage du gestionnaire.
+     */
+    private static volatile java.util.function.BiPredicate<CustomEntity, Player> visibility = (entity, player) -> true;
 
     private final SkWhy plugin;
     private final NamespacedKey key;
@@ -113,6 +118,16 @@ public final class CustomEntityManager implements Listener {
     }
 
     public static CustomEntityManager get() { return instance; }
+
+    /** Pose le filtre de visibilité (voir {@link #visibility}) ; {@code null} le retire. */
+    public static void visibilityFilter(java.util.function.BiPredicate<CustomEntity, Player> filter) {
+        visibility = filter == null ? (entity, player) -> true : filter;
+    }
+
+    /** Réapplique le filtre de visibilité aux entités fausses (les réelles suivent le suivi des joueurs, que le filtre pilote par hideEntity). */
+    public void refreshVisibility() {
+        for (CustomEntity entity : fakes) refreshViewers(entity);
+    }
 
     public CustomEntityRegistry registry() { return registry; }
 
@@ -451,12 +466,12 @@ public final class CustomEntityManager implements Listener {
         Location at = locationOf(entity);
         if (at == null || at.getWorld() == null || !at.getWorld().isChunkLoaded(at.getBlockX() >> 4, at.getBlockZ() >> 4)) return null;
         CustomEntityBrain brain = brains.get(entity);
-        if (brain != null && (!brain.type().equals(ai) || brain.isDead() || !brain.world().equals(at.getWorld()))) {
+        if (brain != null && (!brain.type().equals(ai) || brain.goals() != def.aiGoals() || brain.isDead() || !brain.world().equals(at.getWorld()))) {
             discardBrain(entity);
             brain = null;
         }
         if (brain == null) {
-            brain = CustomEntityBrain.create(ai, at, plugin.getLogger());
+            brain = CustomEntityBrain.create(ai, def.aiGoals(), at, plugin.getLogger());
             if (brain == null) {
                 entity.failedAi(ai);
                 return null;
@@ -519,7 +534,7 @@ public final class CustomEntityManager implements Listener {
     private void show(CustomEntity entity, Player player) {
         CustomEntityDef def = defOf(entity);
         Location at = locationOf(entity);
-        if (def == null || at == null || entity.isDestroyed()) return;
+        if (def == null || at == null || entity.isDestroyed() || !visibility.test(entity, player)) return;
         if (!entity.viewers().add(player.getUniqueId())) return;
         CustomEntityPackets.send(player, CustomEntityPackets.show(entity, def, at));
         entity.markSent(at);
@@ -559,7 +574,7 @@ public final class CustomEntityManager implements Listener {
             boolean sameWorld = p.getWorld().equals(at.getWorld());
             double distance = sameWorld ? p.getLocation().distanceSquared(at) : Double.MAX_VALUE;
             if (entity.isViewedBy(p)) {
-                if (!sameWorld || distance > hide * hide) hide(entity, p);
+                if (!sameWorld || distance > hide * hide || !visibility.test(entity, p)) hide(entity, p);
             } else if (sameWorld && distance <= show * show) {
                 show(entity, p);
             }

@@ -27,7 +27,7 @@ import skwhy.quest.npc.NpcService;
 
 @Name("[Quest] Make Quest NPC Look At")
 @Description("Turns the head and body of a quest NPC towards an entity or a location, for the given players only (the real entity does not move). " +
-    "Every entity of the NPC that is loaded turns, at all its positions.")
+    "Every entity of the NPC that is loaded turns, at all its positions (real entities, real custom entities with their visual, and fake custom entities).")
 @Examples({
     "make quest npc \"maire\" look at player for player",
     "make quest npc \"maire\" face location(0, 70, 0) for all players"
@@ -68,17 +68,20 @@ public class EffNpcLook extends Effect {
         if (look == null) return;
         for (NpcEntityRef ref : QuestRegistry.entityRefs()) {
             if (!ref.npcId().equals(npc.id())) continue;
-            Entity entity = NpcService.entity(ref);
-            if (entity == null) continue;
-            Location from = entity.getLocation();
+            NpcService.Body body = NpcService.body(ref);
+            if (body == null) continue;
+            Location from = body.location();
             double dx = look.getX() - from.getX();
             double dz = look.getZ() - from.getZ();
-            double dy = look.getY() - (from.getY() + entity.getHeight() * 0.9);
+            double dy = look.getY() - (from.getY() + body.height() * 0.9);
             float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
             float pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz)));
+            boolean onGround = body.entity() == null || body.entity().isOnGround();
             for (Player player : playersExpr.getArray(event)) {
-                PacketEvents.getAPI().getPlayerManager().sendPacket(player, new WrapperPlayServerEntityRotation(entity.getEntityId(), yaw, pitch, entity.isOnGround()));
-                PacketEvents.getAPI().getPlayerManager().sendPacket(player, new WrapperPlayServerEntityHeadLook(entity.getEntityId(), yaw));
+                for (int id : body.lookIds()) {
+                    PacketEvents.getAPI().getPlayerManager().sendPacket(player, new WrapperPlayServerEntityRotation(id, yaw, pitch, onGround));
+                    PacketEvents.getAPI().getPlayerManager().sendPacket(player, new WrapperPlayServerEntityHeadLook(id, yaw));
+                }
             }
         }
     }

@@ -9,7 +9,18 @@ import org.skriptlang.skript.registration.SyntaxRegistry;
 import ch.njol.skript.lang.util.SimpleEvent;
 
 import skwhy.SkWhy;
+import skwhy.modules.ApiElements.ApiClientService;
+import skwhy.modules.ApiElements.conditions.CondApiSuccess;
+import skwhy.modules.ApiElements.effects.EffSendApiCall;
 import skwhy.modules.ApiElements.effects.ReplyToRequest;
+import skwhy.modules.ApiElements.expressions.ExprApiHeaderNames;
+import skwhy.modules.ApiElements.expressions.ExprApiKeyed;
+import skwhy.modules.ApiElements.expressions.ExprApiStatus;
+import skwhy.modules.ApiElements.expressions.ExprApiTime;
+import skwhy.modules.ApiElements.expressions.ExprNewApiCall;
+import skwhy.modules.ApiElements.sections.SecNewApiCall;
+import skwhy.modules.ApiElements.sections.SecSendApiCall;
+import skwhy.modules.ApiElements.types.ApiClientTypes;
 import skwhy.modules.ApiElements.events.API_request_event;
 import skwhy.modules.ApiElements.expressions.RequestContent;
 import skwhy.modules.ApiElements.types.API_request;
@@ -33,6 +44,7 @@ public class APIModule implements AddonModule {
     @Override
     public void init(SkriptAddon addon) {
         API_request.register();
+        ApiClientTypes.register();
     }
 
     // load() : sections, effets, conditions, expressions
@@ -80,14 +92,41 @@ public class APIModule implements AddonModule {
 
         RequestContent.register(addon);
         ReplyToRequest.register(addon);
+
+        // ── 4. Client HTTP (requêtes sortantes, since 1.6.1) ──
+        ApiClientService.start();
+        ExprNewApiCall.register(addon);
+        ExprApiHeaderNames.register(addon); // avant ExprApiKeyed : « api header names of » ne doit pas être lu comme « api header %string% of »
+        ExprApiKeyed.register(addon);
+        ExprApiStatus.register(addon);
+        ExprApiTime.register(addon);
+        CondApiSuccess.register(addon);
+        SecNewApiCall.register(addon);
+        SecSendApiCall.register(addon);
+        EffSendApiCall.register(addon);
     }
 
     /**
      * À appeler depuis onDisable() du plugin principal.
      */
     public static void shutdown() {
+        ApiClientService.stop();
         if (apiServer != null) {
             apiServer.stop();
         }
+    }
+
+    /** Arrête l'API REST (le serveur HTTP ne se ferme que si l'éditeur ne l'utilise plus non plus). */
+    public static void stopHttp() {
+        if (apiServer != null) apiServer.stop();
+    }
+
+    /** Redémarre l'API REST avec la config courante ; sans effet si le module API est désactivé. */
+    public static boolean startHttp() {
+        return apiServer != null && apiServer.start();
+    }
+
+    public static boolean isHttpRunning() {
+        return apiServer != null && apiServer.isStarted();
     }
 }

@@ -427,7 +427,13 @@ public final class QuestEngine {
         QuestVariableChangeEvent event = new QuestVariableChangeEvent(player, quest, name, old, result);
         Bukkit.getPluginManager().callEvent(event);
         if (event.isCancelled()) return false;
-        if (result == null) p.variables.remove(name); else p.variables.put(name, result);
+        if (result == null) {
+            p.variables.remove(name);
+            p.removedVariables.add(name);
+        } else {
+            p.variables.put(name, result);
+            p.removedVariables.remove(name);
+        }
         data.markDirty();
         recheckSpecials(player, "variable");
         return true;

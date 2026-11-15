@@ -22,7 +22,7 @@ import skwhy.customentity.CustomEntityManager;
 @Description("Makes custom entities walk to a location with the vanilla pathfinding of their AI mob (the 'ai' parameter, see 'custom entity parameter'): " +
     "same navigation, same obstacles, doors and jumps as the mob would have. The speed is a multiplier of the walking speed of the mob (1 by default). " +
     "Real and fake custom entities are driven the same way. Nothing happens for an entity without AI, in a chunk that is not loaded, or when no path exists. " +
-    "'stop walking' cancels the walk; the AI goals of the mob (wandering, chasing players...) go on.")
+    "'stop walking' cancels the walk; the AI goals of the mob (wandering, chasing players...) go on unless the entity has 'ai_goals: false'.")
 @Examples({
     "make custom entity {_pet} walk to location of player",
     "make custom entity {_pet} walk to {_target} at speed 1.5",

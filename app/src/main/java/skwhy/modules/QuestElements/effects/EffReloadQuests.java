@@ -60,7 +60,10 @@ public class EffReloadQuests extends Effect {
     protected void execute(Event event) {
         String id = idExpr == null ? null : idExpr.getSingle(event);
         switch (mode) {
-            case 0, 2 -> QuestRegistry.reloadAll();
+            case 0, 2 -> {
+                QuestRegistry.reloadAll();
+                if (mode == 0) skwhy.quest.npc.CompassService.reloadStyle();
+            }
             case 1 -> { if (id != null) QuestRegistry.reloadQuest(id); }
             case 3 -> { if (id != null) QuestRegistry.reloadNpc(id); }
             default -> QuestStore.saveDirty();

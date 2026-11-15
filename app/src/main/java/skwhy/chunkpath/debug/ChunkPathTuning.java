@@ -43,6 +43,8 @@ public final class ChunkPathTuning {
     public static volatile double crossMargin = 4.0;
     /** Records the position of every long navigation in plugins/SkWhy/traces. */
     public static volatile boolean trace = false;
+    /** Logs every entity packet sent by the navigations to the console. */
+    public static volatile boolean packets = false;
 
     private ChunkPathTuning() {}
 
@@ -65,6 +67,7 @@ public final class ChunkPathTuning {
         map.put("crosscost", String.valueOf(crossCost));
         map.put("crossmargin", String.valueOf(crossMargin));
         map.put("trace", String.valueOf(trace));
+        map.put("packets", String.valueOf(packets));
         return map;
     }
 
@@ -89,6 +92,7 @@ public final class ChunkPathTuning {
                 case "crosscost" -> crossCost = Double.parseDouble(value);
                 case "crossmargin" -> crossMargin = Double.parseDouble(value);
                 case "trace" -> trace = value.equals("on") || value.equals("true");
+                case "packets" -> packets = value.equals("on") || value.equals("true");
                 default -> { return "clé inconnue : " + key + " (" + String.join(", ", describe().keySet()) + ")"; }
             }
         } catch (NumberFormatException e) {

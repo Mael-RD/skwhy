@@ -28,7 +28,7 @@ public record ScriptContext(OfflinePlayer player, ScriptSet scripts, QuestNpc np
     /** Position du NPC pour ce joueur (1 par défaut). */
     public int npcPosition() {
         if (npc == null) return 1;
-        skwhy.quest.model.NpcEntityRef ref = entity == null ? null : skwhy.quest.QuestRegistry.refOf(entity.getUniqueId());
+        skwhy.quest.model.NpcEntityRef ref = entity == null ? null : skwhy.quest.QuestRegistry.refOf(entity);
         if (ref != null) return ref.position();
         return skwhy.quest.data.QuestStore.get(player.getUniqueId()).npcPosition(npc.id());
     }

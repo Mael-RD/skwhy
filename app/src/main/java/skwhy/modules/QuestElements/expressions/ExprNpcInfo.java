@@ -47,7 +47,7 @@ public class ExprNpcInfo extends SimpleExpression<Object> {
             case 0 -> new Object[]{ npc.id() };
             case 1, 2 -> new Object[]{ npc.displayName() };
             case 3 -> npc.type() == null ? null : new Object[]{ npc.type() };
-            default -> new Object[]{ npc.positions().size() };
+            default -> new Object[]{ skwhy.quest.QuestRegistry.places(npc).size() };
         };
     }
 

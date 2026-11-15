@@ -12,8 +12,6 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import skwhy.quest.data.PlayerQuestData;
-import skwhy.quest.data.QuestProgress;
 import skwhy.quest.model.ObjectiveType;
 import skwhy.quest.model.Quest;
 import skwhy.quest.model.QuestDestination;
@@ -158,49 +156,5 @@ class QuestModelTest {
         assertEquals(QuestIndicator.MAIN, QuestIndicator.fromLegacy(1));
         assertEquals(QuestIndicator.NONE, QuestIndicator.fromLegacy(-1));
         assertEquals(QuestIndicator.REGION, QuestIndicator.parse("contrée"));
-    }
-
-    @Test
-    void playerDataRoundTripsThroughATree() {
-        PlayerQuestData data = new PlayerQuestData(java.util.UUID.randomUUID());
-        data.selected = "chasse";
-        data.categories.add("villes");
-        data.metNpcs.add("maire");
-        data.knownNames.add("maire");
-        data.npcPositions.put("maire", 3);
-        data.dialogues.put("action1", "suite");
-        data.compass = true;
-        data.filterState = "start";
-        QuestProgress progress = new QuestProgress();
-        progress.status = QuestStatus.STARTED;
-        progress.step = 2;
-        progress.progress.put(0, Boolean.TRUE);
-        progress.progress.put(1, 4);
-        progress.variables.put("kills", 7);
-        progress.variables.put("note", "ok");
-        progress.rewardClaimed = true;
-        data.quests.put("chasse", progress);
-
-        PlayerQuestData copy = PlayerQuestData.fromTree(data.uuid, data.toTree());
-        assertEquals("chasse", copy.selected);
-        assertEquals(List.of("villes"), copy.categories);
-        assertTrue(copy.metNpcs.contains("maire"));
-        assertTrue(copy.knownNames.contains("maire"));
-        assertEquals(3, copy.npcPosition("maire"));
-        assertEquals(1, copy.npcPosition("inconnu"));
-        assertEquals("suite", copy.dialogues.get("action1"));
-        assertTrue(copy.compass);
-        assertEquals("start", copy.filterState);
-        QuestProgress p = copy.quests.get("chasse");
-        assertNotNull(p);
-        assertEquals(QuestStatus.STARTED, p.status);
-        assertEquals(2, p.step);
-        assertTrue(p.isDone(0));
-        assertEquals(4, p.count(1, 10));
-        assertEquals(10, p.count(0, 10));
-        assertEquals(7, p.variables.get("kills"));
-        assertEquals("ok", p.variables.get("note"));
-        assertTrue(p.rewardClaimed);
-        assertEquals(QuestStatus.UNKNOWN, copy.status("autre"));
     }
 }
